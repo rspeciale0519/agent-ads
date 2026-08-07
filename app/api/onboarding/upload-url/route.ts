@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { uploadRequestSchema } from "../../../../lib/onboarding-schema";
 import { getStorageBucket, getSupabaseAdmin } from "../../../../lib/supabase-admin";
+import { getSupabaseServer } from "../../../../lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -9,9 +10,13 @@ export async function POST(request: Request) {
   const parsed = uploadRequestSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Check the file name, type, and size." }, { status: 400 });
 
+  const authClient = await getSupabaseServer();
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: "Sign in to upload business files." }, { status: 401 });
+
   const { submissionId, fileName, contentType } = parsed.data;
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-");
-  const storagePath = `onboarding/${submissionId}/${crypto.randomUUID()}-${safeName}`;
+  const storagePath = `onboarding/${user.id}/${submissionId}/${crypto.randomUUID()}-${safeName}`;
   try {
     const supabase = getSupabaseAdmin();
     const bucket = getStorageBucket();

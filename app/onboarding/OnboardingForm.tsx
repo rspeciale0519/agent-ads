@@ -8,9 +8,14 @@ import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, isAllowedUpload } from "../../lib/u
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { AttachmentStatus, FormData, initialFormData, OnboardingAttachment, OrganicChannel, PaidChannel, StepId } from "./types";
 
-const STORAGE_KEY = "agent-ads-pilot-onboarding-draft";
+const STORAGE_KEY_PREFIX = "agent-ads-pilot-onboarding-draft";
 
-export default function OnboardingForm() {
+type OnboardingFormProps = {
+  applicantId: string;
+  applicantEmail: string;
+};
+
+export default function OnboardingForm({ applicantId, applicantEmail }: OnboardingFormProps) {
   const [form, setForm] = useState<FormData>(initialFormData);
   const [stepIndex, setStepIndex] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -20,23 +25,24 @@ export default function OnboardingForm() {
   const [uploadError, setUploadError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const storageKey = useMemo(() => `${STORAGE_KEY_PREFIX}:${applicantId}`, [applicantId]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const stored = window.localStorage.getItem(storageKey);
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as Partial<FormData>;
         const attachments = Array.isArray(parsed.attachments) ? parsed.attachments.map((attachment) => ({ ...attachment, status: attachment.status === "uploaded" ? "uploaded" : "error", error: attachment.status === "uploaded" ? undefined : "Upload needs to be restarted." })) as OnboardingAttachment[] : [];
         setForm({ ...initialFormData, ...parsed, attachments });
       } catch {
-        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(storageKey);
       }
     }
-    const storedSubmissionId = window.localStorage.getItem(`${STORAGE_KEY}-id`) || crypto.randomUUID();
-    window.localStorage.setItem(`${STORAGE_KEY}-id`, storedSubmissionId);
+    const storedSubmissionId = window.localStorage.getItem(`${storageKey}-id`) || crypto.randomUUID();
+    window.localStorage.setItem(`${storageKey}-id`, storedSubmissionId);
     setSubmissionId(storedSubmissionId);
     setHydrated(true);
-  }, []);
+  }, [storageKey]);
 
   const currentStep = steps[stepIndex];
   const completion = useMemo(() => Math.round(((stepIndex + 1) / steps.length) * 100), [stepIndex]);
@@ -86,7 +92,7 @@ export default function OnboardingForm() {
   };
 
   const saveDraft = () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+    window.localStorage.setItem(storageKey, JSON.stringify(form));
     setSaved(true);
   };
 
@@ -145,8 +151,8 @@ export default function OnboardingForm() {
       const response = await fetch("/api/onboarding/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId, form: formPayload, attachments }) });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "We could not send your onboarding.");
-      window.localStorage.removeItem(STORAGE_KEY);
-      window.localStorage.removeItem(`${STORAGE_KEY}-id`);
+      window.localStorage.removeItem(storageKey);
+      window.localStorage.removeItem(`${storageKey}-id`);
       setComplete(true);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "We could not send your onboarding. Please try again.");
@@ -161,6 +167,11 @@ export default function OnboardingForm() {
     else next();
   };
 
+  const signOut = async () => {
+    await getSupabaseBrowser().auth.signOut();
+    window.location.assign("/auth");
+  };
+
   if (!hydrated) return <div className="loading-screen"><span className="loading-orb"><Icon name="spark" /></span><p>Preparing your marketing workspace…</p></div>;
   if (complete) return <SuccessState businessName={form.businessName} />;
 
@@ -172,7 +183,7 @@ export default function OnboardingForm() {
       <div className="sidebar-footer"><span className="mini-avatar">M</span><span><strong>Prepared for your marketing team</strong><small>Private · takes about 8 minutes</small></span></div>
     </aside>
     <section className="onboarding-main">
-      <header className="topbar"><div className="mobile-brand"><span className="brand-orb"><Icon name="spark" size={16} /></span>MioDio<span className="brand-dot">.</span></div><div className="topbar-actions"><button type="button" className="save-button" onClick={saveDraft}>{saved ? <><Icon name="check" size={15} /> Saved</> : "Save and finish later"}</button><button type="button" className="help-button" aria-label="Get help"><Icon name="help" size={18} /></button></div></header>
+      <header className="topbar"><div className="mobile-brand"><span className="brand-orb"><Icon name="spark" size={16} /></span>MioDio<span className="brand-dot">.</span></div><div className="topbar-actions"><span className="account-email">{applicantEmail}</span><button type="button" className="save-button" onClick={saveDraft}>{saved ? <><Icon name="check" size={15} /> Saved</> : "Save and finish later"}</button><button type="button" className="sign-out-button" onClick={() => void signOut()}>Sign out</button><button type="button" className="help-button" aria-label="Get help"><Icon name="help" size={18} /></button></div></header>
       <div className="main-content"><div className="progress-mobile"><span>Step {stepIndex + 1} of {steps.length}</span><div><span style={{ width: `${completion}%` }} /></div></div><form onSubmit={handleSubmit}><StepPanels form={form} activeStep={currentStep.id} setField={setField} toggleChannel={toggleChannel} goTo={goTo} onFilesSelected={handleFilesSelected} removeAttachment={removeAttachment} uploadError={uploadError} />{submitError && <p className="submit-error" role="alert">{submitError}</p>}<footer className="form-footer"><div className="footer-trust"><Icon name="lock" size={15} /><span>Your answers are private and used only to prepare your marketing workspace.</span></div><div className="footer-actions">{stepIndex > 0 && <button type="button" className="back-button" onClick={() => setStepIndex((index) => index - 1)}><Icon name="back" size={16} />Back</button>}{stepIndex < steps.length - 1 ? <button type="button" className="primary-button" onClick={next}>Continue <Icon name="arrow" size={16} /></button> : <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting}>{submitting ? "Sending…" : "Send onboarding"} {!submitting && <Icon name="arrow" size={16} />}</button>}</div></footer></form></div>
     </section>
   </main>;

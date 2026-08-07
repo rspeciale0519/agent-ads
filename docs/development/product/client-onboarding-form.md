@@ -119,4 +119,4 @@ The form must state:
 
 ## Current implementation boundary
 
-The current build includes the visual flow, client-side validation, channel selection, browser draft behavior, signed private uploads, durable Supabase submission storage, and Resend staff notification wiring. Before collecting real client data, it still needs the authenticated expiring invitation/resume model, rate limiting/bot protection, malware scanning, attachment review state, and retention/correction/export/deletion operations described above.
+The current build includes the visual flow, client-side validation, channel selection, email-confirmed Supabase Auth accounts, cookie-based sessions, applicant-scoped browser drafts, protected API routes, signed private uploads, durable applicant-owned Supabase submission storage, and Resend staff notification wiring. Before collecting real client data, it still needs the authenticated expiring invitation/resume model, rate limiting/bot protection, malware scanning, attachment review state, and retention/correction/export/deletion operations described above.
