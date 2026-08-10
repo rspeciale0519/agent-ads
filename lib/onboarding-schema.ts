@@ -3,23 +3,24 @@ import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, isAllowedUpload } from "./upload-ru
 
 const paidChannels = ["Meta Ads", "Google Ads", "Microsoft Advertising", "LinkedIn Ads", "TikTok Ads", "Reddit Ads", "X Ads"] as const;
 const organicChannels = ["LinkedIn", "X", "Instagram", "TikTok", "Facebook", "YouTube", "Reddit"] as const;
+export const ONBOARDING_LONG_TEXT_MAX_LENGTH = 5000;
 
 export const onboardingFormSchema = z.object({
   businessName: z.string().trim().min(1, "Enter the business name.").max(180, "Keep the business name under 180 characters."),
   website: z.string().trim().min(1, "Enter the business website.").url("Enter a full website address, including https://").max(500, "Keep the website address under 500 characters."),
-  description: z.string().trim().max(4000, "Keep the offer and audience description under 4,000 characters."),
+  description: z.string().trim().max(ONBOARDING_LONG_TEXT_MAX_LENGTH, "Keep the offer and audience description at 5,000 characters or fewer."),
   locations: z.string().trim().max(1000, "Keep the markets and service areas under 1,000 characters."),
   businessModel: z.enum(["B2B", "B2C", "B2B2C", "Other", ""], { error: "Choose a valid business model." }),
   primaryGoal: z.enum(["qualified-leads", "revenue", "pipeline", "awareness", "retention", ""], { error: "Choose a valid primary marketing outcome." }),
-  goalDetails: z.string().trim().max(4000, "Keep the promotion and audience details under 4,000 characters."),
+  goalDetails: z.string().trim().max(ONBOARDING_LONG_TEXT_MAX_LENGTH, "Keep the promotion and audience details at 5,000 characters or fewer."),
   monthlyBudget: z.string().trim().max(500, "Keep the monthly media budget under 500 characters."),
   qualifiedOutcome: z.string().trim().min(1, "Describe what counts as a qualified lead or conversion.").max(2000, "Keep the qualified result description under 2,000 characters."),
   salesCycle: z.string().trim().max(500, "Keep the sales cycle under 500 characters."),
   paidChannels: z.array(z.enum(paidChannels, { error: "Choose a supported paid media channel." })).max(paidChannels.length, "Choose only the supported paid media channels."),
   organicChannels: z.array(z.enum(organicChannels, { error: "Choose a supported organic content channel." })).max(organicChannels.length, "Choose only the supported organic content channels."),
   brandVoice: z.string().trim().max(100, "Choose a supported brand voice."),
-  prohibitedTopics: z.string().trim().max(4000, "Keep the claims and topics to avoid under 4,000 characters."),
-  existingAssets: z.string().trim().max(4000, "Keep the existing assets description under 4,000 characters."),
+  prohibitedTopics: z.string().trim().max(ONBOARDING_LONG_TEXT_MAX_LENGTH, "Keep the claims and topics to avoid at 5,000 characters or fewer."),
+  existingAssets: z.string().trim().max(ONBOARDING_LONG_TEXT_MAX_LENGTH, "Keep the existing assets description at 5,000 characters or fewer."),
   crm: z.string().trim().max(120, "Choose a supported CRM or lead system."),
   analytics: z.string().trim().max(120, "Choose a supported web analytics option."),
   revenueSource: z.string().trim().max(120, "Choose a supported revenue or commerce source."),

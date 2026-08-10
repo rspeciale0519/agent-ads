@@ -42,8 +42,8 @@ export function TextInput({ value, onChange, placeholder, type = "text", id, nam
   return <input id={id} name={name} type={type} value={value} placeholder={placeholder} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid} onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)} />;
 }
 
-export function TextArea({ value, onChange, placeholder, rows = 4, id, name, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid }: { value: string; onChange: (value: string) => void; placeholder?: string; rows?: number; id?: string; name?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) {
-  return <textarea id={id} name={name} value={value} placeholder={placeholder} rows={rows} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} />;
+export function TextArea({ value, onChange, placeholder, rows = 4, maxLength, id, name, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid }: { value: string; onChange: (value: string) => void; placeholder?: string; rows?: number; maxLength?: number; id?: string; name?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) {
+  return <textarea id={id} name={name} value={value} placeholder={placeholder} rows={rows} maxLength={maxLength} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} />;
 }
 
 export function ChoiceCard({ selected, title, description, onClick, icon }: { selected: boolean; title: string; description: string; onClick: () => void; icon: string }) {
