@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { organicChannels, paidChannels, steps } from "./data";
 import { StepPanels } from "./StepPanels";
 import { Icon } from "./ui";
+import styles from "./validation.module.css";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, isAllowedUpload } from "../../lib/upload-rules";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
+import { formatOnboardingValidationIssues, onboardingSubmissionSchema, type OnboardingValidationField, type OnboardingValidationIssue } from "../../lib/onboarding-schema";
 import { AttachmentStatus, FormData, initialFormData, OnboardingAttachment, OrganicChannel, PaidChannel, StepId } from "./types";
 
 const STORAGE_KEY_PREFIX = "agent-ads-pilot-onboarding-draft";
@@ -24,6 +26,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   const [submissionId, setSubmissionId] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [validationIssues, setValidationIssues] = useState<OnboardingValidationIssue[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const storageKey = useMemo(() => `${STORAGE_KEY_PREFIX}:${applicantId}`, [applicantId]);
 
@@ -44,11 +47,25 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     setHydrated(true);
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!hydrated || complete) return;
+    const timeout = window.setTimeout(() => {
+      window.localStorage.setItem(storageKey, JSON.stringify(form));
+      setSaved(true);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [complete, form, hydrated, storageKey]);
+
   const currentStep = steps[stepIndex];
   const completion = useMemo(() => Math.round(((stepIndex + 1) / steps.length) * 100), [stepIndex]);
 
+  const clearValidationIssues = (...fields: OnboardingValidationField[]) => {
+    setValidationIssues((current) => current.filter((issue) => !fields.includes(issue.field)));
+  };
+
   const setField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((previous) => ({ ...previous, [key]: value }));
+    if (key !== "attachments") clearValidationIssues(key);
     setSaved(false);
   };
 
@@ -56,10 +73,12 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     if (kind === "paid") {
       const next = form.paidChannels.includes(channel as PaidChannel) ? form.paidChannels.filter((item) => item !== channel) : [...form.paidChannels, channel as PaidChannel];
       setField("paidChannels", next);
+      clearValidationIssues("paidChannels", "organicChannels");
       return;
     }
     const next = form.organicChannels.includes(channel as OrganicChannel) ? form.organicChannels.filter((item) => item !== channel) : [...form.organicChannels, channel as OrganicChannel];
     setField("organicChannels", next);
+    clearValidationIssues("paidChannels", "organicChannels");
   };
 
   const goTo = (step: StepId) => {
@@ -67,25 +86,35 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     if (index >= 0) setStepIndex(index);
   };
 
-  const validateStep = () => {
-    if (currentStep.id === "business" && (!form.businessName.trim() || !form.website.trim())) return "Add the business name and website so we can understand your offer and market.";
-    if (currentStep.id === "goals" && (!form.primaryGoal || !form.qualifiedOutcome.trim())) return "Choose a primary marketing outcome and define what a qualified result means.";
-    if (currentStep.id === "channels" && form.paidChannels.length === 0 && form.organicChannels.length === 0) return "Select at least one paid media or organic content channel to continue.";
-    return null;
+  const getSubmissionPayload = () => {
+    const { attachments, ...formPayload } = form;
+    return { submissionId, form: formPayload, attachments };
   };
 
-  const validateForm = () => {
-    if (!form.businessName.trim() || !form.website.trim()) return "Add the business name and website so we can understand your offer and market.";
-    if (!form.primaryGoal || !form.qualifiedOutcome.trim()) return "Choose a primary marketing outcome and define what a qualified result means.";
-    if (form.paidChannels.length === 0 && form.organicChannels.length === 0) return "Select at least one paid media or organic content channel to continue.";
-    if (form.attachments.some((attachment) => attachment.status !== "uploaded")) return "Wait for every file to finish uploading, or remove the file that needs attention.";
-    return null;
+  const getValidationIssues = () => {
+    const parsed = onboardingSubmissionSchema.safeParse(getSubmissionPayload());
+    return parsed.success ? [] : formatOnboardingValidationIssues(parsed.error);
+  };
+
+  const focusValidationIssue = (issue: OnboardingValidationIssue) => {
+    goTo(issue.step);
+    window.setTimeout(() => {
+      const container = document.querySelector<HTMLElement>(`[data-validation-field="${issue.field}"]`);
+      container?.scrollIntoView({ behavior: "smooth", block: "center" });
+      container?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
+    }, 0);
+  };
+
+  const showValidationIssues = (issues: OnboardingValidationIssue[]) => {
+    setValidationIssues(issues);
+    setSubmitError("");
+    if (issues[0]) focusValidationIssue(issues[0]);
   };
 
   const next = () => {
-    const error = validateStep();
-    if (error) {
-      window.alert(error);
+    const issues = getValidationIssues().filter((issue) => issue.step === currentStep.id);
+    if (issues.length > 0) {
+      showValidationIssues(issues);
       return;
     }
     setStepIndex((index) => Math.min(index + 1, steps.length - 1));
@@ -98,6 +127,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
 
   const updateAttachment = (id: string, patch: Partial<OnboardingAttachment>) => {
     setForm((previous) => ({ ...previous, attachments: previous.attachments.map((attachment) => attachment.id === id ? { ...attachment, ...patch } : attachment) }));
+    clearValidationIssues("attachments");
     setSaved(false);
   };
 
@@ -135,21 +165,27 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
 
   const removeAttachment = (id: string) => {
     setForm((previous) => ({ ...previous, attachments: previous.attachments.filter((attachment) => attachment.id !== id) }));
+    clearValidationIssues("attachments");
     setSaved(false);
   };
 
   const submit = async () => {
-    const error = validateForm();
-    if (error) {
-      setSubmitError(error);
+    saveDraft();
+    const issues = getValidationIssues();
+    if (issues.length > 0) {
+      showValidationIssues(issues);
       return;
     }
+    setValidationIssues([]);
     setSubmitError("");
     setSubmitting(true);
-    const { attachments, ...formPayload } = form;
     try {
-      const response = await fetch("/api/onboarding/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId, form: formPayload, attachments }) });
-      const data = await response.json() as { error?: string };
+      const response = await fetch("/api/onboarding/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(getSubmissionPayload()) });
+      const data = await response.json() as { error?: string; validationIssues?: OnboardingValidationIssue[] };
+      if (!response.ok && data.validationIssues?.length) {
+        showValidationIssues(data.validationIssues);
+        return;
+      }
       if (!response.ok) throw new Error(data.error || "We could not send your onboarding.");
       window.localStorage.removeItem(storageKey);
       window.localStorage.removeItem(`${storageKey}-id`);
@@ -168,6 +204,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   };
 
   const signOut = async () => {
+    saveDraft();
     await getSupabaseBrowser().auth.signOut();
     window.location.assign("/auth");
   };
@@ -175,7 +212,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   if (!hydrated) return <div className="loading-screen"><span className="loading-orb"><Icon name="spark" /></span><p>Preparing your marketing workspace…</p></div>;
   if (complete) return <SuccessState businessName={form.businessName} />;
 
-  return <main className="onboarding-shell">
+  return <main className={`${styles.validationScope} onboarding-shell`}>
     <aside className="onboarding-sidebar">
       <div className="brand-lockup"><span className="brand-orb"><Icon name="spark" size={19} /></span><span>MioDio<span className="brand-dot">.</span></span></div>
       <div className="sidebar-intro"><span className="sidebar-kicker">Digital marketing pilot</span><h2>Let’s build your AI marketing system.</h2><p>We’ll use what you share to configure an AI agent-driven digital marketing system that understands your business, creates campaigns, publishes content, measures results, and keeps you in control.</p></div>
@@ -184,9 +221,13 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     </aside>
     <section className="onboarding-main">
       <header className="topbar"><div className="mobile-brand"><span className="brand-orb"><Icon name="spark" size={16} /></span>MioDio<span className="brand-dot">.</span></div><div className="topbar-actions"><span className="account-email">{applicantEmail}</span><button type="button" className="save-button" onClick={saveDraft}>{saved ? <><Icon name="check" size={15} /> Saved</> : "Save and finish later"}</button><button type="button" className="sign-out-button" onClick={() => void signOut()}>Sign out</button><button type="button" className="help-button" aria-label="Get help"><Icon name="help" size={18} /></button></div></header>
-      <div className="main-content"><div className="progress-mobile"><span>Step {stepIndex + 1} of {steps.length}</span><div><span style={{ width: `${completion}%` }} /></div></div><form onSubmit={handleSubmit}><StepPanels form={form} activeStep={currentStep.id} setField={setField} toggleChannel={toggleChannel} goTo={goTo} onFilesSelected={handleFilesSelected} removeAttachment={removeAttachment} uploadError={uploadError} />{submitError && <p className="submit-error" role="alert">{submitError}</p>}<footer className="form-footer"><div className="footer-trust"><Icon name="lock" size={15} /><span>Your answers are private and used only to prepare your marketing workspace.</span></div><div className="footer-actions">{stepIndex > 0 && <button type="button" className="back-button" onClick={() => setStepIndex((index) => index - 1)}><Icon name="back" size={16} />Back</button>}{stepIndex < steps.length - 1 ? <button type="button" className="primary-button" onClick={next}>Continue <Icon name="arrow" size={16} /></button> : <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting}>{submitting ? "Sending…" : "Send onboarding"} {!submitting && <Icon name="arrow" size={16} />}</button>}</div></footer></form></div>
+      <div className="main-content"><div className="progress-mobile"><span>Step {stepIndex + 1} of {steps.length}</span><div><span style={{ width: `${completion}%` }} /></div></div><form noValidate onSubmit={handleSubmit}><StepPanels form={form} activeStep={currentStep.id} setField={setField} toggleChannel={toggleChannel} goTo={goTo} onFilesSelected={handleFilesSelected} removeAttachment={removeAttachment} uploadError={uploadError} validationIssues={validationIssues} />{validationIssues.length > 0 && <ValidationSummary issues={validationIssues} onSelect={focusValidationIssue} />}{submitError && <p className="submit-error" role="alert">{submitError}</p>}<footer className="form-footer"><div className="footer-trust"><Icon name="lock" size={15} /><span>Your answers are private and used only to prepare your marketing workspace.</span></div><div className="footer-actions">{stepIndex > 0 && <button type="button" className="back-button" onClick={() => setStepIndex((index) => index - 1)}><Icon name="back" size={16} />Back</button>}{stepIndex < steps.length - 1 ? <button type="button" className="primary-button" onClick={next}>Continue <Icon name="arrow" size={16} /></button> : <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting}>{submitting ? "Sending…" : "Send onboarding"} {!submitting && <Icon name="arrow" size={16} />}</button>}</div></footer></form></div>
     </section>
   </main>;
+}
+
+function ValidationSummary({ issues, onSelect }: { issues: OnboardingValidationIssue[]; onSelect: (issue: OnboardingValidationIssue) => void }) {
+  return <section className="validation-summary" role="alert" aria-labelledby="validation-summary-title"><strong id="validation-summary-title">{issues.length} {issues.length === 1 ? "answer needs" : "answers need"} attention</strong><p>Your progress is saved. Select a field below to complete or correct it.</p><ul>{issues.map((issue) => <li key={issue.field}><button type="button" onClick={() => onSelect(issue)}><span>{issue.label}</span>{issue.message}</button></li>)}</ul></section>;
 }
 
 function SuccessState({ businessName }: { businessName: string }) {

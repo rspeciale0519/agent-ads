@@ -16,25 +16,34 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   return <svg {...common} aria-hidden="true">{paths[name] ?? paths.spark}</svg>;
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  const fieldId = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+type LabelledControlProps = {
+  id?: string;
+  name?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+};
+
+export function Field({ label, hint, fieldName, error, required = false, children }: { label: string; hint?: string; fieldName?: string; error?: string; required?: boolean; children: ReactNode }) {
+  const fieldId = fieldName ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const errorId = `${fieldId}-error`;
+  const labelId = `${fieldId}-label`;
   const labelable = Children.toArray(children).some((child) => isValidElement(child) && (child.type === TextInput || child.type === TextArea || child.type === "select"));
   const labelledChildren = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
     if (child.type === TextInput || child.type === TextArea || child.type === "select") {
-      return cloneElement(child as ReactElement<{ id?: string; name?: string }>, { id: fieldId, name: fieldId });
+      return cloneElement(child as ReactElement<LabelledControlProps>, { id: fieldId, name: fieldId, "aria-describedby": error ? errorId : undefined, "aria-invalid": Boolean(error) });
     }
     return child;
   });
-  return <div className="field"><div className="field-heading">{labelable ? <label htmlFor={fieldId}>{label}</label> : <span className="field-label">{label}</span>}{hint && <span>{hint}</span>}</div>{labelledChildren}</div>;
+  return <div className={`field ${error ? "field-invalid" : ""}`} data-validation-field={fieldName} role={labelable ? undefined : "group"} aria-labelledby={labelable ? undefined : labelId} aria-describedby={!labelable && error ? errorId : undefined} aria-invalid={!labelable ? Boolean(error) : undefined}><div className="field-heading">{labelable ? <label htmlFor={fieldId}>{label}</label> : <span id={labelId} className="field-label">{label}</span>}<span className="field-meta">{required && <span className="required-label">Required</span>}{hint && <span>{hint}</span>}</span></div>{labelledChildren}{error && <p id={errorId} className="field-error-message">{error}</p>}</div>;
 }
 
-export function TextInput({ value, onChange, placeholder, type = "text", id, name }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string; id?: string; name?: string }) {
-  return <input id={id} name={name} type={type} value={value} placeholder={placeholder} onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)} />;
+export function TextInput({ value, onChange, placeholder, type = "text", id, name, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string; id?: string; name?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) {
+  return <input id={id} name={name} type={type} value={value} placeholder={placeholder} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid} onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)} />;
 }
 
-export function TextArea({ value, onChange, placeholder, rows = 4, id, name }: { value: string; onChange: (value: string) => void; placeholder?: string; rows?: number; id?: string; name?: string }) {
-  return <textarea id={id} name={name} value={value} placeholder={placeholder} rows={rows} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} />;
+export function TextArea({ value, onChange, placeholder, rows = 4, id, name, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid }: { value: string; onChange: (value: string) => void; placeholder?: string; rows?: number; id?: string; name?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) {
+  return <textarea id={id} name={name} value={value} placeholder={placeholder} rows={rows} aria-describedby={ariaDescribedBy} aria-invalid={ariaInvalid} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} />;
 }
 
 export function ChoiceCard({ selected, title, description, onClick, icon }: { selected: boolean; title: string; description: string; onClick: () => void; icon: string }) {

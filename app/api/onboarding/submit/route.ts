@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { buildOnboardingEmail } from "../../../../lib/onboarding-email";
-import { onboardingSubmissionSchema } from "../../../../lib/onboarding-schema";
+import { formatOnboardingValidationIssues, onboardingSubmissionSchema } from "../../../../lib/onboarding-schema";
 import { getStorageBucket, getSupabaseAdmin } from "../../../../lib/supabase-admin";
 import { getSupabaseServer } from "../../../../lib/supabase-server";
 
@@ -10,7 +10,14 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = onboardingSubmissionSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Please complete the required fields and finish all file uploads." }, { status: 400 });
+  if (!parsed.success) {
+    const validationIssues = formatOnboardingValidationIssues(parsed.error);
+    const count = validationIssues.length;
+    const error = count > 0
+      ? `${count} ${count === 1 ? "field needs" : "fields need"} your attention before sending.`
+      : "Please check the form and finish all file uploads.";
+    return NextResponse.json({ error, validationIssues }, { status: 400 });
+  }
 
   const authClient = await getSupabaseServer();
   const { data: { user }, error: authError } = await authClient.auth.getUser();
