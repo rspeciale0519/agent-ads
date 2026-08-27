@@ -7,12 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "security:rls-audit": "node scripts/rls-audit.mjs",
+    "security:f0-schema": "node scripts/f0/fresh-migration-proof.mjs",
+    "security:f0-upgrade": "node scripts/f0/upgrade-proof.mjs",
+    "security:f0-schema-single": "node scripts/f0/single-user-migration-proof.mjs"
   },
   "dependencies": {
+    "@prisma/client": "6.19.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
-    "next": "^15.0.0",
+    "next": "^15.5.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.18.1",
@@ -24,7 +30,15 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.0.0",
-    "typescript": "^5.0.0"
+    "eslint-config-next": "^15.5.23",
+    "prisma": "6.19.3",
+    "typescript": "^5.0.0",
+    "vitest": "4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.23",
+      "sharp": "0.35.2"
+    }
   }
 }

@@ -1,0 +1,415 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public", "private"]
+}
+
+model Organization {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String                   @unique
+  status               String                   @default("active")
+  locale               String                   @default("en-US")
+  timeZone             String                   @default("UTC") @map("time_zone")
+  retentionDays        Int                      @default(365) @map("retention_days")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  memberships          Membership[]
+  invitations          OrganizationInvitation[]
+  connectionRequests   ConnectionRequest[]
+  connections          Connection[]
+  connectionResources  ConnectionResource[]
+  healthChecks         ConnectionHealthCheck[]
+  credentialReferences CredentialReference[]
+  auditEvents          AuditEvent[]
+  accessInvitations    AccessInvitation[]
+  idempotencyRecords   IdempotencyRecord[]
+
+  @@index([status, updatedAt])
+  @@map("organizations")
+  @@schema("public")
+}
+
+model AppUser {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  authSubject         String                   @unique @map("auth_subject") @db.Uuid
+  email               String?
+  displayName         String?                  @map("display_name")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  memberships         Membership[]
+  sentInvitations     OrganizationInvitation[] @relation("Inviter")
+  acceptedInvitations OrganizationInvitation[] @relation("Accepter")
+  createdRequests     ConnectionRequest[]      @relation("RequestCreator")
+  updatedRequests     ConnectionRequest[]      @relation("RequestUpdater")
+  createdConnections  Connection[]             @relation("ConnectionCreator")
+  auditEvents         AuditEvent[]
+  accessInvitations   AccessInvitation[]       @relation("AccessInvitationCreator")
+  idempotencyRecords  IdempotencyRecord[]
+
+  @@map("users")
+  @@schema("public")
+}
+
+model Membership {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           String
+  permissions    String[]
+  status         String       @default("active")
+  invitedAt      DateTime?    @map("invited_at")
+  acceptedAt     DateTime?    @map("accepted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           AppUser      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, status])
+  @@index([userId, status])
+  @@map("memberships")
+  @@schema("public")
+}
+
+model OrganizationInvitation {
+  id                   String       @id @default(uuid()) @db.Uuid
+  organizationId       String       @map("organization_id") @db.Uuid
+  inviterUserId        String       @map("inviter_user_id") @db.Uuid
+  recipientEmail       String       @map("recipient_email")
+  recipientAuthSubject String?      @map("recipient_auth_subject") @db.Uuid
+  tokenHash            String       @unique @map("token_hash")
+  role                 String       @default("member")
+  permissions          String[]
+  status               String       @default("pending")
+  expiresAt            DateTime     @map("expires_at")
+  acceptedAt           DateTime?    @map("accepted_at")
+  acceptedByUserId     String?      @map("accepted_by_user_id") @db.Uuid
+  revokedAt            DateTime?    @map("revoked_at")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  inviter              AppUser      @relation("Inviter", fields: [inviterUserId], references: [id], onDelete: Restrict)
+  accepter             AppUser?     @relation("Accepter", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, expiresAt])
+  @@index([recipientEmail, status])
+  @@index([inviterUserId])
+  @@index([acceptedByUserId])
+  @@map("organization_invitations")
+  @@schema("public")
+}
+
+model StepUpGrant {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  sessionId      String    @map("session_id")
+  actionClass    String    @map("action_class")
+  issuedAt       DateTime  @default(now()) @map("issued_at")
+  expiresAt      DateTime  @map("expires_at")
+  consumedAt     DateTime? @map("consumed_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([organizationId, userId, actionClass, expiresAt])
+  @@index([sessionId, expiresAt])
+  @@map("step_up_grants")
+  @@schema("private")
+}
+
+model ConnectionRequest {
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  createdByUserId  String       @map("created_by_user_id") @db.Uuid
+  updatedByUserId  String?      @map("updated_by_user_id") @db.Uuid
+  system           String
+  provider         String
+  product          String?
+  purpose          String       @default("inventory")
+  knownIdentifiers Json         @map("known_identifiers")
+  ownershipStatus  String       @map("ownership_status")
+  preferredMethod  String       @map("preferred_method")
+  state            String       @default("draft")
+  notes            String?
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy        AppUser      @relation("RequestCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy        AppUser?     @relation("RequestUpdater", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  connections      Connection[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, state, updatedAt])
+  @@index([organizationId, provider, createdAt])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@map("connection_requests")
+  @@schema("public")
+}
+
+model Connection {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  organizationId        String                  @map("organization_id") @db.Uuid
+  requestId             String?                 @map("request_id") @db.Uuid
+  createdByUserId       String                  @map("created_by_user_id") @db.Uuid
+  provider              String
+  product               String?
+  purpose               String                  @default("reporting")
+  authorizationMethod   String                  @map("authorization_method")
+  principal             String?
+  status                String                  @default("pending")
+  accessMode            String                  @default("read_only") @map("access_mode")
+  credentialReferenceId String?                 @map("credential_reference_id") @db.Uuid
+  grantedScopes         String[]                @map("granted_scopes")
+  effectiveRole         String?                 @map("effective_role")
+  expiresAt             DateTime?               @map("expires_at")
+  lastVerifiedAt        DateTime?               @map("last_verified_at")
+  archivedAt            DateTime?               @map("archived_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  request               ConnectionRequest?      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  createdBy             AppUser                 @relation("ConnectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  resources             ConnectionResource[]
+  healthChecks          ConnectionHealthCheck[]
+  capabilitySnapshots   CapabilitySnapshot[]
+  accessInvitations     AccessInvitation[]
+  credentialReferences       CredentialReference[] @relation("OwnedCredentialReferences")
+  currentCredentialReference CredentialReference?  @relation("CurrentCredentialReference", fields: [organizationId, id, credentialReferenceId], references: [organizationId, connectionId, id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, status, updatedAt])
+  @@index([organizationId, provider, createdAt])
+  @@index([requestId])
+  @@index([createdByUserId])
+  @@index([credentialReferenceId])
+  @@index([organizationId, credentialReferenceId])
+  @@map("connections")
+  @@schema("public")
+}
+
+model ConnectionResource {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  connectionId   String               @map("connection_id") @db.Uuid
+  resourceType   String               @map("resource_type")
+  displayName    String               @map("display_name")
+  externalId     String               @map("external_id")
+  metadata       Json?
+  selected       Boolean              @default(false)
+  eligibility    String               @default("unknown")
+  archivedAt     DateTime?            @map("archived_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection     Connection           @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  capabilities   CapabilitySnapshot[]
+
+  @@unique([organizationId, connectionId, resourceType, externalId])
+  @@unique([organizationId, id])
+  @@index([organizationId, selected, updatedAt])
+  @@map("connection_resources")
+  @@schema("public")
+}
+
+model CapabilitySnapshot {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @map("organization_id") @db.Uuid
+  connectionId     String              @map("connection_id") @db.Uuid
+  resourceId       String?             @map("resource_id") @db.Uuid
+  connectorVersion String              @map("connector_version")
+  capabilityKey    String              @map("capability_key")
+  supportLevel     String              @map("support_level")
+  limitation       String?
+  evidenceSource   String?             @map("evidence_source")
+  sourceDate       DateTime?           @map("source_date")
+  evidenceAt       DateTime            @map("evidence_at")
+  expiresAt        DateTime?           @map("expires_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  connection       Connection          @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  resource         ConnectionResource? @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, connectionId, evidenceAt])
+  @@index([resourceId])
+  @@map("capability_snapshots")
+  @@schema("public")
+}
+
+model RateLimitBucket {
+  keyHash         String   @id @map("key_hash")
+  organizationId  String?  @map("organization_id") @db.Uuid
+  windowStartedAt DateTime @map("window_started_at")
+  hitCount        Int      @map("hit_count")
+  expiresAt       DateTime @map("expires_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([expiresAt])
+  @@index([organizationId])
+  @@map("rate_limit_buckets")
+  @@schema("private")
+}
+
+model IdempotencyRecord {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  action         String
+  keyHash        String       @map("key_hash")
+  requestHash    String       @map("request_hash")
+  status         String       @default("pending")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  expiresAt      DateTime     @map("expires_at")
+  completedAt    DateTime?    @map("completed_at")
+  failedAt       DateTime?    @map("failed_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           AppUser      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId, action, keyHash])
+  @@index([organizationId, userId, expiresAt])
+  @@index([organizationId, status, updatedAt])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+  @@schema("private")
+}
+
+model ConnectionHealthCheck {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  connectionId    String       @map("connection_id") @db.Uuid
+  checkKind       String       @map("check_kind")
+  outcomeCode     String       @map("outcome_code")
+  checkedAt       DateTime     @default(now()) @map("checked_at")
+  latencyMs       Int?         @map("latency_ms")
+  remediationCode String?      @map("remediation_code")
+  diagnosticRef   String?      @map("diagnostic_ref")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection      Connection   @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, connectionId, checkedAt])
+  @@map("connection_health_checks")
+  @@schema("public")
+}
+
+model OAuthTransaction {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  connectionId         String?   @map("connection_id") @db.Uuid
+  provider             String
+  stateHash            String    @unique @map("state_hash")
+  pkceSecretReference  String?   @map("pkce_secret_reference")
+  returnPath           String    @map("return_path")
+  browserTransactionId String?   @map("browser_transaction_id")
+  status               String    @default("issued")
+  issuedAt             DateTime  @default(now()) @map("issued_at")
+  expiresAt            DateTime  @map("expires_at")
+  consumedAt           DateTime? @map("consumed_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  @@index([organizationId, userId, provider, status, expiresAt])
+  @@index([connectionId, status])
+  @@map("oauth_transactions")
+  @@schema("public")
+}
+
+model AccessInvitation {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @map("organization_id") @db.Uuid
+  connectionId       String?      @map("connection_id") @db.Uuid
+  createdByUserId    String       @map("created_by_user_id") @db.Uuid
+  provider           String
+  expectedPrincipal  String       @map("expected_principal")
+  externalAccountId  String?      @map("external_account_id")
+  instructions       String
+  status             String       @default("draft")
+  sentAt             DateTime?    @map("sent_at")
+  acceptedAt         DateTime?    @map("accepted_at")
+  verifiedAt         DateTime?    @map("verified_at")
+  expiresAt          DateTime?    @map("expires_at")
+  revokedAt          DateTime?    @map("revoked_at")
+  verificationSource String?      @map("verification_source")
+  sourceDate         DateTime?    @map("source_date")
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection         Connection?  @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  createdBy          AppUser      @relation("AccessInvitationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, expiresAt])
+  @@index([connectionId])
+  @@index([createdByUserId])
+  @@map("access_invitations")
+  @@schema("public")
+}
+
+model CredentialReference {
+  id                    String         @id @default(uuid()) @db.Uuid
+  organizationId        String         @map("organization_id") @db.Uuid
+  connectionId          String         @map("connection_id") @db.Uuid
+  brokerHandle          String         @unique @map("broker_handle")
+  backend               String
+  credentialKind        String         @map("credential_kind")
+  keyVersion            String         @map("key_version")
+  cleanupStatus         String         @default("active") @map("cleanup_status")
+  cleanupLeaseExpiresAt DateTime?      @map("cleanup_lease_expires_at")
+  expiresAt             DateTime?      @map("expires_at")
+  revokedAt             DateTime?      @map("revoked_at")
+  fingerprint           String?
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  connection            Connection     @relation("OwnedCredentialReferences", fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade)
+  currentForConnections Connection[]   @relation("CurrentCredentialReference")
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, connectionId, id])
+  @@index([organizationId, connectionId, cleanupStatus])
+  @@index([cleanupStatus, cleanupLeaseExpiresAt])
+  @@map("credential_references")
+  @@schema("private")
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  action         String
+  resourceType   String       @map("resource_type")
+  resourceId     String?      @map("resource_id")
+  correlationId  String       @map("correlation_id")
+  causationId    String?      @map("causation_id")
+  outcomeCode    String       @map("outcome_code")
+  metadata       Json
+  previousHash   String?      @map("previous_hash")
+  integrityHash  String       @map("integrity_hash")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor          AppUser?     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, resourceType, resourceId])
+  @@index([actorUserId])
+  @@map("audit_events")
+  @@schema("public")
+}
+
+model OnboardingSubmission {
+  id                 String    @id @db.Uuid
+  businessName       String    @map("business_name")
+  payload            Json
+  attachmentCount    Int       @map("attachment_count")
+  storageBucket      String    @map("storage_bucket")
+  notificationStatus String    @map("notification_status")
+  notificationError  String?   @map("notification_error")
+  submittedAt        DateTime  @map("submitted_at")
+  notificationSentAt DateTime? @map("notification_sent_at")
+  applicantId        String?   @map("applicant_id") @db.Uuid
+
+  @@map("onboarding_submissions")
+  @@schema("public")
+}
