@@ -1,8 +1,12 @@
 # Organic Publishing Specification
 
+> Status: expansion specification. Organic publishing does not block the sales-trainer pilot MVP.
+
 ## Objective
 
 Provide a unified but platform-native system for researching, creating, approving, scheduling, publishing, measuring, and learning from organic content across LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and authorized Reddit communities.
+
+The pilot can create website and CMS drafts through the separate AI Reach content workflow. It does not publish social content.
 
 ## Content hierarchy
 
@@ -132,9 +136,8 @@ The system recommends:
 
 ## Community management boundary
 
-The MVP may ingest comments and prepare reply drafts where authorized, but replies are a separate capability and approval class. Automated high-volume commenting, unsolicited interaction, or reputation-sensitive responses are not implied by organic publishing support.
+An expansion release may ingest comments and prepare reply drafts where authorized. Replies remain a separate capability and approval class.
 
 ## Minimum channel readiness gate
 
-A channel counts as MVP-ready when an eligible account can connect, expose capabilities, validate an applicable content type, publish an approved test item through an authorized route, reconcile terminal state, ingest available analytics, prevent duplicate delivery, surface a realistic failure, and honor the kill switch.
-
+A channel counts as expansion-ready after it passes connection, validation, approved publication, reconciliation, analytics, failure, duplication, and kill-switch tests.

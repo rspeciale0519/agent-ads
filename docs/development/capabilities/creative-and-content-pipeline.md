@@ -2,7 +2,9 @@
 
 ## Objective
 
-Create high-volume, platform-native marketing assets without losing factual grounding, brand consistency, rights provenance, human control, or experiment traceability.
+Create useful marketing content without losing factual grounding, originality, brand consistency, rights provenance, human control, or outcome traceability.
+
+The pilot focuses on website drafts that close an AI Reach or conversion gap. Broad social asset production is expansion work.
 
 ## Pipeline
 
@@ -34,6 +36,35 @@ May include:
 
 Every item records source, date, trust class, rights, and applicable organization.
 
+## Website and AI Reach content
+
+Pilot inputs can include:
+
+- approved sales-trainer expertise and first-hand examples;
+- existing website pages;
+- Search Console demand;
+- GA4 landing-page outcomes;
+- AI Reach answer and citation samples;
+- CRM objections and qualification outcomes;
+- approved claims, testimonials, offer details, and source evidence.
+
+The workflow is:
+
+```text
+AI Reach finding
+  -> opportunity
+  -> source brief
+  -> website draft
+  -> factual, brand, search, and policy validation
+  -> approval
+  -> CMS draft
+  -> subject review
+  -> later publication approval
+  -> reobservation
+```
+
+AI Reach owns the finding. The content domain owns the draft. The control plane owns approval and execution.
+
 ## Concept contract
 
 - Target audience and stage.
@@ -46,7 +77,7 @@ Every item records source, date, trust class, rights, and applicable organizatio
 - Differentiation from active concepts.
 - Risk and claim markers.
 
-## Multi-agent creative tournament
+## Multi-agent creative tournament — expansion
 
 For important campaigns, multiple bounded creative roles may generate alternatives. A separate reviewer compares them using an explicit rubric:
 
@@ -106,6 +137,17 @@ Every generated asset stores:
 
 - File type, dimensions, aspect ratio, duration, codec, size, safe zones, captions, and alt text.
 
+### Website and discovery
+
+- Content gives material value to a human reader.
+- Search intent matches the page purpose.
+- Claims and citations match approved evidence.
+- Canonical and index directives match the intended state.
+- Structured data matches visible page content.
+- Duplicate, thin, generic, and scaled low-value content is blocked.
+- The page stays accessible and usable.
+- The draft makes no ranking, citation, recommendation, or revenue promise.
+
 Failures produce explicit remediation; they are never silently removed from a creative.
 
 ## Editing and versioning
@@ -115,6 +157,7 @@ Failures produce explicit remediation; they are never silently removed from a cr
 - Approved versions are immutable.
 - Reuse creates a derivative with lineage, not a disconnected copy.
 - Corrections can be promoted to business context or skill eval cases.
+- Page body, title, metadata, structured data, internal links, human edits, CMS draft, and published snapshot keep separate versions.
 
 ## Creative performance model
 
@@ -128,4 +171,3 @@ Creative fatigue detection uses deterministic thresholds and uncertainty, includ
 - Strong paid concepts may inspire organic variants without copying an ad verbatim.
 - Shared source briefs and concept IDs permit cross-channel learning.
 - Each channel keeps separate execution, approval, and measurement.
-

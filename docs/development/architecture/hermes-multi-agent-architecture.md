@@ -1,8 +1,10 @@
 # Hermes Multi-Agent Architecture
 
+> Status: expansion target. The pilot uses one supervisor through the application-owned AI gateway. Hermes is not a pilot release gate.
+
 ## Role of Hermes
 
-Hermes is the chief marketing orchestrator and agent runtime. It coordinates specialist roles, skills, memory, schedules, and model/tool selection. It is not the authorization, policy, metric, credential, or execution authority.
+Hermes is the target runtime for later specialist coordination. It remains behind the application-owned gateway and never becomes an authority.
 
 ## Logical agent organization
 
@@ -28,7 +30,9 @@ flowchart TD
     ORG --> CH["LinkedIn, X, Instagram, TikTok, Facebook, YouTube, Reddit"]
 ```
 
-These are logical roles. The MVP may run several roles in one Hermes deployment, but each role has a distinct profile, task contract, tool allowlist, memory scope, and evaluation suite.
+These are expansion roles. Each added role needs a distinct profile, task contract, tool allowlist, memory scope, and evaluation suite.
+
+The pilot supervisor covers AI Reach, outcome briefings, drafts, and proposals until evidence justifies a split.
 
 ## Role contracts
 
@@ -224,7 +228,8 @@ Each role requires:
 
 A skill or model version cannot reach production when a critical policy, tenant, or side-effect test fails.
 
-## Initial deployment recommendation
+## Expansion deployment recommendation
 
-Use one Hermes chief orchestrator deployment with logical specialist profiles and isolated tool tokens. Split roles into separate services only when scale, security, cost, or evaluation evidence requires it. Maintain the contracts so physical separation does not change product behavior.
+Deploy Hermes only after a recorded workflow, quality, scale, or isolation trigger.
 
+Start with logical specialist profiles and isolated tool tokens. Split services only when scale, security, cost, or evaluation evidence requires it.

@@ -5,7 +5,11 @@
 - TypeScript strict mode and Zod validation at every trust boundary.
 - Version contracts explicitly; additive changes remain backward compatible within a version.
 - Never accept `organization_id`, authorization level, or credential reference from an agent as authoritative.
-- Every mutation accepts an idempotency key and correlation ID.
+- Every state-changing browser request carries validated `Idempotency-Key` and `X-Correlation-Id` headers. The client retains one pair in memory for an identical logical intent until success is confirmed or the user explicitly resets it.
+- Durable mutation claims are scoped to organization, authenticated application user, action, and an HMAC of the key. The ledger stores an HMAC of the canonical request plus safe state/timestamps, never a payload, response, grant, OAuth state, credential, or secret.
+- A reused key with different input fails. Pending, completed, and failed/unknown claims return stable reconciliation outcomes; sensitive responses are never replayed. The caller reads current state before deciding whether an explicit new mutation is safe.
+- Explicit non-ledger routes must prove equivalent one-time behavior: OAuth callbacks atomically consume short-lived provider/user/organization/browser-bound state; onboarding submission and upload use stable identifiers plus provider idempotency; onboarding draft save uses an applicant-bound stable submission ID and an atomic upsert that can update only the same applicant's unsent record; internal maintenance uses an authenticated, bounded, concurrency-safe cleanup function.
+- Onboarding draft save is a specific non-ledger invariant: an authenticated applicant supplies a stable submission ID, and one atomic upsert can update only that same applicant's unsent record. Submission and upload retain their stable identifiers and provider-idempotency boundary.
 - Errors use stable machine codes plus safe user-facing detail.
 - Large, sensitive, or raw payloads are referenced by authorized object IDs rather than embedded in events or prompts.
 
@@ -25,6 +29,31 @@
 - `POST /context/profile/versions/{version}/approve`
 - `POST /context/corrections`
 - `GET /offers`, `/audiences`, `/claims`, `/goals`
+
+### Conversations and briefings
+
+- `GET /conversations`
+- `POST /conversations`
+- `GET /conversations/{id}`
+- `POST /conversations/{id}/messages`
+- `POST /conversations/{id}/cancel-current-run`
+- `POST /conversations/{id}/retry-current-run`
+- `GET /briefings/latest`
+- `GET /briefings/{id}`
+- `POST /briefings/refresh`
+
+### AI Reach and website
+
+- `GET /ai-reach/snapshot`
+- `GET /ai-reach/question-sets`
+- `POST /ai-reach/question-sets`
+- `POST /ai-reach/question-sets/{id}/approve`
+- `POST /ai-reach/observation-runs`
+- `GET /ai-reach/observation-runs/{id}`
+- `GET /ai-reach/pages`
+- `GET /ai-reach/citations`
+- `GET /website-drafts/{id}`
+- `POST /website-drafts/{id}/proposal`
 
 ### Connections
 
@@ -128,6 +157,15 @@ Events are immutable facts. Consumers must be idempotent and tolerate redelivery
 - `connector.sync_failed.v1`
 - `data_quality.blocker_detected.v1`
 
+### AI Reach and briefings
+
+- `ai_reach.question_set_approved.v1`
+- `ai_reach.observation_run_completed.v1`
+- `ai_reach.assessment_ready.v1`
+- `briefing.ready.v1`
+- `website.draft_ready.v1`
+- `lead.follow_up_approved.v1`
+
 ### Campaigns and content
 
 - `campaign.plan_created.v1`
@@ -159,6 +197,21 @@ Events are immutable facts. Consumers must be idempotent and tolerate redelivery
 - `experiment.decision_boundary_reached.v1`
 - `experiment.concluded.v1`
 
+### Hosting, edge, and billing
+
+- `deployment.profile_approved.v1`
+- `deployment.provisioned.v1`
+- `deployment.drift_detected.v1`
+- `edge_connector.enrolled.v1`
+- `edge_connector.health_changed.v1`
+- `edge_connector.disabled.v1`
+- `entitlement.changed.v1`
+- `usage.recorded.v1`
+- `usage.corrected.v1`
+- `billing.reconciled.v1`
+- `organization.offboarding_started.v1`
+- `organization.offboarding_completed.v1`
+
 ## Agent-facing tool design
 
 Tool responses include `evidence_id`, source/freshness, tenant-scoped resource IDs, and machine-readable limitations. Tools never return secrets.
@@ -170,6 +223,12 @@ Tool responses include `evidence_id`, source/freshness, tenant-scoped resource I
 - `get_offer`
 - `get_audience`
 - `get_metric_snapshot`
+- `get_outcome_snapshot`
+- `get_ai_reach_snapshot`
+- `get_ai_reach_evidence`
+- `get_web_page_snapshot`
+- `get_search_performance`
+- `get_lead_outcomes`
 - `get_campaign_performance`
 - `get_content_performance`
 - `get_platform_capabilities`
@@ -191,7 +250,9 @@ Tool responses include `evidence_id`, source/freshness, tenant-scoped resource I
 ### Artifact and proposal tools
 
 - `submit_business_profile_proposal`
+- `submit_ai_reach_assessment`
 - `submit_recommendation`
+- `submit_web_content_draft`
 - `submit_cross_channel_plan`
 - `submit_platform_campaign_draft`
 - `submit_source_brief`
@@ -200,7 +261,7 @@ Tool responses include `evidence_id`, source/freshness, tenant-scoped resource I
 - `submit_experiment_design`
 - `request_action_proposal`
 
-There is intentionally no `run_sql`, `call_platform_api`, `publish_post`, `increase_budget`, or general shell tool in a production agent profile.
+There is intentionally no `run_sql`, `call_platform_api`, `publish_post`, `publish_page`, `send_email`, `pause_campaign`, `increase_budget`, or general shell tool in a production agent profile.
 
 ## Proposal action schema
 
@@ -251,9 +312,8 @@ External provider messages are preserved in restricted diagnostic storage and re
 ## Contract testing
 
 - Schema fixtures for every version.
-- Consumer-driven tests for UI, workers, Hermes tools, and connectors.
+- Consumer-driven tests for UI, jobs, AI-gateway tools, and connectors.
 - Replay tests against recorded redacted provider payloads.
 - Forward/backward compatibility tests for events.
 - Authorization tests for every endpoint and tool.
 - Idempotency tests for all mutations and event consumers.
-

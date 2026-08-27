@@ -8,6 +8,7 @@
 - Use immutable versions for policies, metric definitions, proposals, skills, and approved content.
 - Store platform payload references and external IDs without making provider schemas the domain model.
 - Use explicit state machines and append audit events; do not infer lifecycle only from nullable fields.
+- A foreign-key column must use the exact PostgreSQL type of the referenced primary key.
 
 ## Identity and tenancy
 
@@ -24,6 +25,26 @@ Fields: id, identity-provider subject, email, display name, MFA status, status.
 Fields: organization_id, user_id, role, custom permissions, status, invited_by, accepted_at.
 
 Roles: owner, administrator, strategist, creator, analyst, approver, viewer, system operator. Sensitive capabilities remain explicit permissions rather than role-name assumptions.
+
+### DeploymentProfile
+
+Fields: organization_id, profile type (`pooled`, `dedicated`, `hybrid`), customer-facing host, data/auth/storage provider, automation host, infrastructure ownership, optional AWS account ownership/reference, region, residency requirements, infrastructure version, support/SLA tier, edge-connector requirement, status, approved_by, activated_at, offboarding owner.
+
+Account identifiers and management-role references are sensitive operational metadata. They are never agent context unless a narrowly scoped diagnostic tool explicitly permits it.
+
+### PlanEntitlement
+
+Fields: organization_id, plan/version, capability, allowance, hard/soft limit, effective window, source contract, status, approved_by.
+
+### UsageEvent
+
+Fields: organization_id, meter, unit, quantity, source event/workflow/run, occurred_at, idempotency key, provider cost reference, price version, billable status, correction reference, invoice reference.
+
+Usage events are immutable. Corrections append offsetting or superseding records rather than rewriting billed history.
+
+### EdgeConnector
+
+Fields: organization_id, device identity, deployment profile, version, allowed job types, allowed destinations, credential references, last health, last audit upload, certificate expiry, status, enrolled_by, disabled_at.
 
 ## Business context
 
@@ -55,6 +76,32 @@ Fields: objective, primary metric definition, target, time window, budget, guard
 
 Fields: type, title, content reference, source, trust classification, effective date, review date, supersedes, status.
 
+### PilotScopeRecord
+
+Fields: organization_id, persona, primary outcome, website, required connections, optional connections, CRM stage map reference, enabled action classes, owners, approved_by, version, effective_at, status.
+
+Approved versions are immutable. A later version supersedes the old record.
+
+## Conversations and briefings
+
+### Conversation
+
+Fields: organization_id, title, created_by, business-context version, status, created_at, updated_at.
+
+### ConversationMessage
+
+Fields: conversation, actor type and identifier, safe content reference, evidence references, recommendation references, proposal references, provenance, created_at.
+
+### BriefingSnapshot
+
+Fields: organization_id, reporting window, goal version, metric-definition versions, data-quality state, summary, agent run, status, created_at.
+
+### BriefingRecommendation
+
+Fields: briefing, recommendation, display rank, selection reason.
+
+Each briefing has exactly three unique ranks: one, two, and three.
+
 ## Connections and capabilities
 
 ### Connection
@@ -74,6 +121,74 @@ Support levels: supported, read_only, provider_limited, account_ineligible, appr
 ### SyncCursor
 
 Fields: connector, account, resource, cursor/window, watermark, last success, last error, reconciliation state.
+
+### ConnectorSyncRun
+
+Fields: organization_id, connection, resource, connector version, window or cursor, started_at, completed_at, status, object counts, error class, evidence reference.
+
+### EvidenceObject
+
+Fields: organization_id, source type, source identifier, object-storage reference, checksum, collected_at, collector version, trust class, retention class, access class.
+
+Raw pages, provider payloads, and AI answers use evidence references. Ordinary agent context does not contain unrestricted raw objects.
+
+## AI Reach and website discovery
+
+### WebProperty
+
+Fields: organization_id, canonical origin, verified ownership, locale, markets, website connection, CMS resource, Search Console resource, GA4 resource, status.
+
+### WebPageSnapshot
+
+Fields: organization_id, web property, URL, canonical URL, fetched_at, content hash, crawl status, index eligibility, directives, title, headings, structured-data summary, evidence reference.
+
+### AIReachQuestionSetVersion
+
+Fields: organization_id, name, audience, offer, buyer stage, locale, market, sample policy, version, status, approved_by, effective_at.
+
+### AIReachQuestion
+
+Fields: question-set version, stable key, question text, intent labels, active status.
+
+Approved question-set versions are immutable.
+
+### AIReachObservationRun
+
+Fields: organization_id, question-set version, surface, provider, model or interface version, method, locale, location, repeat policy, collector version, cost, status, started_at, completed_at.
+
+### AIReachAnswerObservation
+
+Fields: run, question, sample number, answer evidence reference, brand mentioned, business recommended, owned source cited, limitation codes, classifier version, review state.
+
+Repeated samples remain separate observations.
+
+### AIReachCitationObservation
+
+Fields: answer observation, raw URL, canonical URL, source domain, title, citation order or span, source class.
+
+Source class is owned, competitor, or third party.
+
+### AIReachFactObservation
+
+Fields: answer observation, observed statement, approved claim reference, result, method, reviewer, confidence.
+
+Result is accurate, incomplete, unsupported, conflicting, or unknown.
+
+### AIReachAssessment
+
+Fields: organization_id, scope, window, question-set version, page and observation snapshots, metric-definition versions, data-quality state, findings, limitations, confidence, status.
+
+### WebContentDraftVersion
+
+Fields: organization_id, web property, page, source brief, opportunity, body and metadata references, structured-data changes, approved claim references, validation, version, status.
+
+Website drafts remain separate from social `ContentVariant` records.
+
+### LeadFollowUpDraftVersion
+
+Fields: organization_id, pseudonymous CRM lead reference, purpose, message reference, channel, consent evidence, suppression evidence, destination reference, expiry, approval state, version.
+
+Raw lead identity does not enter agent context unless a scoped task requires minimized fields.
 
 ## Paid advertising
 
@@ -137,7 +252,9 @@ Fields: event type, occurred_at, source, subject pseudonym, value, currency, cam
 
 ### CustomerOutcome
 
-Fields: lead/customer reference, funnel stage, qualification, pipeline value, revenue, margin, occurred_at, source, correction history.
+Fields: lead/customer reference, funnel stage, qualification, pipeline value, booked revenue, currency, occurred_at, source, deduplication key, correction history, cancellation state.
+
+Booked revenue is the approved amount at the configured closed-won stage. It is not cash received.
 
 ### AttributionRecord
 
@@ -228,6 +345,10 @@ Fields: severity, category, affected organizations/connectors, detected_at, stat
 - Active autonomy policies may not overlap ambiguously for the same action scope.
 - Every execution references one proposal and one policy decision.
 - Every approved proposal references at least one approval unless policy explicitly authorized bounded autonomy.
+- Briefing recommendation rank is unique within a briefing and limited to one through three.
+- Question stable key is unique within one question-set version.
+- AI Reach sample number is unique within one run and question.
+- Website origin is unique within an organization.
 
 ## Retention classes
 
@@ -237,4 +358,3 @@ Fields: severity, category, affected organizations/connectors, detected_at, stat
 - Creative and public content: retained while licensed and useful.
 - Agent working data: short-lived by default.
 - Eval artifacts: de-identified where possible and version-linked.
-

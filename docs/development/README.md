@@ -8,18 +8,33 @@ Research evidence remains under [`docs/agentic-marketing`](../agentic-marketing/
 
 ## Product definition
 
-The product is a multi-tenant marketing operating system for nontechnical business users. A Hermes-centered team of specialist agents researches, plans, drafts, analyzes, and recommends. Deterministic application services own identity, canonical metrics, policy, approvals, credentials, execution, audit, and rollback.
+The product is a cloud-hosted marketing operating system for nontechnical business owners. It turns plain-language goals into measured, supervised marketing work.
 
-The MVP includes:
+AI Reach is a feature inside the product. It is the primary chat workspace and helps users improve search and AI discovery.
 
-- Paid campaign management for Meta Ads, Google Ads, Microsoft Advertising, LinkedIn Ads, TikTok Ads, Reddit Ads, and X Ads.
-- User selection of any one or any combination of those paid platforms for a campaign.
-- Organic publishing for LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and authorized Reddit communities.
-- Hermes as the chief marketing orchestrator with bounded specialist-agent roles.
-- Unified business context, creative production, measurement, recommendations, approvals, experimentation, and reporting.
-- A performance-seeking operating posture: retain and test every legal, permitted, potentially useful tactic; never execute illegal, unauthorized, deceptive, or enforcement-evasive mechanisms.
+The first pilot serves a sales trainer or similar expert-led business. It proves one complete outcome loop from discovery to booked revenue.
 
-Availability is subject to the client holding eligible accounts, granting required permissions, and receiving any platform or developer approvals. Unsupported platform operations must be represented honestly through capability flags; browser automation must not impersonate unavailable official advertising APIs.
+The first useful release is read-only. It connects approved website, analytics, search, advertising, and CRM sources.
+
+Connect Google Ads, Meta Ads, or both, as selected in the Pilot Scope Record. Both read adapters ship.
+
+AI Reach explains what works, what wastes money, what limits discovery, and which three actions matter now.
+
+The pilot MVP then adds three supervised actions:
+
+- create a CMS draft without publishing it;
+- send one approved lead follow-up after consent checks;
+- pause one approved advertising campaign with a tested resume path.
+
+Every external action needs deterministic policy, approval, execution, reconciliation, audit, and a kill switch.
+
+The initial pooled service uses the current Next.js control plane on Vercel with managed Supabase. OpenAI and Resend remain managed services.
+
+Hermes, Temporal, Postiz, Coolify, broad specialist teams, and AWS remain trigger-based target components. They are not pilot release gates.
+
+The seven paid and seven organic platform plans remain expansion specifications. They do not block the narrow pilot MVP.
+
+Availability still depends on eligible client accounts, granted permissions, and provider approval. Capability flags must show every limit honestly.
 
 ## Documentation map
 
@@ -36,6 +51,8 @@ Availability is subject to the client holding eligible accounts, granting requir
 
 - [System architecture](./architecture/system-architecture.md)
 - [Hermes multi-agent architecture](./architecture/hermes-multi-agent-architecture.md)
+- [Agent orchestration architecture](./architecture/agent-orchestration-architecture.md)
+- [Cloud hosting and service delivery](./architecture/cloud-hosting-and-service-delivery.md)
 - [Domain data model](./architecture/domain-data-model.md)
 - [API, event, and tool contracts](./architecture/api-event-and-tool-contracts.md)
 - [Platform integration architecture](./architecture/platform-integration-architecture.md)
@@ -45,6 +62,7 @@ Availability is subject to the client holding eligible accounts, granting requir
 - [Paid advertising specification](./capabilities/paid-advertising.md)
 - [Organic publishing specification](./capabilities/organic-publishing.md)
 - [Creative and content pipeline](./capabilities/creative-and-content-pipeline.md)
+- [AI Reach](./capabilities/ai-reach.md)
 - [Measurement, attribution, and experimentation](./capabilities/measurement-attribution-and-experimentation.md)
 - [Platform capability verification matrix](./capabilities/platform-capability-matrix.md)
 
@@ -58,6 +76,7 @@ Availability is subject to the client holding eligible accounts, granting requir
 ### Delivery and governance
 
 - [Implementation roadmap](./delivery/implementation-roadmap.md)
+- [Phase 0 readiness workbook](./delivery/phase-0-readiness-workbook.md)
 - [Pilot onboarding and launch](./delivery/pilot-onboarding-and-launch.md)
 - [Risk register](./delivery/risk-register.md)
 - [Decision register](./governance/decision-register.md)
@@ -69,13 +88,16 @@ Availability is subject to the client holding eligible accounts, granting requir
 1. Product brief
 2. Product requirements
 3. UX and information architecture
-4. System architecture
-5. Hermes multi-agent architecture
-6. Domain data model
-7. Platform integration architecture
-8. Security and autonomy
-9. Capability specifications
-10. Testing, operations, and implementation roadmap
+4. AI Reach
+5. Implementation roadmap
+6. System architecture
+7. Agent orchestration architecture
+8. Domain data model
+9. Platform integration architecture
+10. Security and autonomy
+11. Testing and operations
+12. Other capability specifications
+13. Hermes and cloud expansion architecture
 
 ## Authority and change control
 

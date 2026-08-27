@@ -2,77 +2,74 @@
 
 ## Personas
 
-### Business owner
+### Sales trainer and business owner
 
-Needs business results, understandable recommendations, predictable spending, and minimal operational burden. Does not want to learn prompts or platform internals.
+Sells speeches, workshops, training programs, or consulting. Needs qualified leads, booked calls, closed deals, and clear marketing actions.
 
-### Marketing operator
+Does not want to learn prompts, code, campaign structures, attribution models, or agent roles.
 
-Needs campaign and content control, evidence, fast iteration, bulk workflows, platform-native previews, and an audit trail.
+### Assistant or marketer
+
+Helps manage content, leads, schedules, and approvals. Needs clear ownership, evidence, and activity history.
 
 ### Approver
 
-Needs a concise decision, exact proposed change, risk, cost, evidence, expiry, and rollback information. May approve through desktop or mobile.
-
-### Analyst
-
-Needs canonical metrics, freshness, source lineage, filters, experiment results, and the ability to reconcile platform and revenue data.
-
-### Agency administrator
-
-Needs tenant isolation, role assignment, connector health, policy templates, client-specific approvals, and portfolio-level operations without sharing client data.
+Needs the exact proposed change, destination, reason, risk, cost, expiry, and rollback. Can approve through desktop or mobile.
 
 ### System operator
 
-Needs deployment status, queues, connector errors, agent traces, policy decisions, incidents, kill switches, and safe replay tools.
+Needs connector health, data quality, security events, failed workflows, kill switches, and safe recovery tools.
 
-## Journey 1: Onboard a business
+Agency administration, deep analysis workspaces, and broad channel operations are expansion personas.
 
-1. The owner creates an organization and invites collaborators.
-2. A wizard collects the website, offers, prices, margins, target customers, locations, exclusions, goals, budgets, brand rules, competitors, and prohibited claims.
-3. The owner connects advertising, social, CRM, analytics, commerce, and revenue accounts through authorized flows.
-4. The system inventories permissions and capabilities without making external changes.
-5. Hermes proposes a Business and Marketing Profile based on supplied and connected evidence.
-6. The owner corrects assumptions; corrections become versioned organization context.
-7. The system proposes metric definitions, attribution caveats, approval rules, and a starting autonomy profile.
-8. The owner signs off before recommendations or publishing begin.
+## Journey 1: Onboard through AI Reach
 
-## Journey 2: Review the initial audit
+1. The owner creates an organization and opens AI Reach.
+2. AI Reach asks short questions about the offer, audience, location, funnel, goals, budget, brand, and claims.
+3. Structured cards collect details that need exact values.
+4. The owner connects the website, GA4, Search Console, the selected CRM, and the approved advertising sources.
+5. The owner connects Google Ads, Meta Ads, or both, as selected in the Pilot Scope Record. Both read adapters ship.
+6. AI Reach shows missing sources and the useful degraded mode for each gap.
+7. The supervisor proposes a Business and Marketing Profile from approved evidence.
+8. The owner corrects assumptions and approves the Pilot Scope Record.
+9. The system makes no external change.
 
-1. The system checks data health, tracking, historical campaigns, content, creative fatigue, funnel stages, and competitor context.
-2. The user receives findings ranked by potential value, confidence, effort, and risk.
-3. Each finding can be accepted into the opportunity registry, rejected with a reason, postponed, or discussed with the agent team.
-4. Accepted findings become proposals or controlled experiments; no external change occurs implicitly.
+## Journey 2: Receive the first diagnosis
 
-## Journey 3: Create a multiplatform paid campaign
+1. The system checks connector health, tracking, campaign results, landing pages, CRM stages, and AI Reach evidence.
+2. AI Reach explains what works, what wastes money, and what blocks discovery.
+3. The outcome dashboard shows leads, booked calls, closed-won deals, booked revenue, and data limitations.
+4. AI Reach gives exactly three actions with evidence, expected value, effort, risk, and uncertainty.
+5. The owner can ask plain questions without learning a prompt format.
+6. No recommendation changes an external system.
 
-1. The user enters an offer, objective, qualified outcome, geography, total budget, duration, and constraints.
-2. The user selects one or more of the seven paid platforms.
-3. Hermes asks only unresolved material questions.
-4. Cross-channel, budget, creative, measurement, and selected platform agents prepare a coordinated plan.
-5. The user reviews total and per-platform budget, audiences, campaign structures, creative, forecast assumptions, stop conditions, and tracking readiness.
-6. The user edits or regenerates individual platform sections without invalidating unrelated approved work.
-7. The system freezes a proposal snapshot and validates current platform capability and state.
-8. Authorized approvers approve all or selected platform launches.
-9. Deterministic executors create the campaigns and record every platform response.
-10. The system reconciles delivered state and begins monitoring outcomes.
+## Journey 3: Improve advertising safely
 
-## Journey 4: Create an organic content program
+1. AI Reach reads connected Google Ads, Meta Ads, or both.
+2. The system links available campaigns to landing-page behavior and CRM outcomes.
+3. AI Reach identifies a pause candidate and explains the evidence and uncertainty.
+4. The owner opens the proposal inside the conversation.
+5. The proposal shows the exact campaign, current state, expected effect, risk, and resume path.
+6. The owner approves or rejects the proposal.
+7. The executor rechecks permission, policy, capability, and current state.
+8. The executor pauses the campaign and reconciles the provider result.
+9. AI Reach monitors later outcomes and offers resume when evidence supports it.
 
-1. The user starts from a topic, offer, source asset, campaign, transcript, announcement, or research request.
-2. Research and brand agents create a source brief with claims and citations.
-3. The creative team proposes concepts and assets.
-4. Each selected channel specialist creates a native variant.
-5. The user previews LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and Reddit versions.
-6. The user edits, requests alternatives, approves, and schedules per channel.
-7. The publishing service validates current permissions and media constraints before delivery.
-8. Publication receipts and analytics flow back into the content record.
-9. The system recommends repurposing winners, revising weak variants, or using strong organic concepts as paid hypotheses.
+## Journey 4: Improve website discovery
 
-## Journey 5: Process an approval
+1. AI Reach finds a factual, technical, or content gap.
+2. The owner sees the affected page, evidence, and business reason.
+3. AI Reach prepares a source brief from approved claims and first-hand expertise.
+4. The content service creates a website draft and validation report.
+5. The owner reviews and approves the exact draft.
+6. The CMS connector creates a draft without publishing it.
+7. A subject expert reviews the CMS draft before any later publication proposal.
+8. After a separate Stage 3 publication gate executes an approved publication, AI Reach rechecks the evidence.
+
+## Journey 5: Process an approval in chat
 
 1. The approver receives a notification with the action, reason, cost, confidence, risk, evidence, and expiry.
-2. The approver opens an authenticated approval card.
+2. The approver opens the same authenticated card in AI Reach or the approval queue.
 3. They view the exact before-and-after state and any dependent actions.
 4. They approve, reject, edit, defer, or ask for an explanation.
 5. Approval creates an immutable decision record tied to a proposal hash.
@@ -80,20 +77,21 @@ Needs deployment status, queues, connector errors, agent traces, policy decision
 
 ## Journey 6: Daily operation
 
-1. The command center summarizes spend, qualified outcomes, revenue, content status, experiments, anomalies, and pending decisions.
-2. The user sees only material exceptions by default.
-3. The daily briefing explains what changed and why it matters.
-4. The user can ask questions in plain language; answers link to metrics and evidence.
-5. State-changing requests become proposals unless already authorized by a bounded policy.
+1. The owner opens AI Reach.
+2. The conversation shows the latest outcome briefing and one compact dashboard.
+3. The briefing explains material changes, data gaps, pending decisions, and three actions.
+4. The owner asks questions in plain language and can inspect the supporting evidence.
+5. A state-changing request becomes a proposal and never becomes hidden permission.
 
-## Journey 7: Promote an action to bounded autonomy
+## Journey 7: Follow up with a lead
 
-1. The system accumulates shadow and approved-execution evidence for an action class.
-2. Evaluation reports show precision, outcome impact, reversibility, and failure rate.
-3. An administrator proposes limits by organization, platform, campaign, budget, and time window.
-4. An authorized owner approves the policy version.
-5. The system auto-executes only matching actions and immediately records and reports them.
-6. Limit breach, data staleness, policy uncertainty, or incident state reverts the action class to approval-required.
+1. AI Reach identifies an approved lead that needs follow-up.
+2. The system checks consent, suppression, purpose, destination, and CRM state.
+3. AI Reach prepares a draft in the conversation.
+4. The owner edits and approves the exact message and destination.
+5. A separate executor sends it and stores the delivery result.
+6. An uncertain result blocks blind retry.
+7. CRM and booking events show the later outcome.
 
 ## Journey 8: Investigate or reverse a change
 
@@ -106,10 +104,16 @@ Needs deployment status, queues, connector errors, agent traces, policy decision
 ## Experience requirements
 
 - No required prompt engineering.
+- AI Reach guides the next question and shows structured choices when precision matters.
+- Conversations keep organization context, evidence links, artifacts, proposals, and outcomes.
 - Plain-language summaries with optional technical detail.
 - Progressive disclosure: business outcome first, platform detail second, raw evidence last.
 - Every external action is visible in an activity stream.
 - Empty, stale, partial, and conflicting data states are explicit.
 - Accessibility target is WCAG 2.2 AA.
-- Desktop-first operational surfaces with mobile-capable approvals and alerts.
+- Chat, alerts, and approvals work on mobile.
+- Missing connections and partial data produce useful explanations instead of dead ends.
 
+## Expansion journeys
+
+Full campaign building, broad organic publishing, channel calendars, specialist teams, agency administration, and bounded autonomy remain expansion work.

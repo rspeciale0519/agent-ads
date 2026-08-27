@@ -16,15 +16,28 @@ The system combines deterministic software, external APIs, probabilistic agents,
 
 - Zod schemas for API, event, tool, and connector boundaries.
 - Golden fixtures and invalid/fuzz cases.
-- Consumer-driven contracts among UI, API, workers, Hermes gateway, and connectors.
+- Consumer-driven contracts among UI, API, jobs, the AI gateway/runtime, and connectors.
 - Backward compatibility for active event versions.
 
 ### Database tests
 
-- Prisma migrations forward and rollback/recovery strategy.
+- Prisma forward migrations, compatible application rollback, and restored-state recovery.
 - Tenant scoping and row-level security.
 - Uniqueness, immutable approval, audit linkage, and concurrent-update behavior.
 - Retention, suppression, export, and deletion.
+
+### Foundation Gate F0 tests
+
+- Validate the Prisma schema.
+- Apply every migration to a fresh disposable database.
+- Compare Prisma native types with PostgreSQL catalog types.
+- Verify every foreign-key type, target, constraint, and supporting index.
+- Verify migration order, checksums, and live target heads.
+- Test missing tenant context and cross-tenant access.
+- Verify enabled and forced RLS on every protected table.
+- Verify runtime and broker roles have only approved privileges.
+- Test the database target fingerprint and disposable-target guard.
+- Restore the complete database, Storage, Vault, role, configuration, and artifact recovery set.
 
 ### Connector tests
 
@@ -35,25 +48,47 @@ The system combines deterministic software, external APIs, probabilistic agents,
 - Validation and provider error mapping.
 - Duplicate request, timeout after write, uncertain result, reconciliation, and retry.
 - Credential expiry, revocation, insufficient scope, and ineligible account.
-- Contract suite shared by all paid or organic adapters.
+- Contract suite shared by adapters of the same capability class.
+
+### Pilot connector tests
+
+- Website/CMS reads treat every page and file as untrusted.
+- GA4, Search Console, Google Ads, Meta Ads, and selected CRM use read-only scopes first.
+- Stale data, revoked access, partial data, quota errors, corrections, and reconciliation stay visible.
+- Calendar and email tests run only when the Pilot Scope Record enables them.
+- No read-only release process can obtain a mutation principal.
 
 ### Workflow tests
 
 - Durable restart and replay.
 - Long approval wait and expiry.
-- Partial multi-platform saga.
-- Scheduled publication and cancellation races.
+- Partial AI Reach observation run.
+- CMS draft, lead follow-up, and campaign pause/resume races.
 - Kill switch during execution.
 - Policy/data/capability changes between approval and execution.
 - Notification failure independent of action state.
 
+### Pilot cloud and cost-control tests
+
+- Pooled-tenant isolation, fair-use quotas, and noisy-neighbor load behavior.
+- Usage-event idempotency, provider-cost reconciliation, corrections, and cost-limit enforcement.
+- Offboarding export, role/credential revocation, connector deregistration, and retention/deletion behavior.
+
+### Expansion cloud and billing tests
+
+- Repeatable dedicated provisioning in operator-owned and client-owned AWS accounts.
+- Dedicated database, storage, key, secret, worker, and identity isolation.
+- Allowance, overage, price-version, correction, and invoice reconciliation.
+- Hybrid enrollment, outbound networking, signed updates, buffering, expiry, revocation, remote disablement, and cloud-authority enforcement.
+
 ### UI tests
 
-- Onboarding, campaign builder, content composer, approvals, calendar, analytics, autonomy, and connection-health flows.
+- AI Reach onboarding, chat, outcome dashboard, Work, Decisions, Connections, and Settings.
 - Accessibility and keyboard operation.
 - Responsive approval flows.
 - Stale, partial, unsupported, and error states.
-- Visual regression for platform previews and high-risk confirmation screens.
+- Visual regression for outcome cards, evidence, and high-risk confirmation screens.
+- Loading, cancel, retry, interruption, partial-result, and support-handoff states.
 
 ### Security tests
 
@@ -64,9 +99,31 @@ The system combines deterministic software, external APIs, probabilistic agents,
 - Prompt injection and tool argument manipulation.
 - Approval replay, proposal drift, budget bypass, and destination substitution.
 
+### Supervised mutation tests
+
+- Current AAL2 and active-session binding.
+- Action-bound grant, proposal hash, cap, destination, expiry, and drift invalidation.
+- Consent and suppression denial for lead follow-up.
+- Idempotency, unknown result, and reconciliation before retry.
+- Global, provider, organization, and action kill switches.
+- Campaign pause and resume rollback through one approved provider and account.
+
+### AI Reach tests
+
+- Crawler-control, sitemap, canonical, indexing, and structured-data classification.
+- Question-set versioning and repeated sample provenance.
+- Citation extraction, canonical URL handling, factual accuracy, and approved business truth.
+- Referral and CRM outcome lineage.
+- Partial, stale, missing, conflicting, and corrected evidence.
+- Exactly three useful recommendations in each formal briefing.
+- Rejection of ranking, citation, recommendation, traffic, revenue, or causal guarantees.
+- Answer presence is not a deterministic release assertion.
+
 ## Agent eval framework
 
-Each agent role has a versioned evaluation suite with held-out tasks and adversarial cases.
+The pilot supervisor has a versioned evaluation suite with held-out tasks and adversarial cases.
+
+Later specialist roles need separate suites before activation.
 
 ### Common metrics
 
@@ -89,6 +146,7 @@ Each agent role has a versioned evaluation suite with held-out tasks and adversa
 - Creative reviewer: detects factual, rights, brand, accessibility, and policy failures.
 - Measurement analyst: distinguishes observation, attribution, forecast, and causality.
 - Orchestrator: complete delegation, dependency handling, no infinite loops, preserves disagreement.
+- AI Reach supervisor: correct evidence classes, factual limits, exactly three actions, useful abstention, and no false promise.
 
 ### Scoring and release
 
@@ -111,13 +169,13 @@ Each agent role has a versioned evaluation suite with held-out tasks and adversa
 - Measure time saved, edit/reject rate, execution reliability, policy blocks, rollback, and observed outcomes.
 - Compare with historical or controlled baselines where feasible.
 
-### Bounded autonomy phase
+### Bounded autonomy phase — expansion
 
 - Require per-action precision, low incident rate, sufficient volume, reversibility, calibrated confidence, and organization-specific owner approval.
 
 ## Performance and resilience
 
-- Dashboard and approval latency budgets.
+- AI Reach chat, outcome dashboard, and approval latency budgets.
 - Connector throughput and backfill tests.
 - Agent concurrency and cost limits.
 - Queue backlog recovery.
@@ -127,18 +185,26 @@ Each agent role has a versioned evaluation suite with held-out tasks and adversa
 
 ## Required CI gates
 
-1. Type check.
-2. Lint.
-3. Unit and schema tests.
-4. Database and tenant tests.
-5. Contract tests.
-6. Security scans.
-7. Relevant agent eval suite.
-8. Build.
+The required pull-request gates are:
 
-Staging promotion additionally requires connector integration, workflow, E2E, accessibility, and rollback checks. Production promotion requires release checklist and owner approval.
+1. Prisma validation.
+2. Type check.
+3. Lint.
+4. Unit and contract tests.
+5. Fresh migration and tenant tests.
+6. RLS and mutation audits.
+7. Security scan.
+8. Relevant supervisor evaluation suite.
+9. Build.
+
+The GitHub workflow now configures Prisma validation and generation, type-check, lint, tests, security audits, a disposable migration proof, and build.
+
+The schema job also configures Prisma checksum history, UUID upgrade branches, and low-privilege tenant tests. A successful GitHub run remains unverified.
+
+Target inventory, complete tenant tests, restore tests, supervisor evaluation, and staging evidence remain Gate F0 requirements.
+
+Staging adds target Gate F0, restore, connector, browser, accessibility, and canary checks. Pilot promotion needs the release checklist and owner approval.
 
 ## Test evidence
 
 Each release stores code revision, schema versions, migrations, connector versions, skill/model versions, eval results, security results, environment, approver, known limitations, and rollback target.
-

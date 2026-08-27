@@ -23,6 +23,7 @@ Every request and background action propagates:
 - proposal/approval/execution ID;
 - connector and platform account reference;
 - external request ID where available.
+- deployment profile, environment, customer-facing host, automation host, conditional AWS account/region, and edge-connector ID where applicable.
 
 Never place secrets, access tokens, raw personal data, or unrestricted content in telemetry.
 
@@ -32,7 +33,10 @@ Never place secrets, access tokens, raw personal data, or unrestricted content i
 
 - onboarding completion;
 - connected/healthy accounts;
-- campaign/content completion funnels;
+- AI Reach conversation and briefing completion;
+- exactly-three recommendation usefulness and action acceptance;
+- qualified lead, booked call, closed-won, and booked-revenue reconciliation;
+- website draft, lead follow-up, and campaign pause/resume completion;
 - approval latency and outcomes;
 - active experiments;
 - user corrections and recommendation usefulness.
@@ -56,8 +60,9 @@ Never place secrets, access tokens, raw personal data, or unrestricted content i
 - queued/running/waiting/failed counts;
 - age and retry count;
 - approval wait and expiry;
-- scheduled publication delay;
-- partial saga and compensation status.
+- website crawl, AI Reach observation, and briefing freshness;
+- partial observation runs and reconciliation backlog;
+- supervised action and compensation status.
 
 ### Business guardrails
 
@@ -67,13 +72,29 @@ Never place secrets, access tokens, raw personal data, or unrestricted content i
 - unexpected external change;
 - platform warning or enforcement.
 
+### Hosting, usage, and commercial health
+
+- Vercel, Supabase, Resend, OpenAI, Stripe, GitHub, and Sentry availability, usage-tier pressure, database/storage health, backup age, restore-test status, and configuration drift;
+- Coolify, Hermes, Temporal, Postiz, worker, and self-hosted telemetry health only when a recorded trigger enables them;
+- AWS service availability and account/region health when an AWS deployment exists;
+- per-tenant concurrency, quota pressure, throttling, queue fairness, and noisy-neighbor indicators;
+- edge-connector version, certificate expiry, last health/audit upload, buffered work, and remote-disable state;
+- internal usage, provider cost, cost-limit status, and usage-record lag; add allowance and invoice status only after billing starts.
+
 ## Logs and traces
 
 - Structured logs with stable event names and safe reason codes.
-- Distributed traces across UI/API, workflow, Hermes gateway, tool, connector, and reconciliation.
+- Distributed traces across UI/API, job, AI gateway/runtime, tool, connector, and reconciliation.
 - Agent inputs/outputs stored as access-controlled artifacts, not general logs.
 - Provider raw requests/responses stored encrypted with redaction and restricted access.
 - Sampling must never omit mutation, approval, policy, or security audit spans.
+
+## Telemetry backend policy
+
+- OpenTelemetry is the required application-owned collection and correlation boundary.
+- Use Sentry's free tier initially for application exception grouping and release correlation while its single-user, event, retention, and integration limits remain sufficient.
+- Self-host SigNoz when team access, telemetry volume, retention, or managed cost justifies operating the backend and its restore, patching, capacity, and incident controls pass.
+- A telemetry vendor or self-hosted backend outage must not block core application workflows or the durable audit path.
 
 ## Service-level objectives
 
@@ -81,7 +102,7 @@ Initial pilot targets:
 
 - Approval and read-only control-plane availability: 99.9% monthly.
 - Acknowledged mutation has durable audit/proposal linkage: 100%.
-- Scheduled organic publication starts within five minutes of target for healthy providers, excluding documented provider delays.
+- Approved CMS draft creation starts within five minutes for a healthy enabled connector.
 - Critical connector freshness meets each metric's policy threshold at least 99% of measured periods.
 - High-risk incident detection/notification within five minutes.
 
@@ -96,6 +117,7 @@ Provider outages are reported separately but still require graceful product beha
 - secret exposure;
 - uncontrolled spend or repeated duplicate execution;
 - audit integrity failure.
+- dedicated-tenant isolation failure or compromised hybrid connector.
 
 ### High
 
@@ -104,6 +126,7 @@ Provider outages are reported separately but still require graceful product beha
 - widespread connector failure;
 - policy service unavailable;
 - critical data corruption/freshness block.
+- regional/service outage, failed backup/restore control, or material invoice/usage discrepancy.
 
 ### Medium
 
@@ -132,6 +155,8 @@ Provider outages are reported separately but still require graceful product beha
 
 ## Required runbooks
 
+Only runbooks for enabled pilot capabilities block pilot release. Other runbooks activate with their feature gates.
+
 - Unapproved or unexpected platform change.
 - Duplicate campaign, spend change, or publication.
 - Platform write timed out with unknown result.
@@ -144,8 +169,14 @@ Provider outages are reported separately but still require graceful product beha
 - Model/provider outage or quality regression.
 - Workflow/queue backlog.
 - Database or object-store recovery.
+- Customer-facing managed-service or self-hosted automation-plane outage.
+- AWS region or service outage when an AWS deployment exists.
+- Automation-host capacity exhaustion, failed patch, failed backup, or failed restore.
+- Dedicated deployment drift or management-role loss.
+- Hybrid connector compromise, outage, or stale version.
+- Usage-meter, allowance, invoice, or provider-cost reconciliation failure.
+- Client offboarding and credential/account-role revocation.
 
 ## Post-incident requirements
 
 Material incidents produce a timeline, impact, affected records, authorization path, root cause, detection gap, containment/recovery actions, user communication, corrective owners/dates, and evidence that recurrence tests pass. Incidents involving agent behavior feed the appropriate eval suite after privacy review.
-
