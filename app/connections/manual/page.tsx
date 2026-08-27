@@ -1,0 +1,15 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isOrganizationAccessError, requireOrganizationContext } from "../../../lib/auth/organization-context";
+import { listManualInvitations } from "../../../lib/connections/manual-lifecycle";
+import ManualInventoryPanel from "./ManualInventoryPanel";
+import ManualInvitationActions from "./ManualInvitationActions";
+
+export const dynamic = "force-dynamic";
+
+export default async function ManualConnectionsPage() {
+  let context;
+  try { context = await requireOrganizationContext(); } catch (error) { if (isOrganizationAccessError(error)) { if (error.code === "AUTHENTICATION_REQUIRED") redirect("/auth"); if (error.code === "ORGANIZATION_SELECTION_REQUIRED") redirect("/organizations/select"); redirect("/access-pending"); } throw error; }
+  const invitations = await listManualInvitations(context);
+  return <main className="workspace-shell"><header className="workspace-header"><div><span className="eyebrow">Manual access routes</span><h1>Track invitations and approved exports</h1><p className="workspace-muted">Use official provider invitations, a client-owned integration, or an approved Dubsado export. This workspace never accepts passwords, platform MFA codes, private keys, cookies, or arbitrary tokens.</p></div><div className="workspace-header-actions"><Link className="secondary-button" href="/connections">All systems</Link><Link className="secondary-button" href="/security/mfa">Security</Link></div></header><section className="workspace-grid"><article className="workspace-card workspace-card-wide"><span className="eyebrow">Create a route</span><h2>Record the safe handoff</h2><ManualInventoryPanel /></article><article className="workspace-card workspace-card-wide"><span className="eyebrow">Tracked routes</span><h2>{invitations.length ? `${invitations.length} routes` : "No routes yet"}</h2>{invitations.length ? <div className="connection-summary-list">{invitations.map((invitation) => <div className="manual-route-entry" key={invitation.id}><div className="connection-summary-row"><span><strong>{invitation.provider}</strong><small>{invitation.expectedPrincipal} · {invitation.method === "provider_invitation" ? "official invitation" : invitation.method === "approved_export" ? "approved export" : invitation.method === "client_owned_integration" ? "client-owned integration" : "inventory only"}{invitation.verificationSource ? ` · ${invitation.verificationSource}` : " · verification pending"}{invitation.expired ? " · expired" : ""}</small></span><span className="status-pill">{invitation.status.replaceAll("_", " ")}</span></div><ManualInvitationActions invitation={invitation} /></div>)}</div> : <p>Manual inventory lets the pilot keep moving while provider review or API access is pending.</p>}</article></section><footer className="workspace-footer"><Link href="/dashboard">← Back to dashboard</Link><span>Dubsado source and date are recorded only when an approved export or client-owned integration is verified.</span></footer></main>;
+}

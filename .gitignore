@@ -6,3 +6,14 @@ out/
 .env*
 !.env.example
 docs/temp/*.log
+docs/temp/onboarding-submissions/
+docs/temp/cmgpa-local-recovery.md
+docs/temp/test-marketing-keywords.csv
+scripts/gate0/generated/
+.Codex/plans/feature-account-connections.md
+archive/instruction-backups/
+archive/app-api-v1-connections-provider-routes/
+archive/next-before-dynamic-route-fix/
+archive/next-cache-20260810-final/
+
+.vercel

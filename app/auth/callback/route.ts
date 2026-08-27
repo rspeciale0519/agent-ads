@@ -10,5 +10,10 @@ export async function GET(request: Request) {
     const supabase = await getSupabaseServer();
     await supabase.auth.exchangeCodeForSession(code);
   }
-  return NextResponse.redirect(new URL("/", requestUrl.origin));
+  const requestedNext = requestUrl.searchParams.get("next");
+  const safeNext = requestedNext && ["/dashboard", "/onboarding", "/connections"].includes(requestedNext) ? requestedNext : "/dashboard";
+  const response = NextResponse.redirect(new URL(safeNext, requestUrl.origin));
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
 }
