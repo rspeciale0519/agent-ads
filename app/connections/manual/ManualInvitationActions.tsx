@@ -54,7 +54,6 @@ export default function ManualInvitationActions({ invitation }: { invitation: In
   const verificationOptions = verificationOptionsByMethod[invitation.method ?? "default"] ?? verificationOptionsByMethod.default;
   const [verificationSource, setVerificationSource] = useState(verificationOptions[0]?.value ?? "provider_console");
   const [sourceDate, setSourceDate] = useState(invitation.sourceDate?.slice(0, 10) ?? "");
-  const [evidenceNote, setEvidenceNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -108,19 +107,19 @@ export default function ManualInvitationActions({ invitation }: { invitation: In
   };
 
   const verify = async () => {
-    if (!sourceDate || !evidenceNote.trim()) { setError("Add the evidence source, date, and a safe evidence note."); return; }
+    if (!sourceDate) { setError("Select the evidence source and date."); return; }
     setBusy(true); setError(""); setMessage("");
     try {
       const response = await mutationFetch(mutations, verificationIntent, `/api/v1/access-invitations/${invitation.id}/verify`, {
         method: "POST",
-        body: JSON.stringify({ verificationSource, sourceDate, evidenceNote }),
+        body: JSON.stringify({ verificationSource, sourceDate }),
       });
       const body = await response.json() as ResponseBody;
       if (body.error === "IDEMPOTENCY_ALREADY_COMPLETED" || body.error === "IDEMPOTENCY_RECONCILIATION_REQUIRED") {
         mutations.reset(verificationIntent); setMessage("The previous verification needs reconciliation. Refreshing the recorded route state."); router.refresh(); return;
       }
       if (!response.ok) throw new Error(responseError(body, "Verification failed."));
-      setEvidenceNote(""); setMessage("Route verified from the recorded non-mutating evidence.");
+      setMessage("Route verified from the recorded non-mutating evidence.");
       router.refresh();
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : "Verification failed.");
@@ -139,8 +138,7 @@ export default function ManualInvitationActions({ invitation }: { invitation: In
       </select>
       <label htmlFor={`verification-date-${invitation.id}`}>Evidence date</label>
       <input id={`verification-date-${invitation.id}`} type="date" value={sourceDate} onChange={(event) => { mutations.reset(verificationIntent); setSourceDate(event.target.value); }} max={new Date().toISOString().slice(0, 10)} disabled={busy} />
-      <label htmlFor={`verification-note-${invitation.id}`}>Safe evidence note</label>
-      <textarea id={`verification-note-${invitation.id}`} value={evidenceNote} onChange={(event) => { mutations.reset(verificationIntent); setEvidenceNote(event.target.value); }} maxLength={500} placeholder="Record what was observed. Never paste a password, token, key, cookie, or MFA code." disabled={busy} />
+      <p className="soft-note">The audit records the source, date, actor, route, and result. It does not collect free-text notes.</p>
       <button className="secondary-button" type="button" onClick={() => void verify()} disabled={busy}>{busy ? "Working…" : "Mark verified"}</button>
       <small>Verification requires an AAL2 application session; an email or checkbox alone is not evidence.</small>
     </fieldset>}

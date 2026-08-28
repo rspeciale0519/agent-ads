@@ -13,15 +13,14 @@ export default function ReadOnlyRoleConfirmation({ connectionId }: { connectionI
   const router = useRouter();
   const [evidenceSource, setEvidenceSource] = useState("provider_console");
   const [sourceDate, setSourceDate] = useState(new Date().toISOString().slice(0, 10));
-  const [evidenceNote, setEvidenceNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const resetConfirmation = () => { mutations.reset(`connection-role-confirm:${connectionId}`); grantId.current = ""; };
 
   const confirmRole = async () => {
-    if (!sourceDate || !evidenceNote.trim()) {
-      setError("Record a safe evidence source, date, and observation note.");
+    if (!sourceDate) {
+      setError("Select the evidence source and date.");
       return;
     }
     setBusy(true);
@@ -41,7 +40,7 @@ export default function ReadOnlyRoleConfirmation({ connectionId }: { connectionI
       }
       const response = await mutationFetch(mutations, `connection-role-confirm:${connectionId}`, `/api/v1/connections/${connectionId}/role-confirmation`, {
         method: "POST",
-        body: JSON.stringify({ grantId: grantId.current, evidenceSource, sourceDate, evidenceNote }),
+        body: JSON.stringify({ grantId: grantId.current, evidenceSource, sourceDate }),
       });
       const body = await response.json() as ResponseBody;
       if (body.error === "IDEMPOTENCY_ALREADY_COMPLETED" || body.error === "IDEMPOTENCY_RECONCILIATION_REQUIRED") {
@@ -52,7 +51,6 @@ export default function ReadOnlyRoleConfirmation({ connectionId }: { connectionI
       }
       if (!response.ok) throw new Error(body.error ?? "Role evidence could not be recorded.");
       grantId.current = "";
-      setEvidenceNote("");
       setMessage("Read-only role evidence recorded for this connection. Run verification to activate it.");
       router.refresh();
     } catch (confirmationError) {
@@ -72,8 +70,7 @@ export default function ReadOnlyRoleConfirmation({ connectionId }: { connectionI
     </select>
     <label htmlFor={`role-date-${connectionId}`}>Evidence date</label>
     <input id={`role-date-${connectionId}`} type="date" value={sourceDate} onChange={(event) => { resetConfirmation(); setSourceDate(event.target.value); }} max={new Date().toISOString().slice(0, 10)} disabled={busy} />
-    <label htmlFor={`role-note-${connectionId}`}>Safe observation note</label>
-    <textarea id={`role-note-${connectionId}`} value={evidenceNote} onChange={(event) => { resetConfirmation(); setEvidenceNote(event.target.value); }} maxLength={500} placeholder="Describe where the read-only or analyst role was observed. Never paste credentials, tokens, cookies, or codes." disabled={busy} />
+    <p className="soft-note">The audit records the source, date, actor, connection, and result. It does not collect free-text notes.</p>
     <button className="secondary-button" type="button" onClick={() => void confirmRole()} disabled={busy}>{busy ? "Recording…" : "Record role evidence"}</button>
     {error && <p className="auth-message error" role="alert">{error}</p>}
     {message && <p className="auth-message notice" role="status">{message}</p>}

@@ -22,16 +22,17 @@ describe("Google read-only adapter", () => {
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
     process.env.GOOGLE_ADS_API_VERSION = "v25";
     process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes("oauth2.googleapis.com/token")) return json({ access_token: "access" });
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer access");
       return json({ resourceNames: ["customers/123"] });
     });
     const adapter = new GoogleReadOnlyAdapter("google_ads");
-    const resources = await adapter.discoverResources("refresh");
+    const resources = await adapter.discoverResources("refresh", "oauth_refresh_token");
     expect(resources[0]).toMatchObject({ resourceType: "ads_customer", externalId: "123", eligibility: "eligible" });
     expect(resources[0]?.metadata).not.toHaveProperty("token");
-    expect((await adapter.verify("refresh", resources)).outcomeCode).toBe("verified");
+    expect((await adapter.verify("refresh", resources, "oauth_refresh_token")).outcomeCode).toBe("verified");
     expect(fetchMock).toHaveBeenCalled();
   });
 
@@ -44,9 +45,74 @@ describe("Google read-only adapter", () => {
       if (url.endsWith("accountSummaries")) return json({ accountSummaries: [{ account: "accounts/1", displayName: "Account", propertySummaries: [{ property: "properties/2", displayName: "Property" }] }] });
       return json({ dataStreams: [{ name: "properties/2/dataStreams/3", displayName: "Web" }] });
     });
-    const resources = await new GoogleReadOnlyAdapter("google_analytics").discoverResources("refresh");
+    const resources = await new GoogleReadOnlyAdapter("google_analytics").discoverResources("refresh", "oauth_refresh_token");
     expect(resources.map((resource) => resource.resourceType)).toEqual(["analytics_account", "analytics_property", "analytics_data_stream"]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses the lifetime that belongs to the stored Google credential", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    process.env.GOOGLE_OAUTH_REDIRECT_URI = "https://example.test/google/callback";
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ access_token: "access", refresh_token: "refresh", expires_in: 3600 }))
+      .mockResolvedValueOnce(json({ access_token: "access", refresh_token: "refresh", expires_in: 3600, refresh_token_expires_in: 7200 }))
+      .mockResolvedValueOnce(json({ access_token: "access", expires_in: 3600 }));
+    const adapter = new GoogleReadOnlyAdapter("google_analytics");
+
+    const durableRefresh = await adapter.exchangeCode("code", "verifier");
+    const expiringRefresh = await adapter.exchangeCode("code", "verifier");
+    const accessOnly = await adapter.exchangeCode("code", "verifier");
+
+    expect(durableRefresh).toMatchObject({ secretKind: "oauth_refresh_token", expiresAt: undefined });
+    expect(expiringRefresh.secretKind).toBe("oauth_refresh_token");
+    expect(expiringRefresh.expiresAt?.getTime()).toBeGreaterThan(Date.now() + 7_100_000);
+    expect(accessOnly.secretKind).toBe("oauth_access_token");
+    expect(accessOnly.expiresAt?.getTime()).toBeGreaterThan(Date.now() + 3_500_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([429, 500])("keeps a temporary Google refresh failure retryable for status %s", async (status) => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    process.env.GOOGLE_ADS_API_VERSION = "v25";
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ error: "temporarily_unavailable" }, status));
+    const adapter = new GoogleReadOnlyAdapter("google_ads");
+    const result = await adapter.verify("refresh", [{ resourceType: "ads_customer", externalId: "123", displayName: "Customer", eligibility: "eligible" }], "oauth_refresh_token");
+
+    expect(result).toMatchObject({ outcomeCode: "provider_unavailable", remediationCode: "provider_retry" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { status: 400, error: "invalid_grant", outcomeCode: "invalid_grant", remediationCode: "reconnect" },
+    { status: 401, error: "invalid_client", outcomeCode: "provider_unavailable", remediationCode: "provider_retry" },
+    { status: 500, error: "invalid_grant", outcomeCode: "provider_unavailable", remediationCode: "provider_retry" },
+  ])("maps Google refresh error $error without blaming the user incorrectly", async ({ status, error, outcomeCode, remediationCode }) => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    process.env.GOOGLE_ADS_API_VERSION = "v25";
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ error }, status));
+    const adapter = new GoogleReadOnlyAdapter("google_ads");
+    const result = await adapter.verify("refresh", [{ resourceType: "ads_customer", externalId: "123", displayName: "Customer", eligibility: "eligible" }], "oauth_refresh_token");
+
+    expect(result).toMatchObject({ outcomeCode, remediationCode });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a stored Google access token without calling the refresh endpoint", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    process.env.GOOGLE_ADS_API_VERSION = "v25";
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ resourceNames: ["customers/123"] }));
+
+    await new GoogleReadOnlyAdapter("google_ads").discoverResources("access", "oauth_access_token");
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("googleads.googleapis.com");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -67,11 +133,19 @@ describe("Meta read-only adapter", () => {
     });
     const adapter = new MetaReadOnlyAdapter();
     const token = await adapter.exchangeCode("code", "verifier");
-    const resources = await adapter.discoverResources(token.secret);
+    const resources = await adapter.discoverResources(token.secret, token.secretKind);
     expect(token.secret).toBe("access");
     expect(resources.map((resource) => resource.resourceType)).toContain("meta_ad_account");
     expect(resources.find((resource) => resource.resourceType === "meta_ad_account")?.metadata).toMatchObject({ accountStatus: "1", tasks: "ANALYZE" });
     expect(fetchMock).toHaveBeenCalled();
+    await expect(adapter.discoverResources(token.secret, "oauth_refresh_token")).rejects.toThrow("META_CREDENTIAL_KIND_UNSUPPORTED");
+  });
+
+  it("does not call Meta when revocation receives the wrong credential kind", async () => {
+    process.env.META_GRAPH_API_VERSION = "v26.0";
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(new MetaReadOnlyAdapter().revoke("access", "oauth_refresh_token")).rejects.toThrow("META_CREDENTIAL_KIND_UNSUPPORTED");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -88,10 +162,17 @@ describe("TikTok read-only adapter", () => {
     });
     const adapter = new TikTokReadOnlyAdapter();
     const token = await adapter.exchangeCode("auth-code", "verifier");
-    const resources = await adapter.discoverResources(token.secret);
+    const resources = await adapter.discoverResources(token.secret, token.secretKind);
     expect(token.grantedScopes).toEqual(["4"]);
     expect(resources[0]).toMatchObject({ externalId: "adv-1", eligibility: "eligible" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    await expect(adapter.discoverResources(token.secret, "oauth_refresh_token")).rejects.toThrow("TIKTOK_CREDENTIAL_KIND_UNSUPPORTED");
+  });
+
+  it("does not call TikTok when revocation receives the wrong credential kind", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(new TikTokReadOnlyAdapter().revoke("access", "oauth_refresh_token")).rejects.toThrow("TIKTOK_CREDENTIAL_KIND_UNSUPPORTED");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -137,7 +218,7 @@ describe("provider OAuth redirect boundaries", () => {
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
     process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
     process.env.GOOGLE_ADS_API_VERSION = "v999";
-    await expect(new GoogleReadOnlyAdapter("google_ads").discoverResources("access")).rejects.toThrow("GOOGLE_ADS_API_VERSION_UNSUPPORTED");
+    await expect(new GoogleReadOnlyAdapter("google_ads").discoverResources("access", "oauth_access_token")).rejects.toThrow("GOOGLE_ADS_API_VERSION_UNSUPPORTED");
 
     process.env.META_GRAPH_API_VERSION = "../../oauth";
     process.env.META_APP_ID = "app";

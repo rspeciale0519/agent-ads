@@ -4,7 +4,7 @@ import { appendAuditEvent } from "../audit";
 import { requireAal2, getAssuranceStatus } from "../auth/assurance";
 import { hasPermission, type ConnectionPermission } from "../auth/permissions";
 import { withTenantContext, type OrganizationContext } from "../auth/organization-context";
-import { getProviderAdapter } from "./providers";
+import { getProviderAdapter, parseProviderCredentialKind } from "./providers";
 import type { ProviderResource } from "./providers";
 import { redactSensitive } from "./redaction";
 import { getSecretBroker } from "./secrets/supabase-vault";
@@ -155,7 +155,7 @@ export async function verifyConnection(context: OrganizationContext, id: string,
   if (!secret && connection.authorizationMethod === "oauth") throw new ConnectionServiceError("SECRET_UNAVAILABLE", 503);
   const provider = connection.provider as ConnectionProvider;
   const adapter = getProviderAdapter(provider);
-  const adapterResult = await adapter.verify(secret ?? "manual-inventory", connection.resources as ProviderResource[]);
+  const adapterResult = await adapter.verify(secret ?? "manual-inventory", connection.resources as ProviderResource[], parseProviderCredentialKind(reference?.credentialKind));
   const roleConfirmed = reference && providerRequiresRoleConfirmation(provider)
     ? await withTenantContext(context, (tx) => tx.capabilitySnapshot.count({ where: { organizationId: context.organizationId, connectionId: id, connectorVersion: adapter.version, capabilityKey: "read_only_role", supportLevel: "confirmed", evidenceAt: { gte: reference.createdAt }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } })).then((count) => count > 0)
     : !providerRequiresRoleConfirmation(provider);
@@ -192,7 +192,7 @@ export async function confirmConnectionReadOnlyRole(context: OrganizationContext
     const evidenceAt = new Date();
     const snapshot = await tx.capabilitySnapshot.create({ data: { organizationId: context.organizationId, connectionId: id, connectorVersion: adapter.version, capabilityKey: "read_only_role", supportLevel: "confirmed", evidenceSource: parsed.evidenceSource, sourceDate: parsed.sourceDate, evidenceAt, expiresAt: new Date(evidenceAt.getTime() + 90 * 24 * 60 * 60 * 1000) } });
     await tx.connection.update({ where: { id }, data: { effectiveRole: "read_only_evidence_recorded" } });
-    await appendAuditEvent(tx, context, { action: "connection.read_only_role_confirmed", resourceType: "connection", resourceId: id, outcomeCode: "evidence_recorded", correlationId, metadata: { provider, evidenceSource: parsed.evidenceSource, sourceDate: parsed.sourceDate.toISOString(), evidenceNoteRecorded: true, connectorVersion: adapter.version } });
+    await appendAuditEvent(tx, context, { action: "connection.read_only_role_confirmed", resourceType: "connection", resourceId: id, outcomeCode: "evidence_recorded", correlationId, metadata: { provider, evidenceSource: parsed.evidenceSource, sourceDate: parsed.sourceDate.toISOString(), connectorVersion: adapter.version } });
     return { id: snapshot.id, evidenceAt: evidenceAt.toISOString(), expiresAt: snapshot.expiresAt?.toISOString() ?? null };
   });
 }
@@ -340,7 +340,7 @@ export async function completeOAuth(context: OrganizationContext, input: { provi
   let stored: Awaited<ReturnType<SecretBroker["put"]>> | undefined;
   try {
     const exchanged = await adapter.exchangeCode(input.code, verifier);
-    const resources = await adapter.discoverResources(exchanged.secret);
+    const resources = await adapter.discoverResources(exchanged.secret, exchanged.secretKind);
     stored = await broker.put({ value: exchanged.secret, kind: exchanged.secretKind, expiresAt: exchanged.expiresAt });
     const storedSecret = stored;
     const completed = await withTenantContext(context, async (tx) => {

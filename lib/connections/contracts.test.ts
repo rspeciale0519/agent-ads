@@ -51,9 +51,10 @@ describe("connection metadata boundaries", () => {
     expect(requestPatchSchema.safeParse({ notes: "api_token: do-not-store" }).success).toBe(false);
   });
 
-  it("requires recent secret-free evidence for a connection role confirmation", () => {
-    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "provider_console", sourceDate: new Date(), evidenceNote: "Analyst role observed on the selected account." }).success).toBe(true);
-    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "email", sourceDate: new Date(), evidenceNote: "Confirmed" }).success).toBe(false);
-    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "provider_console", sourceDate: new Date(), evidenceNote: "access_token: do-not-store" }).success).toBe(false);
+  it("requires recent structured evidence and rejects unrecorded free text", () => {
+    expect(readOnlyRoleConfirmationSchema.safeParse({ grantId: "00000000-0000-4000-8000-000000000001", evidenceSource: "provider_console", sourceDate: new Date() }).success).toBe(true);
+    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "email", sourceDate: new Date() }).success).toBe(false);
+    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "provider_console", sourceDate: new Date(), evidenceNote: "Analyst role observed on the selected account." }).success).toBe(false);
+    expect(readOnlyRoleConfirmationSchema.safeParse({ evidenceSource: "provider_console", sourceDate: new Date(), clientSecret: "must-not-be-accepted" }).success).toBe(false);
   });
 });

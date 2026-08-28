@@ -2,7 +2,7 @@ import type { CredentialReference } from "@prisma/client";
 import type { OrganizationContext } from "../auth/organization-context";
 import { withTenantContext } from "../auth/organization-context";
 import type { ConnectionProvider } from "./contracts";
-import { getProviderAdapter } from "./providers";
+import { getProviderAdapter, parseProviderCredentialKind } from "./providers";
 import { withRefreshLock } from "./refresh-lock";
 import type { SecretBroker } from "./secrets/secret-broker";
 
@@ -89,7 +89,10 @@ export async function cleanupCredentialReferences(input: {
       const revokeProvider = input.revokeCurrentProviderGrant && reference.id === input.currentReferenceId;
       if (secret) {
         await withRefreshLock(secret, async () => {
-          if (revokeProvider) await getProviderAdapter(input.provider).revoke(secret);
+          if (revokeProvider) {
+            const credentialKind = parseProviderCredentialKind(reference.credentialKind);
+            await getProviderAdapter(input.provider).revoke(secret, credentialKind);
+          }
           await input.broker.destroy(reference.brokerHandle);
         });
       } else {

@@ -13,8 +13,9 @@ describe("manual access lifecycle contracts", () => {
   });
 
   it("requires non-mutating evidence source and a non-future date", () => {
-    expect(manualVerificationSchema.safeParse({ verificationSource: "email", sourceDate: new Date(), evidenceNote: "Invite sent" }).success).toBe(false);
-    expect(manualVerificationSchema.safeParse({ verificationSource: "provider_console", sourceDate: new Date(Date.now() + 60_000), evidenceNote: "Read-only access confirmed in provider console." }).success).toBe(false);
+    expect(manualVerificationSchema.safeParse({ verificationSource: "email", sourceDate: new Date() }).success).toBe(false);
+    expect(manualVerificationSchema.safeParse({ verificationSource: "provider_console", sourceDate: new Date(Date.now() + 60_000) }).success).toBe(false);
+    expect(manualVerificationSchema.safeParse({ verificationSource: "provider_console", sourceDate: new Date(), evidenceNote: "Read-only access confirmed." }).success).toBe(false);
   });
 
   it("binds evidence source to the approved route", () => {

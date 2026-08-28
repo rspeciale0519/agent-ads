@@ -82,15 +82,13 @@ export const stepUpActionSchema = z.object({
 });
 
 export const readOnlyRoleConfirmationSchema = z.object({
+  grantId: z.string().uuid().optional(),
   evidenceSource: z.enum(["provider_console", "operator_observation"]),
   sourceDate: z.coerce.date(),
-  evidenceNote: z.string().trim().min(1).max(500),
-}).superRefine((value, ctx) => {
+}).strict().superRefine((value, ctx) => {
   if (value.sourceDate.getTime() > Date.now()) ctx.addIssue({ code: "custom", path: ["sourceDate"], message: "Evidence date cannot be in the future." });
   if (value.sourceDate.getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) ctx.addIssue({ code: "custom", path: ["sourceDate"], message: "Role evidence must be recent." });
-  const finding = findSecretPattern(value.evidenceNote);
-  if (finding) ctx.addIssue({ code: "custom", path: ["evidenceNote"], message: `Do not submit ${finding} or other platform credentials.` });
-});
+}).transform(({ evidenceSource, sourceDate }) => ({ evidenceSource, sourceDate }));
 
 export function providerMetadata(provider: ConnectionProvider) {
   const metadata: Record<ConnectionProvider, { label: string; description: string; methods: readonly string[]; automated: boolean }> = {

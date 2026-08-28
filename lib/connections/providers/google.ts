@@ -1,5 +1,5 @@
 import type { ConnectionProvider } from "../contracts";
-import type { AuthorizationContext, ProviderAdapter, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
+import type { AuthorizationContext, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
 import { ProviderAdapterError } from "./provider-adapter";
 import { configuredRedirectUri, isJsonObject, parseLatency, requestJson, stringArray, stringValue } from "./http";
 import { withRefreshLock } from "../refresh-lock";
@@ -23,8 +23,25 @@ function resourceId(value: unknown, prefix: string) {
 
 function googleErrorCode(error: unknown) {
   if (!(error instanceof ProviderAdapterError)) return "provider_unavailable";
+  if (error.code === "GOOGLE_TOKEN_REFRESH_INVALID_GRANT") return "invalid_grant";
+  if (error.code.startsWith("GOOGLE_TOKEN_REFRESH_")) return "provider_unavailable";
   if (error.code.includes("UNAUTHORIZED")) return "invalid_grant";
   return "provider_unavailable";
+}
+
+function googleRefreshErrorCode(payload: unknown, status: number) {
+  if (status !== 400) return undefined;
+  if (!isJsonObject(payload)) return undefined;
+  const code = stringValue(payload.error);
+  if (code === "invalid_grant") return "GOOGLE_TOKEN_REFRESH_INVALID_GRANT";
+  if (code === "invalid_client") return "GOOGLE_TOKEN_REFRESH_INVALID_CLIENT";
+  return undefined;
+}
+
+function tokenExpiry(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  const expiresAt = new Date(Date.now() + value * 1000);
+  return Number.isNaN(expiresAt.getTime()) ? undefined : expiresAt;
 }
 
 export class GoogleReadOnlyAdapter implements ProviderAdapter {
@@ -67,28 +84,28 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
     const accessToken = stringValue(payload.access_token);
     const secret = refreshToken ?? accessToken;
     if (!secret) throw new ProviderAdapterError("GOOGLE_TOKEN_MISSING");
-    const expiresIn = typeof payload.expires_in === "number" ? payload.expires_in : undefined;
-    return { secret, secretKind: refreshToken ? "oauth_refresh_token" : "oauth_access_token", grantedScopes: stringValue(payload.scope)?.split(" ").filter(Boolean) ?? [], principal: "google-principal-pending", effectiveRole: "role_pending", expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : undefined };
+    const secretKind = refreshToken ? "oauth_refresh_token" : "oauth_access_token";
+    const expiresAt = tokenExpiry(refreshToken ? payload.refresh_token_expires_in : payload.expires_in);
+    return { secret, secretKind, grantedScopes: stringValue(payload.scope)?.split(" ").filter(Boolean) ?? [], principal: "google-principal-pending", effectiveRole: "role_pending", expiresAt };
   }
 
-  private async accessToken(secret: string) {
+  private async accessToken(secret: string, credentialKind: ProviderCredentialKind) {
+    if (credentialKind === "oauth_access_token") return secret;
+    if (credentialKind !== "oauth_refresh_token") throw new ProviderAdapterError("GOOGLE_CREDENTIAL_KIND_UNSUPPORTED");
     return withRefreshLock(secret, async () => {
       const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
       if (!clientId || !clientSecret) throw new ProviderAdapterError("GOOGLE_CLIENT_NOT_CONFIGURED");
-      try {
-        const payload = await requestJson(GOOGLE_TOKEN_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: secret, grant_type: "refresh_token" }) }, "GOOGLE_TOKEN_REFRESH", GOOGLE_HOSTS);
-        if (isJsonObject(payload) && stringValue(payload.access_token)) return stringValue(payload.access_token) as string;
-      } catch (error) {
-        if (error instanceof ProviderAdapterError && error.code === "GOOGLE_TOKEN_REFRESH_UNAVAILABLE") throw error;
-      }
-      return secret;
+      const payload = await requestJson(GOOGLE_TOKEN_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: secret, grant_type: "refresh_token" }) }, "GOOGLE_TOKEN_REFRESH", GOOGLE_HOSTS, { mapErrorCode: googleRefreshErrorCode });
+      const accessToken = isJsonObject(payload) ? stringValue(payload.access_token) : undefined;
+      if (!accessToken) throw new ProviderAdapterError("GOOGLE_TOKEN_REFRESH_INVALID_RESPONSE");
+      return accessToken;
     });
   }
 
-  async discoverResources(secret: string): Promise<ProviderResource[]> {
+  async discoverResources(secret: string, credentialKind: ProviderCredentialKind): Promise<ProviderResource[]> {
     if (!secret) throw new ProviderAdapterError("GOOGLE_SECRET_MISSING");
-    const token = await this.accessToken(secret);
+    const token = await this.accessToken(secret, credentialKind);
     if (this.provider === "google_ads") return this.discoverAds(token);
     if (this.provider === "google_analytics") return this.discoverAnalytics(token);
     return this.discoverTagManager(token);
@@ -148,12 +165,12 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
     return resources;
   }
 
-  async verify(secret: string, resources: ProviderResource[]): Promise<ProviderVerification> {
+  async verify(secret: string, resources: ProviderResource[], credentialKind: ProviderCredentialKind): Promise<ProviderVerification> {
     const startedAt = Date.now();
     if (!secret) return { outcomeCode: "invalid_grant", remediationCode: "reconnect", latencyMs: 0 };
     if (!resources.length) return { outcomeCode: "missing_role", remediationCode: "select_eligible_resource", latencyMs: 0 };
     try {
-      const discovered = await this.discoverResources(secret);
+      const discovered = await this.discoverResources(secret, credentialKind);
       const discoveredIds = new Set(discovered.filter((resource) => resource.eligibility === "eligible").map((resource) => `${resource.resourceType}:${resource.externalId}`));
       if (resources.some((resource) => !discoveredIds.has(`${resource.resourceType}:${resource.externalId}`))) return { outcomeCode: "missing_role", remediationCode: "resource_access_changed", latencyMs: parseLatency(startedAt) };
       return { outcomeCode: "verified", effectiveRole: this.provider === "google_ads" ? "role_evidence_required" : "read_only_scope", latencyMs: parseLatency(startedAt) };
@@ -163,8 +180,9 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
     }
   }
 
-  async revoke(secret: string) {
+  async revoke(secret: string, credentialKind: ProviderCredentialKind) {
     if (!secret) throw new ProviderAdapterError("GOOGLE_SECRET_MISSING");
+    if (credentialKind !== "oauth_refresh_token" && credentialKind !== "oauth_access_token") throw new ProviderAdapterError("GOOGLE_CREDENTIAL_KIND_UNSUPPORTED");
     try {
       const response = await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: secret }), signal: AbortSignal.timeout(10_000) });
       if (!response.ok && response.status !== 400) throw new ProviderAdapterError("GOOGLE_REVOKE_FAILED");

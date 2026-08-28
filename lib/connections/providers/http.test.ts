@@ -28,4 +28,11 @@ describe("provider HTTP boundary", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("sensitive upstream body", { status: 200 })));
     await expect(requestJson("https://api.example.test/v1", {}, "PROVIDER", hosts)).rejects.toThrow("PROVIDER_INVALID_RESPONSE");
   });
+
+  it("maps an approved provider error code without exposing its response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "invalid_grant", detail: "sensitive detail" }), { status: 400 })));
+    await expect(requestJson("https://api.example.test/v1", {}, "PROVIDER", hosts, {
+      mapErrorCode: (payload) => typeof payload === "object" && payload !== null && "error" in payload && payload.error === "invalid_grant" ? "PROVIDER_INVALID_GRANT" : undefined,
+    })).rejects.toThrow("PROVIDER_INVALID_GRANT");
+  });
 });

@@ -20,4 +20,5 @@ export function getProviderAdapter(provider: ConnectionProvider): ProviderAdapte
   throw new ProviderAdapterError("PROVIDER_ADAPTER_NOT_ENABLED");
 }
 
-export type { ProviderAdapter, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
+export { parseProviderCredentialKind } from "./provider-adapter";
+export type { OAuthCredentialKind, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";

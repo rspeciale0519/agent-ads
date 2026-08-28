@@ -1,5 +1,5 @@
 import type { ConnectionProvider } from "../contracts";
-import type { AuthorizationContext, ProviderAdapter, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
+import type { AuthorizationContext, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
 import { ProviderAdapterError } from "./provider-adapter";
 import { configuredRedirectUri, isJsonObject, parseLatency, requestJson, safeProviderUrl, stringArray, stringValue } from "./http";
 
@@ -58,8 +58,9 @@ export class TikTokReadOnlyAdapter implements ProviderAdapter {
     return { secret: accessToken, secretKind: "oauth_access_token", grantedScopes, principal: "tiktok-principal-pending", effectiveRole: "role_pending", expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : undefined };
   }
 
-  async discoverResources(secret: string): Promise<ProviderResource[]> {
+  async discoverResources(secret: string, credentialKind: ProviderCredentialKind): Promise<ProviderResource[]> {
     if (!secret) throw new ProviderAdapterError("TIKTOK_SECRET_MISSING");
+    if (credentialKind !== "oauth_access_token") throw new ProviderAdapterError("TIKTOK_CREDENTIAL_KIND_UNSUPPORTED");
     const advertiserPayload = assertSuccess(await requestJson(apiUrl("/oauth2/advertiser/get/"), { method: "GET", headers: { "Access-Token": secret } }, "TIKTOK_ADVERTISER_DISCOVERY", TIKTOK_HOSTS));
     const advertiserData = dataObject(advertiserPayload);
     const ids = stringArray(advertiserData.advertiser_ids);
@@ -77,12 +78,12 @@ export class TikTokReadOnlyAdapter implements ProviderAdapter {
     });
   }
 
-  async verify(secret: string, resources: ProviderResource[]): Promise<ProviderVerification> {
+  async verify(secret: string, resources: ProviderResource[], credentialKind: ProviderCredentialKind): Promise<ProviderVerification> {
     const startedAt = Date.now();
     if (!secret) return { outcomeCode: "invalid_grant", remediationCode: "reconnect", latencyMs: 0 };
     if (!resources.length) return { outcomeCode: "missing_role", remediationCode: "select_eligible_resource", latencyMs: 0 };
     try {
-      const discovered = await this.discoverResources(secret);
+      const discovered = await this.discoverResources(secret, credentialKind);
       const eligible = new Set(discovered.filter((resource) => resource.eligibility === "eligible").map((resource) => `${resource.resourceType}:${resource.externalId}`));
       if (resources.some((resource) => !eligible.has(`${resource.resourceType}:${resource.externalId}`))) return { outcomeCode: "missing_role", remediationCode: "advertiser_access_changed", latencyMs: parseLatency(startedAt) };
       return { outcomeCode: "verified", effectiveRole: "role_evidence_required", latencyMs: parseLatency(startedAt) };
@@ -92,8 +93,9 @@ export class TikTokReadOnlyAdapter implements ProviderAdapter {
     }
   }
 
-  async revoke(secret: string) {
+  async revoke(secret: string, credentialKind: ProviderCredentialKind) {
     if (!secret) throw new ProviderAdapterError("TIKTOK_SECRET_MISSING");
+    if (credentialKind !== "oauth_access_token") throw new ProviderAdapterError("TIKTOK_CREDENTIAL_KIND_UNSUPPORTED");
     try {
       const payload = assertSuccess(await requestJson(apiUrl("/oauth2/revoke_token/"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: secret }) }, "TIKTOK_REVOKE", TIKTOK_HOSTS));
       void payload;

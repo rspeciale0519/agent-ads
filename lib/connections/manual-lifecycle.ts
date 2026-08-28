@@ -43,10 +43,7 @@ export const manualInvitationInputSchema = z.object({
 export const manualVerificationSchema = z.object({
   verificationSource: verificationSourceSchema,
   sourceDate: z.coerce.date(),
-  evidenceNote: z.string().trim().min(1).max(500),
-}).superRefine((value, ctx) => {
-  const finding = findSecretPattern(value.evidenceNote);
-  if (finding) ctx.addIssue({ code: "custom", path: ["evidenceNote"], message: `Do not submit ${finding} or other platform credentials.` });
+}).strict().superRefine((value, ctx) => {
   if (value.sourceDate.getTime() > Date.now()) ctx.addIssue({ code: "custom", path: ["sourceDate"], message: "Verification date cannot be in the future." });
 });
 
@@ -119,7 +116,7 @@ export async function verifyManualInvitation(context: OrganizationContext, id: s
       await tx.connection.update({ where: { id: current.connectionId }, data: { status: "verifying" } });
       await tx.connection.update({ where: { id: current.connectionId }, data: { status: "active_read_only", accessMode: "read_only", effectiveRole: "manual_verified", lastVerifiedAt: new Date() } });
     }
-    await appendAuditEvent(tx, context, { action: "access_invitation.verified", resourceType: "access_invitation", resourceId: id, outcomeCode: "verified", correlationId, metadata: { provider: current.provider, verificationSource: parsed.verificationSource, evidenceNoteRecorded: true } });
+    await appendAuditEvent(tx, context, { action: "access_invitation.verified", resourceType: "access_invitation", resourceId: id, outcomeCode: "verified", correlationId, metadata: { provider: current.provider, verificationSource: parsed.verificationSource, sourceDate: parsed.sourceDate.toISOString() } });
     return safeInvitation(updated, current.connection?.authorizationMethod);
   });
 }

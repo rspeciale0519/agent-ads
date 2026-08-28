@@ -1,5 +1,5 @@
 import type { ConnectionProvider } from "../contracts";
-import type { AuthorizationContext, ProviderAdapter, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
+import type { AuthorizationContext, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
 import { ProviderAdapterError } from "./provider-adapter";
 
 export class ManualInventoryAdapter implements ProviderAdapter {
@@ -12,7 +12,7 @@ export class ManualInventoryAdapter implements ProviderAdapter {
   }
   buildAuthorizationUrl(context: AuthorizationContext): string { void context; throw new ProviderAdapterError("PROVIDER_MANUAL_ROUTE_ONLY"); }
   async exchangeCode(code: string, verifier: string): Promise<TokenExchangeResult> { void code; void verifier; throw new ProviderAdapterError("PROVIDER_MANUAL_ROUTE_ONLY"); }
-  async discoverResources(secret: string): Promise<ProviderResource[]> { void secret; throw new ProviderAdapterError("PROVIDER_MANUAL_ROUTE_ONLY"); }
-  async verify(secret: string, resources: ProviderResource[]): Promise<ProviderVerification> { void secret; void resources; return { outcomeCode: "provider_unavailable", remediationCode: "manual_verification_required", latencyMs: 0 }; }
-  async revoke(secret: string) { void secret; return undefined; }
+  async discoverResources(secret: string, credentialKind: ProviderCredentialKind): Promise<ProviderResource[]> { void secret; void credentialKind; throw new ProviderAdapterError("PROVIDER_MANUAL_ROUTE_ONLY"); }
+  async verify(secret: string, resources: ProviderResource[], credentialKind: ProviderCredentialKind): Promise<ProviderVerification> { void secret; void resources; return { outcomeCode: "provider_unavailable", remediationCode: credentialKind === "manual_inventory" ? "manual_verification_required" : "credential_kind_unsupported", latencyMs: 0 }; }
+  async revoke(secret: string, credentialKind: ProviderCredentialKind) { void secret; if (credentialKind !== "manual_inventory") throw new ProviderAdapterError("PROVIDER_CREDENTIAL_KIND_UNSUPPORTED"); }
 }
