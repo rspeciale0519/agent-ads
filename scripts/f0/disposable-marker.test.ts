@@ -93,6 +93,8 @@ describe("F0 disposable target marker", () => {
   it("rejects dirty cluster state through one shared catalog guard", () => {
     expect(clusterGuard).toContain("datname NOT IN ('postgres', 'template0', 'template1')");
     expect(clusterGuard).toContain("database_entry.datallowconn");
+    expect(clusterGuard).toContain("database_entry.datname = 'template0'");
+    expect(clusterGuard).toContain("database_entry.datcollversion IS NOT NULL");
     expect(clusterGuard).toContain("aclexplode(database_entry.datacl)");
     expect(clusterGuard).toContain("database_entry.datdba <> current_user::regrole");
     expect(clusterGuard).toContain("FROM pg_tablespace");

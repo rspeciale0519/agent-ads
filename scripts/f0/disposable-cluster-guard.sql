@@ -87,7 +87,15 @@ BEGIN
       OR database_entry.datctype <> template_reference.datctype
       OR database_entry.datlocale IS DISTINCT FROM template_reference.datlocale
       OR database_entry.daticurules IS DISTINCT FROM template_reference.daticurules
-      OR database_entry.datcollversion IS DISTINCT FROM template_reference.datcollversion
+      OR (
+        -- initdb intentionally disables collation-version checks for template0.
+        database_entry.datname = 'template0'
+        AND database_entry.datcollversion IS NOT NULL
+      )
+      OR (
+        database_entry.datname <> 'template0'
+        AND database_entry.datcollversion IS DISTINCT FROM template_reference.datcollversion
+      )
       OR database_entry.dattablespace <> (
         SELECT oid FROM pg_tablespace WHERE spcname = 'pg_default'
       )
