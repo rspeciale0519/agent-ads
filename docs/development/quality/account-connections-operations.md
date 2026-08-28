@@ -17,11 +17,38 @@ The command requires these local process variables:
 - `F0_ALLOW_DISPOSABLE_DATABASE=1`.
 - `F0_POSTGRES_DATA_DIR` resolved inside this repository's `docs/temp/` directory.
 - `F0_DISPOSABLE_MARKER` set to a canonical lowercase UUIDv4.
-- `POSTGRES_BIN` resolved to the PostgreSQL `postgres` executable.
+- `POSTGRES_BIN` resolved to a PostgreSQL 17 `postgres` executable.
 
-Before its first database write, the proof rejects unexpected databases, roles, relations, extensions, or database comments. It then writes and verifies a server-side marker.
+The data directory must keep `pg_wal` inside itself and keep `pg_tblspc` empty. It must contain no escaping link or hard-linked file. Its configured `data_directory` must resolve to the same approved directory.
 
-The proof changes only its isolated cluster. It does not prove networked RLS, Supavisor, Vault, backup, or restore behavior.
+Run `pnpm run security:f0-schema-single:mark` before `pnpm run security:f0-schema-single`. The mark command inventories `postgres`, `template1`, and selected shared and database-local catalogs before it writes the marker. The proof requires that prior marker and repeats both source-database inventories before it creates `agent_ads_f0` from `template1`.
+
+The proofs never clone `template0`. Its metadata is checked, but its internal catalog is not available to the network proof.
+
+The shared guard rejects altered PostgreSQL 17 roles and memberships. It also rejects unexpected access methods, schemas, objects, and database settings. Its privilege checks cover database, public-schema, default, and parameter privileges.
+
+The network proof requires `F0_ALLOW_DISPOSABLE_DATABASE=1`, `F0_DATABASE_URL`, and a canonical lowercase UUIDv4 `F0_DISPOSABLE_MARKER`. `PSQL_BIN` is optional when `psql` is on `PATH`. `F0_DATABASE_URL` must use a numeric loopback address, select `agent_ads_f0`, and contain no query or fragment.
+
+Run these commands in order on a new disposable cluster:
+
+1. Run `pnpm run security:f0-mark-guard` before the marker exists.
+2. Run `pnpm run security:f0-schema:mark`.
+3. Run `pnpm run security:f0-guard`.
+4. Run `pnpm run security:f0-schema`.
+
+The wrapper replaces libpq routing variables with validated fields. Guard connections disable login event triggers and search trusted catalogs first.
+
+The URL check cannot detect a local proxy or tunnel that forwards traffic to another server.
+
+Use a trusted PostgreSQL client installation and a trusted `PATH`. The wrapper cannot detect a malicious executable that copies the `psql` name and output.
+
+Use a cluster that you own exclusively. Do not allow another session to change state during either proof. Readiness probes are allowed. The network proof has check-to-write race windows between connections and processes.
+
+Discard the complete disposable cluster after every successful or failed proof. Never reuse its databases, roles, files, or server process. The proof scripts do not claim general cleanup.
+
+These safeguards cover accidental target selection and known PostgreSQL data links. They do not prove hostile filesystem isolation, networked RLS, Supavisor, Vault, backup, or restore behavior.
+
+The inventories do not cover `template0` internals, every built-in attribute, comments, security labels, transforms, or server configuration.
 
 ## Migration and backup procedure
 

@@ -70,7 +70,7 @@ The original Account Connections migration defines `credential_references.id` as
 
 The local repair now converts the pointer before later comparisons. Prisma maps it as UUID and the database enforces same-connection ownership.
 
-A disposable PostgreSQL 17 single-user run applied every SQL migration and passed UUID upgrade, relationship, index, RLS-flag, and role-attribute assertions.
+A disposable PostgreSQL 17 single-user run applied every SQL migration and passed UUID upgrade, relationship, index, RLS-flag, and role-attribute assertions. A separate mark command inventories `postgres`, `template1`, and selected shared and database-local catalogs before the proof creates databases from `template1`. The proof does not clone `template0`.
 
 The networked CI job adds Prisma checksum history and low-privilege RLS behavior. [GitHub run 33172706999](https://github.com/rspeciale0519/agent-ads/actions/runs/33172706999) passed at commit `96c81608ed8abae860a38049d82dd12f56de2a03` on 2026-08-28. This run proves only its disposable CI target.
 

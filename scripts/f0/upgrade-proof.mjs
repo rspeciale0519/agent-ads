@@ -2,50 +2,29 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { networkDatabaseEnvironment, resolveNetworkProofContext } from "./network-safety.mjs";
 import { upgradeScenarios } from "./upgrade-fixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const databaseUrl = process.env.F0_DATABASE_URL;
-const marker = process.env.F0_DISPOSABLE_MARKER;
-
-if (process.env.F0_ALLOW_DISPOSABLE_DATABASE !== "1") {
-  throw new Error("F0_ALLOW_DISPOSABLE_DATABASE=1 is required for this destructive disposable-database proof.");
-}
-if (!databaseUrl || !marker) throw new Error("F0_DATABASE_URL and F0_DISPOSABLE_MARKER are required.");
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(marker)) {
-  throw new Error("F0_DISPOSABLE_MARKER must be a canonical lowercase UUID.");
-}
-
-const parsed = new URL(databaseUrl);
-const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const databaseName = decodeURIComponent(parsed.pathname).replace(/^\/+/, "");
-if (!allowedHosts.has(parsed.hostname) || databaseName !== "agent_ads_f0") {
-  throw new Error("F0_DATABASE_URL must target the local disposable database agent_ads_f0.");
-}
-
-const psql = process.env.PSQL_BIN || "psql";
+const context = resolveNetworkProofContext();
+const { marker, psql } = context;
 const createdDatabases = [];
 const templateName = "agent_ads_f0_upgrade_template";
 
-function urlFor(name) {
-  const target = new URL(databaseUrl);
-  target.pathname = `/${name}`;
-  return target.toString();
-}
-
-function psqlResult(url, { file, sql } = {}) {
-  const args = ["-X", "--quiet", "--tuples-only", "--no-align", "--dbname", url, "--set", "ON_ERROR_STOP=1"];
+function psqlResult(database, { file, sql } = {}) {
+  const args = ["-X", "--quiet", "--tuples-only", "--no-align", "--set", "ON_ERROR_STOP=1"];
   if (file) args.push("--file", file);
   return spawnSync(psql, args, {
     cwd: root,
     encoding: "utf8",
+    env: networkDatabaseEnvironment(context, database),
     input: sql,
     maxBuffer: 50 * 1024 * 1024,
   });
 }
 
-function requireSuccess(label, url, options) {
-  const result = psqlResult(url, options);
+function requireSuccess(label, database, options) {
+  const result = psqlResult(database, options);
   if (result.error || result.status !== 0) {
     process.stderr.write(`${result.stdout || ""}${result.stderr || ""}`);
     if (result.error) throw new Error(`${label} could not start: ${result.error.message}`);
@@ -53,8 +32,8 @@ function requireSuccess(label, url, options) {
   }
 }
 
-function requireFailure(label, url, sql, expectedMessage) {
-  const result = psqlResult(url, { sql });
+function requireFailure(label, database, sql, expectedMessage) {
+  const result = psqlResult(database, { sql });
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   if (!result.error && result.status === 0) throw new Error(`${label} unexpectedly succeeded.`);
   if (!output.includes(expectedMessage)) {
@@ -63,17 +42,17 @@ function requireFailure(label, url, sql, expectedMessage) {
   }
 }
 
-function createDatabase(name, template = "template0") {
+function createDatabase(name, template = "template1") {
   if (!/^agent_ads_f0_[a-z_]+$/u.test(name)) throw new Error("Unsafe upgrade-proof database name.");
   requireSuccess(
     `Create ${name}`,
-    urlFor("postgres"),
+    "postgres",
     { sql: `CREATE DATABASE "${name}" TEMPLATE "${template}";\n` },
   );
   createdDatabases.push(name);
 }
 
-const markerResult = psqlResult(databaseUrl, {
+const markerResult = psqlResult("agent_ads_f0", {
   sql: `SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database();\n`,
 });
 if (
@@ -104,11 +83,11 @@ function provePermissionRoleLoginGuard(roleName) {
   }
   requireFailure(
     `Permission-role login guard for ${roleName}`,
-    databaseUrl,
+    "agent_ads_f0",
     `BEGIN;\nALTER ROLE "${roleName}" LOGIN;\n${vaultBoundaryMigration}`,
     "ACCOUNT_CONNECTIONS_PERMISSION_ROLE_LOGIN_ENABLED",
   );
-  const state = psqlResult(databaseUrl, {
+  const state = psqlResult("agent_ads_f0", {
     sql: `SELECT rolcanlogin FROM pg_roles WHERE rolname = '${roleName}';\n`,
   });
   if (state.error || state.status !== 0 || state.stdout.trim() !== "f") {
@@ -121,33 +100,42 @@ try {
   provePermissionRoleLoginGuard("app_secret_broker");
 
   createDatabase(templateName);
-  requireSuccess("Upgrade template bootstrap", urlFor(templateName), { file: bootstrapFile });
-  requireSuccess("Upgrade template base migration", urlFor(templateName), { file: baseMigrationFile });
+  requireSuccess("Upgrade template bootstrap", templateName, { file: bootstrapFile });
+  requireSuccess("Upgrade template base migration", templateName, { file: baseMigrationFile });
 
   for (const scenario of upgradeScenarios) {
     const scenarioDatabase = `agent_ads_f0_${scenario.name}`;
     createDatabase(scenarioDatabase, templateName);
-    const scenarioUrl = urlFor(scenarioDatabase);
-    requireSuccess(`Upgrade fixture ${scenario.name}`, scenarioUrl, { sql: scenario.fixture });
+    requireSuccess(`Upgrade fixture ${scenario.name}`, scenarioDatabase, { sql: scenario.fixture });
     if (scenario.expectedFailure) {
-      requireFailure(`Upgrade repair ${scenario.name}`, scenarioUrl, repairMigration, scenario.expectedFailure);
+      requireFailure(
+        `Upgrade repair ${scenario.name}`,
+        scenarioDatabase,
+        repairMigration,
+        scenario.expectedFailure,
+      );
     } else {
-      requireSuccess(`Upgrade repair ${scenario.name}`, scenarioUrl, { sql: repairMigration });
+      requireSuccess(`Upgrade repair ${scenario.name}`, scenarioDatabase, { sql: repairMigration });
     }
     if (scenario.postRepairMigration) {
       requireSuccess(
         `Post-repair migration ${scenario.name}`,
-        scenarioUrl,
+        scenarioDatabase,
         { file: path.join(root, "prisma", "migrations", scenario.postRepairMigration, "migration.sql") },
       );
     }
-    requireSuccess(`Upgrade assertion ${scenario.name}`, scenarioUrl, { sql: scenario.assertion });
+    requireSuccess(`Upgrade assertion ${scenario.name}`, scenarioDatabase, { sql: scenario.assertion });
   }
 } finally {
+  let cleanupFailed = false;
   for (const name of createdDatabases.reverse()) {
-    const result = psqlResult(urlFor("postgres"), { sql: `DROP DATABASE "${name}" WITH (FORCE);\n` });
-    if (result.error || result.status !== 0) process.stderr.write(`${result.stdout || ""}${result.stderr || ""}`);
+    const result = psqlResult("postgres", { sql: `DROP DATABASE "${name}" WITH (FORCE);\n` });
+    if (result.error || result.status !== 0) {
+      cleanupFailed = true;
+      process.stderr.write(`${result.stdout || ""}${result.stderr || ""}`);
+    }
   }
+  if (cleanupFailed) throw new Error("F0 upgrade proof could not remove every run-owned database.");
 }
 
 console.log("F0 upgrade proof passed: permission-role login guards, valid, null, malformed, orphan, cross-tenant, collision, rollback, and historical tenant-column paths are safe.");
