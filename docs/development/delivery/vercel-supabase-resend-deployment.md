@@ -29,9 +29,12 @@ This project is ready for a GitHub → Vercel deployment with Supabase storage/d
 
 1. Push this project to a private GitHub repository.
 2. Import the repository into Vercel using the Next.js framework preset.
-3. Add every variable from `.env.example` to Vercel for Preview and Production environments.
-4. Deploy a Preview first, create an applicant account, confirm the email, submit a test onboarding, upload an `.xlsx` and a PDF, and confirm both the applicant-owned Supabase row/files and Resend email.
-5. Add the MioDio custom domain in Vercel after the preview test passes, then add that domain's `/auth/callback` URL in Supabase Auth.
+3. Keep the Vercel Build Command as `pnpm run build`. Its `prebuild` hook generates the Prisma client before Next.js type checks.
+4. Add every variable from `.env.example` to Vercel for Preview and Production environments.
+5. Deploy a Preview first, create an applicant account, confirm the email, submit a test onboarding, upload an `.xlsx` and a PDF, and confirm both the applicant-owned Supabase row/files and Resend email.
+6. Add the MioDio custom domain in Vercel after the preview test passes, then add that domain's `/auth/callback` URL in Supabase Auth.
+
+Do not replace `pnpm run build` with `next build`. The direct command skips Prisma client generation.
 
 ## Notification shape
 

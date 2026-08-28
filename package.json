@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.12.4",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node node_modules/prisma/build/index.js generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
