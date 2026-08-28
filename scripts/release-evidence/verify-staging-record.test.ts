@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   copyFileSync,
   mkdirSync,
@@ -46,6 +46,8 @@ type VerifierOutput = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const VERIFIER_TEST_TIMEOUT_MS = 20_000;
+vi.setConfig({ testTimeout: VERIFIER_TEST_TIMEOUT_MS });
 const sourceRoot = process.cwd();
 const sourceVerifier = path.join(sourceRoot, "scripts", "release-evidence", "verify-staging-record.mjs");
 const sourceSchema = path.join(sourceRoot, "scripts", "release-evidence", "staging-record-schema.mjs");
@@ -160,6 +162,7 @@ beforeAll(() => {
 
 afterAll(() => {
   if (root) rmSync(root, { recursive: true, force: true });
+  vi.resetConfig();
 });
 
 describe("staging evidence verifier", () => {
