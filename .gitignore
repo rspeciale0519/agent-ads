@@ -6,6 +6,7 @@ out/
 .env*
 !.env.example
 docs/temp/*.log
+docs/temp/account-connections-gate-0.md
 docs/temp/onboarding-submissions/
 docs/temp/cmgpa-local-recovery.md
 docs/temp/test-marketing-keywords.csv

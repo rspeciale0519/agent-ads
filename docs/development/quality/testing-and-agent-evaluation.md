@@ -37,7 +37,13 @@ The system combines deterministic software, external APIs, probabilistic agents,
 - Verify enabled and forced RLS on every protected table.
 - Verify runtime and broker roles have only approved privileges.
 - Test the database target fingerprint and disposable-target guard.
-- Restore the complete database, Storage, Vault, role, configuration, and artifact recovery set.
+
+### Recovery Gate F1 tests
+
+- Verify separate local, preview, staging, and pilot resources.
+- Restore the complete database, Storage, Vault, role, configuration, scheduler, flag, artifact, and migration recovery set.
+- Prove the approved recovery-point and recovery-time targets.
+- Revalidate target fingerprints, migrations, RLS, roles, pooling, and secret access after restore.
 
 ### Connector tests
 
@@ -199,11 +205,11 @@ The required pull-request gates are:
 
 The GitHub workflow now configures Prisma validation and generation, type-check, lint, tests, security audits, a disposable migration proof, and build.
 
-The schema job also configures Prisma checksum history, UUID upgrade branches, and low-privilege tenant tests. A successful GitHub run remains unverified.
+The schema job also configures Prisma checksum history, UUID upgrade branches, and low-privilege tenant tests. [GitHub run 33172706999](https://github.com/rspeciale0519/agent-ads/actions/runs/33172706999) passed at commit `96c81608ed8abae860a38049d82dd12f56de2a03` on 2026-08-28.
 
-Target inventory, complete tenant tests, restore tests, supervisor evaluation, and staging evidence remain Gate F0 requirements.
+Target inventory, complete tenant tests, and target schema evidence remain Gate F0 requirements. Recovery tests remain Gate F1 requirements.
 
-Staging adds target Gate F0, restore, connector, browser, accessibility, and canary checks. Pilot promotion needs the release checklist and owner approval.
+Staging adds target Gate F0, recovery Gate F1, connector, browser, accessibility, and canary checks. Pilot promotion needs supervisor evaluation, the release checklist, and owner approval.
 
 ## Test evidence
 

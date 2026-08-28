@@ -8,6 +8,21 @@ Use separate Supabase projects, Auth redirect URLs, provider applications, Vault
 
 Required deployment variables are documented in `.env.example`. Values are injected by the environment secret manager. The repository must contain names and safe placeholders only.
 
+## Disposable local F0 proof
+
+`pnpm run security:f0-schema-single` is destructive inside its selected PostgreSQL cluster. Never use a shared, staging, pilot, or production data directory.
+
+The command requires these local process variables:
+
+- `F0_ALLOW_DISPOSABLE_DATABASE=1`.
+- `F0_POSTGRES_DATA_DIR` resolved inside this repository's `docs/temp/` directory.
+- `F0_DISPOSABLE_MARKER` set to a canonical lowercase UUIDv4.
+- `POSTGRES_BIN` resolved to the PostgreSQL `postgres` executable.
+
+Before its first database write, the proof rejects unexpected databases, roles, relations, extensions, or database comments. It then writes and verifies a server-side marker.
+
+The proof changes only its isolated cluster. It does not prove networked RLS, Supavisor, Vault, backup, or restore behavior.
+
 ## Migration and backup procedure
 
 1. Record the Supabase project reference, host, database name, environment class, migration heads, Git revision, artifact digest, backup identifier, operator, approver, and UTC time.

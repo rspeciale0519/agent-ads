@@ -72,7 +72,7 @@ The local repair now converts the pointer before later comparisons. Prisma maps 
 
 A disposable PostgreSQL 17 single-user run applied every SQL migration and passed UUID upgrade, relationship, index, RLS-flag, and role-attribute assertions.
 
-The networked CI job adds Prisma checksum history and low-privilege RLS behavior. No successful remote run is recorded yet.
+The networked CI job adds Prisma checksum history and low-privilege RLS behavior. [GitHub run 33172706999](https://github.com/rspeciale0519/agent-ads/actions/runs/33172706999) passed at commit `96c81608ed8abae860a38049d82dd12f56de2a03` on 2026-08-28. This run proves only its disposable CI target.
 
 Do not expose pilot credentials or promote this schema until shared-target inspection, approved repair execution, and staging proof pass.
 
