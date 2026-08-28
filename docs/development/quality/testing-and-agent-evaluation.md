@@ -206,7 +206,7 @@ The required pull-request gates are:
 
 The GitHub workflow now configures Prisma validation and generation, type-check, lint, tests, security and dependency audits, dirty-target guard tests, a disposable migration proof, and build.
 
-The guard job rejects a wrong marker, unsafe URL overrides, dirty database metadata, dirty `template1`, casts, roles, schemas, relations, routines, types, publications, foreign-data wrappers, large objects, and role settings. It also checks database, public-schema, default, and parameter privileges. Its prior migration evidence remains [GitHub run 33172706999](https://github.com/rspeciale0519/agent-ads/actions/runs/33172706999) at commit `96c81608ed8abae860a38049d82dd12f56de2a03` on 2026-08-28. Remote validation must pass for the exact pull-request commit.
+The guard job rejects a wrong marker, unsafe URL overrides, dirty database metadata, dirty `template1`, casts, roles, schemas, relations, routines, types, publications, foreign-data wrappers, large objects, and role settings. It also checks database, public-schema, default, and parameter privileges. [GitHub run 33204340209](https://github.com/rspeciale0519/agent-ads/actions/runs/33204340209) passed `validate`, `guard-proof`, and `schema-proof` at commit `bff8b60f69ae3e0c58279ebb87f8be3f58457b7f` on 2026-08-28. Remote validation must pass again for each later pull-request commit.
 
 Target inventory, complete tenant tests, and target schema evidence remain Gate F0 requirements. Recovery tests remain Gate F1 requirements.
 

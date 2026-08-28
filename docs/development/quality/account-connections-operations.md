@@ -138,16 +138,72 @@ The Vault boundary migration removes write-function access from public and non-b
 
 The Supabase Vault ciphertext is portable only when the documented Vault root-key path is preserved. A database dump without the corresponding root key is not a valid recovery set.
 
-Supabase database backups do not include Storage objects. Back up Storage objects and their object-reference manifest separately.
+Supabase database backups do not include Storage objects. Back up Storage objects, bucket settings, access policies, and their object-reference manifest separately.
 
-1. Restore a recent database export into a disposable Supabase project or isolated PostgreSQL target.
-2. Restore the matching Vault root-key material through the approved recovery workflow; never paste it into a shell command, issue, log, or test fixture.
-3. Restore Storage objects and verify every retained database object reference against the manifest.
-4. Recreate the private Vault access grants and low-privilege roles. Generate new role passwords through the secret manager.
-5. Restore approved Auth, redirect, SMTP, provider-application, deployment, feature-flag, and scheduler configuration.
-6. With a synthetic canary, prove broker write, read, fingerprint, rotation, revoke, destroy, and unprivileged-role refusal.
-7. Run forced-RLS, cross-tenant, Prisma transaction/pooler, connector, and application smoke tests.
-8. Destroy the disposable target through the approved retention process and record the drill without storing the canary value.
+Use only synthetic staging data for a pre-pilot recovery drill. Do not copy production or customer data into a drill.
+
+### Same-project incident recovery
+
+This mode restores an existing environment. It is not a disposable drill.
+
+1. Plan and record downtime.
+2. Record and drop custom subscriptions and replication slots. Supabase manages the Realtime slot.
+3. Restore the approved physical backup.
+4. Keep the existing Vault root key.
+5. Verify Supabase-managed credentials.
+6. Reset every application-created `LOGIN` password through the secret manager.
+7. Recreate and verify custom subscriptions and replication slots.
+8. Restore platform configuration in an inert state.
+9. Keep schedulers, external endpoints, provider credentials, provider flags, and mutations disabled.
+10. Verify Storage references, Vault, roles, RLS, tenant isolation, pooling, Auth, and the application.
+11. Enable only the approved read path after all incident gates pass.
+12. Never destroy the restored environment as a drill-cleanup step.
+
+### Disposable physical-clone drill
+
+1. Use only an inert staging source without active external jobs or real provider credentials.
+2. For incident use, block external destinations outside the database before creating the clone.
+3. Confirm paid-plan access, physical backups, clone restrictions, and cost approval.
+4. Restrict access because roles, users, Auth data, and the Vault root key are copied.
+5. Apply production-class controls and retention when real data exists. Require explicit approval before deletion.
+6. Disable copied `pg_cron`, `pg_net`, wrappers, and other external operations before testing.
+7. Keep the copied Vault root key.
+8. Reset every application-created `LOGIN` password through the secret manager.
+9. Restore missing Storage objects and platform configuration in an inert state.
+
+### Disposable logical-restore drill
+
+The Beta `pgsodium` Management API needs `project_admin_write`.
+
+Logical mode stays blocked until operations approve and test a nonlogging transfer tool.
+
+1. Keep the source and target active.
+2. Use a new isolated target before any schema, data, secret, or encrypted-value write.
+3. Prove the target has no application data and no Vault secrets.
+4. Freeze restore activity until the key transfer finishes.
+5. Use the least-privileged available operator identity for the required projects.
+6. Create a fine-grained token with `project_admin_write` and no unrelated permission.
+7. Disable shell tracing, transcripts, command logging, and CI capture.
+8. Stream `GET /v1/projects/{source_ref}/pgsodium` directly into `PUT /v1/projects/{target_ref}/pgsodium`.
+9. Never print, save, copy, or record the response body.
+10. Compare both keys in memory. Record only a match result and request status.
+11. Revoke the Management API token immediately.
+12. Restore the logical backup and reviewed role SQL.
+13. Create new application login passwords through the secret manager.
+14. If transfer or verification fails, isolate the target and use the approved retention process.
+
+### Common disposable-target proof
+
+1. Restore Storage objects and verify every retained database reference against the manifest.
+2. Verify private Vault grants, roles, login attributes, memberships, and direct grants. Do not recreate verified objects.
+3. Restore Auth and platform settings in an inert state.
+4. Keep schedulers, external endpoints, real credentials, provider flags, and provider mutations disabled.
+5. With a synthetic canary, prove broker write, read, fingerprint, rotation, revoke, destroy, and unprivileged-role refusal.
+6. Run forced-RLS, cross-tenant, Prisma transaction/pooler, Auth, connector, and application smoke tests.
+7. Verify zero external operations occurred.
+8. Destroy the disposable target through the approved retention process. Record the drill without the canary value.
+
+Use the current [Supabase backup](https://supabase.com/docs/guides/platform/backups), [restore-to-new-project](https://supabase.com/docs/guides/platform/clone-project), and [changelog](https://supabase.com/changelog) guidance for every drill.
 
 Run this drill before pilot launch, after each recovery-design change, and quarterly during the pilot.
 

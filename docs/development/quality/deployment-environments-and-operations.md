@@ -96,16 +96,36 @@ Expansion container and infrastructure definitions must support later AWS profil
 
 ## CI/CD
 
-1. Build one immutable artifact from reviewed source.
+Record the branch-to-environment mapping before promotion.
+
+The current GitHub deployment record maps the `develop` head to a Vercel `Production` deployment.
+
+Treat `develop` as a shared deployment branch until verified configuration evidence proves otherwise. Do not merge until staging, recovery, and rollback gates pass.
+
+1. Select one reviewed Git commit and lockfile for all environment builds.
 2. Run every required pull-request gate.
-3. Deploy the compatible artifact to staging.
-4. Verify the target fingerprint and current recovery set.
-5. Apply the approved forward migration.
-6. Run catalog, RLS, role, connector, browser, and smoke checks.
-7. Promote the same artifact to pilot.
-8. Enable read flags for one organization.
-9. Enable each write flag only after its canary approval.
-10. Halt on audit, policy, reconciliation, security, or spend failures.
+3. Keep staging access, flags, schedulers, and external operations disabled.
+4. Verify the staging target fingerprint and current recovery set.
+5. Apply and verify the approved migration on staging.
+6. Build and deploy that commit in staging.
+7. Run catalog, RLS, role, connector, browser, and smoke checks.
+8. Keep the pilot domain, organization access, flags, schedulers, and external operations disabled.
+9. Verify the pilot target and recovery set.
+10. Apply and verify the approved migration on the pilot target.
+11. Build and deploy that commit in the pilot project.
+12. Verify the resulting Production deployment.
+13. Record separate staging and pilot deployment identifiers.
+14. Enable read flags for one organization.
+15. Enable each write flag only after its canary approval.
+16. Halt on audit, policy, reconciliation, security, or spend failures.
+
+Before step 4, record the private disabled-operations manifest defined in the deployment runbook.
+
+Require evidence for disabled access, provider flags, schedulers, customer messages, and external operations. Do not accept configuration claims without observed evidence.
+
+A Preview-to-Production promotion rebuilds with Production variables. Separate Vercel projects create separate deployments.
+
+A staged Production promotion does not rebuild. Create it with `vercel --prod --skip-domain`, then promote it only after verification.
 
 Production secrets and credentials are resolved at runtime and never embedded in artifacts.
 
@@ -118,7 +138,9 @@ Production secrets and credentials are resolved at runtime and never embedded in
 - Database recovery uses a later forward migration. Application rollback uses flags and a compatible build.
 - Restore rehearsal validates database and object references together.
 
-Each preflight records Supabase project reference, database host, database name, environment class, expected and current migration heads, artifact digest, backup identifier, operator, approver, and UTC time.
+Each preflight records the target, migration, deployment, backup, owner, and UTC evidence in a private release record.
+
+Keep infrastructure identifiers and owner details outside Git, pull requests, public documents, and ordinary logs.
 
 A destructive local proof script needs a disposable-target marker. A production migration needs a database owner and operations reviewer.
 
@@ -139,15 +161,37 @@ Security authorization is never implemented only as a client-side feature flag.
 ## Backup and disaster recovery
 
 - Supabase database backup or point-in-time recovery point.
-- Separate Storage object backup and object-reference manifest.
-- Vault root key through the approved out-of-band recovery process.
-- Custom role definitions and new role passwords from the secret manager.
-- Auth, redirect, SMTP, and provider-application configuration.
+- Separate Storage object backup, bucket configuration, access policy, and object-reference manifest.
+- Vault root key through the approved out-of-band recovery process when the selected mode requires key transfer.
+- Custom role definitions from reviewed role SQL and new role passwords from the secret manager.
+- Auth settings, API keys, redirect, SMTP, Realtime, extension, database-setting, and provider-application configuration.
 - Deployment variables, feature flags, scheduler configuration, immutable artifact, and migration revision.
 - Regular restore tests with documented recovery time and recovery point results.
 - Critical audit data replicated according to risk.
 
 A database backup alone is not the complete recovery set. Supabase database backups do not contain Storage objects.
+
+Choose one recovery mode before each operation.
+
+Use only physical-clone or logical-restore modes with synthetic staging data for pre-pilot drills. Same-project restore is incident recovery.
+
+- A same-project physical restore keeps its Vault root key. Plan downtime and manage custom subscriptions and replication slots around the restore.
+- Supabase manages the Realtime replication slot. Recreate and verify other recorded subscriptions and slots after the restore.
+- A physical clone copies roles, permissions, users, Auth data, and the Vault root key. Restrict access before recovery tests.
+- Before cloning, confirm paid-plan access, physical backups, clone restrictions, and cost approval.
+- For drills, clone only an inert staging source without active external jobs or real provider credentials.
+- Before an incident clone, block external destinations outside the database.
+- Apply production-class controls and retention when real data exists. Require explicit approval before target deletion.
+- After cloning, disable copied `pg_cron`, `pg_net`, wrappers, and other external-operation extensions before testing.
+- Reset every application-created login password before Supavisor or application tests.
+- A logical restore does not carry custom role passwords. Restore role definitions from reviewed role SQL and create new passwords through the secret manager.
+- Retrieve the source Vault root key before pausing or deleting the source. Verify the target has no differently encrypted data before replacement.
+
+For every mode, rotate or reset application-created login-role passwords. Restore platform settings and Storage configuration separately when the mode does not include them.
+
+The private recovery manifest states the mode, contents, exclusions, target, backup, deployment, migration revision, owners, and verification steps.
+
+Manual logical restores must follow the nonlogging Vault key-transfer procedure in `account-connections-operations.md`.
 
 Run a restore drill before pilot launch, after each recovery-design change, and quarterly during the pilot.
 

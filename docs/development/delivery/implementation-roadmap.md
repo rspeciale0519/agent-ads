@@ -30,11 +30,11 @@ This overlay records existing local Account Connections work. It does not prove 
 A checked item means only the state written in that item. Release evidence must also record the Git revision, environment, date, owner, and evidence link.
 
 - [x] Gate F0 local migration proof: full SQL migration order, UUID repair branches, permission-role login guards, catalog definitions, role constraints, forced-RLS flags, and low-privilege tenant behavior on a disposable target.
-- [ ] Gate 0 local runtime proof: Prisma transaction reuse, pooler behavior, Vault lifecycle, failure compensation, and concurrent rotation/revocation need a safe, tracked harness and durable evidence.
+- [ ] Gate F0 local runtime proof: Prisma transaction reuse, pooler behavior, Vault lifecycle, failure compensation, and concurrent rotation/revocation need a safe, tracked harness and durable evidence.
 - [x] Phase 1 local foundation: Prisma schema/migrations, tenant-context membership resolution under forced RLS, authenticated-subject RLS for global user identity, cross-tenant relationship constraints, organization permissions/invitations, audit chain, AAL2/active-session checks, action-bound step-up grants, and direct-maintenance bootstrap script.
 - [x] Phase 2 local workspace: `/dashboard`, `/onboarding`, `/connections`, inventory/request APIs, safe redirects, non-secret metadata contracts, DLP rejection, responsive empty/error states, and MFA screen.
 - [x] Phase 3 local authorization boundary: adapter contract, deterministic mock provider, OAuth state/PKCE/replay controls, SecretBroker/Vault boundary, redaction, rate limits, CSRF/origin checks, and lifecycle APIs.
-- [ ] Gate 0 staging revalidation: target Supavisor behavior, Vault root-key restore portability, failure compensation, rotation/revocation concurrency, and migration/restore rehearsal.
+- [ ] Gate F0 staging revalidation: target Supavisor behavior, Vault lifecycle, failure compensation, rotation/revocation concurrency, and migration-target proof.
 - [x] Phase 4 local Google adapter slice: bounded Ads/GA4/GTM discovery, token exchange/revoke normalization, read-only role confirmation gate, and mocked redacted fixtures.
 - [ ] Phase 4 Google supervised pilot: live application credentials, approved scopes, Ads role/developer-token evidence, and staging Chrome DevTools journey.
 - [x] Phase 5 local Meta adapter slice: configured Graph-version allowlist, safe asset discovery/verification/revoke paths, and explicit role-confirmation gate.
@@ -72,7 +72,7 @@ The local repair now converts the pointer before later comparisons. Prisma maps 
 
 A disposable PostgreSQL 17 single-user run applied every SQL migration and passed UUID upgrade, relationship, index, RLS-flag, and role-attribute assertions. A separate mark command inventories `postgres`, `template1`, and selected shared and database-local catalogs before the proof creates databases from `template1`. The proof does not clone `template0`.
 
-The networked CI job adds Prisma checksum history and low-privilege RLS behavior. [GitHub run 33172706999](https://github.com/rspeciale0519/agent-ads/actions/runs/33172706999) passed at commit `96c81608ed8abae860a38049d82dd12f56de2a03` on 2026-08-28. This run proves only its disposable CI target.
+The networked CI jobs add Prisma checksum history and low-privilege RLS behavior. [GitHub run 33204340209](https://github.com/rspeciale0519/agent-ads/actions/runs/33204340209) passed `validate`, `guard-proof`, and `schema-proof` at commit `bff8b60f69ae3e0c58279ebb87f8be3f58457b7f` on 2026-08-28. This run proves only its disposable CI target.
 
 Do not expose pilot credentials or promote this schema until shared-target inspection, approved repair execution, and staging proof pass.
 

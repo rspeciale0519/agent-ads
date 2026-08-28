@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "release:evidence:verify": "node scripts/release-evidence/verify-staging-record.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "security:rls-audit": "node scripts/rls-audit.mjs",
     "security:mutation-audit": "node scripts/mutation-contract-audit.mjs",

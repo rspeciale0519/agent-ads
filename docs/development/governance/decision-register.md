@@ -266,15 +266,15 @@
 - Affects: P-001–P-008, AGT-001–AGT-010, ORG-001–ORG-011, OPS-001–OPS-010, SEC-001–SEC-012.
 - Migration: service contracts, container definitions, telemetry semantics, workflow APIs, storage references, and tenant-scoped canonical records remain portable. A move to AWS or a managed alternative must retire replaced capacity after validation unless an approved resilience design requires temporary overlap.
 
-### D-031 — Account Connections Gate 0 provisional database and secret architecture
+### D-031 — Account Connections Gate F0 provisional database and secret architecture
 
 - Status: proposed pending staging revalidation.
 - Blocker: the local forward repair and disposable proof pass. Shared-target inventory, approved repair execution, and staging evidence remain incomplete.
-- Context: Gate 0 requires Prisma transaction-local tenant context, forced RLS, pooler-safe prepared-statement behavior, and a least-privilege managed secret backend before account-connection tables or provider credentials are enabled.
+- Context: Gate F0 requires tenant context, forced RLS, pooler-safe prepared statements, and least-privilege secret storage. These controls must pass before account-connection tables or provider credentials are enabled.
 - Options: direct Prisma connections, Supabase transaction-mode pooling, session-mode pooling, Supabase Vault, or a dedicated external secret manager.
-- Decision: implement the application contract against Prisma `6.19.3` with a small transaction-compatible runtime configuration (`pgbouncer=true`, conservative connection limit, direct migration URL) and a server-only SecretBroker backed by Supabase Vault in local/staging. Keep all provider flags disabled until the real staging Supavisor transaction endpoint, Vault failure-compensation/concurrency tests, and root-key restore test pass. AWS Secrets Manager/KMS remains the portable dedicated-deployment backend.
-- Consequences: RLS is never weakened to fit a pooler. The current local proof passes forced-RLS isolation, transaction-local context cleanup, prepared-statement compatibility mode, and concurrent reuse; staging pooler and cross-project Vault restore evidence remain release gates.
-- Evidence: `scripts/f0/` and the CI schema-proof job prove local schema, migration, role, and selected RLS behavior only. Prisma pooler, Vault lifecycle, compensation, concurrency, and restore evidence remain unverified release gates. Current references are [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres) and [Vault guidance](https://supabase.com/docs/guides/database/vault).
+- Decision: use Prisma `6.19.3` with transaction-mode pooling, conservative connection limits, and a direct migration URL. Use a server-only SecretBroker backed by Supabase Vault in local and staging. Keep provider flags disabled until staging Supavisor, Vault compensation, and concurrency tests pass. Keep pilot access disabled until Gate F1 proves root-key recovery. AWS Secrets Manager/KMS remains the portable dedicated-deployment backend.
+- Consequences: RLS is never weakened to fit a pooler. Staging pooler and Vault runtime evidence remain Gate F0 requirements. Cross-project Vault recovery remains a Gate F1 requirement.
+- Evidence: `scripts/f0/` and the CI schema-proof job prove local schema, migration, role, and selected RLS behavior only. Prisma pooler, Vault lifecycle, compensation, and concurrency remain unverified Gate F0 requirements. Restore evidence remains an unverified Gate F1 requirement. Current references are [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres) and [Vault guidance](https://supabase.com/docs/guides/database/vault).
 - Owner/date: engineering, database, and security owner, 2026-08-10.
 - Affects: SEC-001–SEC-012, ORG-001–ORG-011, OPS-001–OPS-010.
 - Migration: provider-neutral repository and SecretBroker contracts keep runtime and secret backends replaceable without changing connection-domain records.
