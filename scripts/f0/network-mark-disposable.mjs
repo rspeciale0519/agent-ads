@@ -1,15 +1,17 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { networkDatabaseEnvironment, resolveNetworkProofContext } from "./network-safety.mjs";
+import {
+  networkDatabaseEnvironment,
+  psqlBaseArguments,
+  resolveNetworkProofContext,
+} from "./network-safety.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
 const { databaseUrl, marker, psql } = context;
 const result = spawnSync(psql, [
-  "-X",
-  "--set",
-  "ON_ERROR_STOP=1",
+  ...psqlBaseArguments(),
   "--set",
   `f0_marker=${marker}`,
   "--file",

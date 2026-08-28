@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
+import { devNull, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -147,17 +147,94 @@ describe("F0 disposable target marker", () => {
     }
   });
 
+  it("requires an explicit port, username, and password before any network command starts", () => {
+    for (const databaseUrl of [
+      "postgresql://f0:secret@127.0.0.1/agent_ads_f0",
+      "postgresql://:secret@127.0.0.1:5432/agent_ads_f0",
+      "postgresql://f0@127.0.0.1:5432/agent_ads_f0",
+    ]) {
+      const result = spawnSync(process.execPath, [networkProofPaths[0]], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: isolatedEnvironment({
+          F0_ALLOW_DISPOSABLE_DATABASE: "1",
+          F0_DATABASE_URL: databaseUrl,
+          F0_DISPOSABLE_MARKER: validMarker,
+        }),
+      });
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        "must include an explicit port, username, and password",
+      );
+      expect(`${result.stdout}\n${result.stderr}`).not.toContain("secret");
+    }
+  });
+
+  it("rejects PostgreSQL ports outside the allowed range before any network command starts", () => {
+    for (const [databaseUrl, expectedMessage] of [
+      [
+        "postgresql://f0:secret@127.0.0.1:0/agent_ads_f0",
+        "must include a valid explicit PostgreSQL port",
+      ],
+      [
+        "postgresql://f0:secret@127.0.0.1:65536/agent_ads_f0",
+        "must be a valid PostgreSQL connection URL",
+      ],
+    ] as const) {
+      const result = spawnSync(process.execPath, [networkProofPaths[0]], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: isolatedEnvironment({
+          F0_ALLOW_DISPOSABLE_DATABASE: "1",
+          F0_DATABASE_URL: databaseUrl,
+          F0_DISPOSABLE_MARKER: validMarker,
+        }),
+      });
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(expectedMessage);
+      expect(`${result.stdout}\n${result.stderr}`).not.toContain("secret");
+    }
+  });
+
   it("passes validated PostgreSQL fields through the child environment", () => {
     expect(networkSafety).toContain("networkDatabaseEnvironment");
     expect(networkSafety).toContain("PGDATABASE: databaseName");
+    expect(networkSafety).toContain('PGCONNECT_TIMEOUT: "5"');
     expect(networkSafety).toContain("PGHOST: context.connection.host");
-    expect(networkSafety).toContain("PGPASSWORD = context.connection.password");
+    expect(networkSafety).toContain("PGPASSFILE: devNull");
+    expect(networkSafety).toContain("PGPASSWORD: context.connection.password");
+    expect(networkSafety).toContain("PGPORT: context.connection.port");
+    expect(networkSafety).toContain("PGUSER: context.connection.username");
     expect(networkSafety).toContain("-c event_triggers=false -c search_path=pg_catalog,pg_temp");
     expect(clusterGuard).toContain("SET search_path = pg_catalog, pg_temp");
     for (const source of networkProofSources) {
+      expect(source).toContain("psqlBaseArguments");
+      expect(source).not.toContain('["-X", "--set", "ON_ERROR_STOP=1"');
       expect(source).not.toContain("--dbname");
       expect(source).not.toContain("networkDatabaseUrl");
     }
+  });
+
+  it("disables password prompts and ambient passfiles with a bounded connection timeout", () => {
+    const safetyUrl = pathToFileURL(path.join(root, "network-safety.mjs")).href;
+    const verification = [
+      `import { networkDatabaseEnvironment, psqlBaseArguments } from ${JSON.stringify(safetyUrl)};`,
+      `const expectedDevNull = ${JSON.stringify(devNull)};`,
+      "const context = { spawnEnvironment: { PGHOST: 'unsafe', PGPASSFILE: 'unsafe' }, connection: { host: '127.0.0.1', port: '5432', username: 'f0', password: 'synthetic' } };",
+      "const environment = networkDatabaseEnvironment(context, 'agent_ads_f0');",
+      "const pgNames = Object.keys(environment).filter((name) => name.startsWith('PG')).sort();",
+      "const expectedNames = ['PGCONNECT_TIMEOUT', 'PGDATABASE', 'PGHOST', 'PGPASSFILE', 'PGPASSWORD', 'PGPORT', 'PGUSER'];",
+      "if (JSON.stringify(pgNames) !== JSON.stringify(expectedNames)) process.exit(1);",
+      "if (environment.PGCONNECT_TIMEOUT !== '5' || environment.PGPASSFILE !== expectedDevNull) process.exit(1);",
+      "const argumentsList = psqlBaseArguments();",
+      "if (!argumentsList.includes('-X') || !argumentsList.includes('--no-password')) process.exit(1);",
+      "if (!argumentsList.includes('ON_ERROR_STOP=1')) process.exit(1);",
+    ].join("\n");
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", verification], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
   });
 
   it("forces C messages and rejects each PostgreSQL error severity", () => {

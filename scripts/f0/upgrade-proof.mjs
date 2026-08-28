@@ -2,7 +2,11 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { networkDatabaseEnvironment, resolveNetworkProofContext } from "./network-safety.mjs";
+import {
+  networkDatabaseEnvironment,
+  psqlBaseArguments,
+  resolveNetworkProofContext,
+} from "./network-safety.mjs";
 import { upgradeScenarios } from "./upgrade-fixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -12,7 +16,7 @@ const createdDatabases = [];
 const templateName = "agent_ads_f0_upgrade_template";
 
 function psqlResult(database, { file, sql } = {}) {
-  const args = ["-X", "--quiet", "--tuples-only", "--no-align", "--set", "ON_ERROR_STOP=1"];
+  const args = psqlBaseArguments({ quiet: true, tuplesOnly: true, noAlign: true });
   if (file) args.push("--file", file);
   return spawnSync(psql, args, {
     cwd: root,

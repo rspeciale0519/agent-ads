@@ -27,7 +27,7 @@ The proofs never clone `template0`. Its metadata is checked, but its internal ca
 
 The shared guard rejects altered PostgreSQL 17 roles and memberships. It also rejects unexpected access methods, schemas, objects, and database settings. Its privilege checks cover database, public-schema, default, and parameter privileges.
 
-The network proof requires `F0_ALLOW_DISPOSABLE_DATABASE=1`, `F0_DATABASE_URL`, and a canonical lowercase UUIDv4 `F0_DISPOSABLE_MARKER`. `PSQL_BIN` is optional when `psql` is on `PATH`. `F0_DATABASE_URL` must use a numeric loopback address, select `agent_ads_f0`, and contain no query or fragment.
+The network proof requires `F0_ALLOW_DISPOSABLE_DATABASE=1`, `F0_DATABASE_URL`, and a canonical lowercase UUIDv4 `F0_DISPOSABLE_MARKER`. `PSQL_BIN` is optional when `psql` is on `PATH`. `F0_DATABASE_URL` must use a numeric loopback address, an explicit valid port, an explicit username and password, and the `agent_ads_f0` database. It must contain no query or fragment.
 
 Run these commands in order on a new disposable cluster:
 
@@ -36,7 +36,7 @@ Run these commands in order on a new disposable cluster:
 3. Run `pnpm run security:f0-guard`.
 4. Run `pnpm run security:f0-schema`.
 
-The wrapper replaces libpq routing variables with validated fields. Guard connections disable login event triggers and search trusted catalogs first.
+The wrapper removes ambient libpq variables and rebuilds them from validated fields. It disables password prompts and passfiles, and it sets a five-second connection timeout. Guard connections disable login event triggers and search trusted catalogs first.
 
 The URL check cannot detect a local proxy or tunnel that forwards traffic to another server.
 

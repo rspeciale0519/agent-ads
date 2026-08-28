@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { devNull } from "node:os";
 import path from "node:path";
 
 const markerPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -45,6 +46,13 @@ export function resolveNetworkProofContext(environment = process.env) {
       "F0_DATABASE_URL must use a numeric loopback PostgreSQL authority, the agent_ads_f0 database, and no query or fragment overrides.",
     );
   }
+  if (parsed.port === "" || username === "" || password === "") {
+    throw new Error("F0_DATABASE_URL must include an explicit port, username, and password.");
+  }
+  const port = Number(parsed.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("F0_DATABASE_URL must include a valid explicit PostgreSQL port.");
+  }
 
   const spawnEnvironment = Object.fromEntries(
     Object.entries(environment).filter(([name]) => !name.toUpperCase().startsWith("PG")),
@@ -74,7 +82,7 @@ export function resolveNetworkProofContext(environment = process.env) {
     connection: {
       host: parsed.hostname === "[::1]" ? "::1" : parsed.hostname,
       password,
-      port: parsed.port || "5432",
+      port: parsed.port,
       username,
     },
     databaseUrl,
@@ -82,6 +90,14 @@ export function resolveNetworkProofContext(environment = process.env) {
     psql,
     spawnEnvironment,
   };
+}
+
+export function psqlBaseArguments(options = {}) {
+  const args = ["-X", "--no-password", "--set", "ON_ERROR_STOP=1"];
+  if (options.quiet === true) args.push("--quiet");
+  if (options.tuplesOnly === true) args.push("--tuples-only");
+  if (options.noAlign === true) args.push("--no-align");
+  return args;
 }
 
 export function networkDatabaseEnvironment(context, databaseName, options = {}) {
@@ -96,13 +112,15 @@ export function networkDatabaseEnvironment(context, databaseName, options = {}) 
       ),
     ),
     PGDATABASE: databaseName,
+    PGCONNECT_TIMEOUT: "5",
     PGHOST: context.connection.host,
+    PGPASSFILE: devNull,
+    PGPASSWORD: context.connection.password,
     PGPORT: context.connection.port,
+    PGUSER: context.connection.username,
   };
   if (options.trustedCatalogs === true) {
     environment.PGOPTIONS = "-c event_triggers=false -c search_path=pg_catalog,pg_temp";
   }
-  if (context.connection.username !== "") environment.PGUSER = context.connection.username;
-  if (context.connection.password !== "") environment.PGPASSWORD = context.connection.password;
   return environment;
 }

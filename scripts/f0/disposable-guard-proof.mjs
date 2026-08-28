@@ -2,12 +2,16 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { networkDatabaseEnvironment, resolveNetworkProofContext } from "./network-safety.mjs";
+import {
+  networkDatabaseEnvironment,
+  psqlBaseArguments,
+  resolveNetworkProofContext,
+} from "./network-safety.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
 const { databaseUrl, marker, psql } = context;
-const psqlArgs = ["-X", "--set", "ON_ERROR_STOP=1"];
+const psqlArgs = psqlBaseArguments();
 const clusterGuard = readFileSync(
   path.join(root, "scripts", "f0", "disposable-cluster-guard.sql"),
   "utf8",
@@ -35,7 +39,7 @@ function runPsql(label, args, database = "agent_ads_f0", options = { trustedCata
 function runSql(label, sql, database = "agent_ads_f0") {
   runPsql(
     label,
-    ["-X", "--set", "ON_ERROR_STOP=1", "--command", sql],
+    [...psqlArgs, "--command", sql],
     database,
   );
 }

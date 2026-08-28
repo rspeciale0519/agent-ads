@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { networkDatabaseEnvironment, resolveNetworkProofContext } from "./network-safety.mjs";
+import {
+  networkDatabaseEnvironment,
+  psqlBaseArguments,
+  resolveNetworkProofContext,
+} from "./network-safety.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
@@ -21,7 +25,7 @@ function run(label, command, args, env = spawnEnvironment) {
   if (result.status !== 0) throw new Error(`${label} failed with exit code ${result.status}.`);
 }
 
-const psqlArgs = ["-X", "--set", "ON_ERROR_STOP=1"];
+const psqlArgs = psqlBaseArguments();
 const markerResult = spawnSync(psql, [
   ...psqlArgs,
   "--quiet",
