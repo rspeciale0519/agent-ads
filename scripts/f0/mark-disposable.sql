@@ -1,5 +1,7 @@
 \set ON_ERROR_STOP on
 
+SELECT set_config('f0.expected_marker', :'f0_marker', false);
+
 DO $verification$
 BEGIN
   IF current_database() <> 'agent_ads_f0' THEN
@@ -40,10 +42,12 @@ BEGIN
 END
 $verification$;
 
-CREATE TABLE public._f0_disposable_target (
-  marker uuid PRIMARY KEY,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-INSERT INTO public._f0_disposable_target (marker)
-VALUES (:'f0_marker'::uuid);
+DO $marker$
+BEGIN
+  EXECUTE format(
+    'COMMENT ON DATABASE %I IS %L',
+    current_database(),
+    'agent_ads_f0_disposable:' || current_setting('f0.expected_marker')
+  );
+END
+$marker$;

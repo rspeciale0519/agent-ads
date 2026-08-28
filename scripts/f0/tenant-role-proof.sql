@@ -1,5 +1,63 @@
 \set ON_ERROR_STOP on
 
+CREATE ROLE f0_app_runtime_login
+  LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+CREATE ROLE f0_app_secret_broker_login
+  LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+
+GRANT app_runtime TO f0_app_runtime_login
+  WITH INHERIT TRUE, SET FALSE, ADMIN FALSE;
+GRANT app_secret_broker TO f0_app_secret_broker_login
+  WITH INHERIT TRUE, SET FALSE, ADMIN FALSE;
+
+DO $login_role_contract$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_roles
+    WHERE rolname IN ('f0_app_runtime_login', 'f0_app_secret_broker_login')
+      AND (
+        NOT rolcanlogin OR NOT rolinherit OR rolsuper OR rolcreatedb OR
+        rolcreaterole OR rolreplication OR rolbypassrls
+      )
+  ) THEN
+    RAISE EXCEPTION 'F0 login principal has unsafe role attributes';
+  END IF;
+
+  IF (SELECT count(*)
+      FROM pg_auth_members membership
+      JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
+      JOIN pg_roles member_role ON member_role.oid = membership.member
+      WHERE member_role.rolname IN ('f0_app_runtime_login', 'f0_app_secret_broker_login')) <> 2 THEN
+    RAISE EXCEPTION 'F0 login principal has an unexpected membership count';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_auth_members membership
+    JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
+    JOIN pg_roles member_role ON member_role.oid = membership.member
+    WHERE member_role.rolname IN ('f0_app_runtime_login', 'f0_app_secret_broker_login')
+      AND (
+        (member_role.rolname = 'f0_app_runtime_login' AND granted_role.rolname <> 'app_runtime') OR
+        (member_role.rolname = 'f0_app_secret_broker_login' AND granted_role.rolname <> 'app_secret_broker') OR
+        NOT membership.inherit_option OR membership.set_option OR membership.admin_option
+      )
+  ) THEN
+    RAISE EXCEPTION 'F0 login principal membership is unsafe';
+  END IF;
+
+  IF NOT pg_has_role('f0_app_runtime_login', 'app_runtime', 'USAGE')
+     OR pg_has_role('f0_app_runtime_login', 'app_runtime', 'SET')
+     OR pg_has_role('f0_app_runtime_login', 'app_secret_broker', 'MEMBER')
+     OR NOT pg_has_role('f0_app_secret_broker_login', 'app_secret_broker', 'USAGE')
+     OR pg_has_role('f0_app_secret_broker_login', 'app_secret_broker', 'SET')
+     OR pg_has_role('f0_app_secret_broker_login', 'app_runtime', 'MEMBER') THEN
+    RAISE EXCEPTION 'F0 login principal inheritance boundary failed';
+  END IF;
+END
+$login_role_contract$;
+
 BEGIN;
 
 INSERT INTO auth.users (id) VALUES
@@ -35,7 +93,7 @@ INSERT INTO private.credential_references (
 COMMIT;
 
 BEGIN;
-SET LOCAL ROLE app_runtime;
+SET LOCAL ROLE f0_app_runtime_login;
 
 DO $missing_context$
 DECLARE
@@ -64,7 +122,7 @@ BEGIN;
 SELECT set_config('app.current_organization_id', '00000000-0000-4000-8000-000000001101', true);
 SELECT set_config('app.current_auth_subject', '00000000-0000-4000-8000-000000001001', true);
 SELECT set_config('app.current_session_id', '00000000-0000-4000-8000-000000001011', true);
-SET LOCAL ROLE app_runtime;
+SET LOCAL ROLE f0_app_runtime_login;
 
 DO $tenant_a$
 DECLARE
@@ -127,7 +185,7 @@ $tenant_a$;
 COMMIT;
 
 BEGIN;
-SET LOCAL ROLE app_runtime;
+SET LOCAL ROLE f0_app_runtime_login;
 
 DO $context_reset$
 BEGIN
@@ -144,7 +202,7 @@ DELETE FROM auth.sessions
 WHERE id = '00000000-0000-4000-8000-000000001011';
 
 BEGIN;
-SET LOCAL ROLE app_runtime;
+SET LOCAL ROLE f0_app_runtime_login;
 
 DO $revoked_session$
 BEGIN
@@ -156,6 +214,91 @@ BEGIN
   END IF;
 END
 $revoked_session$;
+
+COMMIT;
+
+BEGIN;
+SET LOCAL ROLE f0_app_runtime_login;
+
+DO $runtime_broker_denial$
+BEGIN
+  BEGIN
+    PERFORM private.read_broker_secret('00000000-0000-4000-8000-000000001499');
+    RAISE EXCEPTION 'runtime login executed a broker-only function';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM vault.create_secret(
+      'f0-runtime-denied',
+      'f0-runtime-denied',
+      'F0 runtime denial proof',
+      NULL
+    );
+    RAISE EXCEPTION 'runtime login created a Vault secret';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM vault.update_secret(
+      '00000000-0000-4000-8000-000000001499',
+      'f0-runtime-denied',
+      NULL,
+      NULL,
+      NULL
+    );
+    RAISE EXCEPTION 'runtime login updated a Vault secret';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$runtime_broker_denial$;
+
+COMMIT;
+
+BEGIN;
+SET LOCAL ROLE f0_app_secret_broker_login;
+
+DO $broker_login_boundary$
+DECLARE
+  secret_id uuid;
+  secret_value text;
+BEGIN
+  secret_id := vault.create_secret(
+    'f0-synthetic-broker-value',
+    'f0-synthetic-broker-name',
+    'F0 synthetic broker proof',
+    NULL
+  );
+
+  SELECT private.read_broker_secret(secret_id) INTO secret_value;
+  IF secret_value <> 'f0-synthetic-broker-value' THEN
+    RAISE EXCEPTION 'broker login could not read through the approved function';
+  END IF;
+
+  PERFORM private.destroy_broker_secret(secret_id);
+  SELECT private.read_broker_secret(secret_id) INTO secret_value;
+  IF secret_value IS NOT NULL THEN
+    RAISE EXCEPTION 'broker login could not destroy through the approved function';
+  END IF;
+
+  BEGIN
+    PERFORM count(*) FROM vault.secrets;
+    RAISE EXCEPTION 'broker login read the Vault table directly';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM count(*) FROM public.connections;
+    RAISE EXCEPTION 'broker login read an application table';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$broker_login_boundary$;
 
 COMMIT;
 
@@ -188,3 +331,6 @@ WHERE id IN (
   '00000000-0000-4000-8000-000000001002'
 );
 COMMIT;
+
+DROP ROLE f0_app_runtime_login;
+DROP ROLE f0_app_secret_broker_login;

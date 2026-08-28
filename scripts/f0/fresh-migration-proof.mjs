@@ -34,6 +34,18 @@ const psqlArgs = ["-X", "--dbname", databaseUrl, "--set", "ON_ERROR_STOP=1"];
 run("F0 disposable-target verification", psql, [...psqlArgs, "--set", `f0_marker=${marker}`, "--file", path.join(root, "scripts", "f0", "verify-disposable.sql")]);
 run("F0 bootstrap", psql, [...psqlArgs, "--file", path.join(root, "scripts", "f0", "bootstrap.sql")]);
 run(
+  "Prisma legacy baseline resolution",
+  process.execPath,
+  [
+    path.join(root, "node_modules", "prisma", "build", "index.js"),
+    "migrate",
+    "resolve",
+    "--applied",
+    "00000000000000_legacy_baseline",
+  ],
+  { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl },
+);
+run(
   "Prisma migration deployment",
   process.execPath,
   [path.join(root, "node_modules", "prisma", "build", "index.js"), "migrate", "deploy"],
@@ -77,4 +89,4 @@ for (const name of migrationNames) {
 
 run("F0 upgrade proof", process.execPath, [path.join(root, "scripts", "f0", "upgrade-proof.mjs")]);
 
-console.log("F0 fresh migration proof passed: marked empty target, Prisma history, UUID upgrades, foreign keys, indexes, forced RLS, tenant isolation, roles, and ownership are valid.");
+console.log("F0 fresh migration proof passed: marked empty target, Prisma history, UUID upgrades, permission-role login guards, foreign keys, indexes, forced RLS, tenant isolation, roles, and ownership are valid.");

@@ -209,7 +209,15 @@ BEGIN
      OR NOT has_function_privilege('app_secret_broker', 'vault.create_secret(text,text,text,uuid)', 'EXECUTE')
      OR NOT has_function_privilege('app_secret_broker', 'vault.update_secret(uuid,text,text,text,uuid)', 'EXECUTE')
      OR has_function_privilege('app_runtime', 'private.read_broker_secret(uuid)', 'EXECUTE')
-     OR has_function_privilege('app_runtime', 'private.destroy_broker_secret(uuid)', 'EXECUTE') THEN
+     OR has_function_privilege('app_runtime', 'private.destroy_broker_secret(uuid)', 'EXECUTE')
+     OR has_function_privilege('app_runtime', 'vault.create_secret(text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('app_runtime', 'vault.update_secret(uuid,text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'vault.create_secret(text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'vault.create_secret(text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'vault.create_secret(text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'vault.update_secret(uuid,text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'vault.update_secret(uuid,text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'vault.update_secret(uuid,text,text,text,uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'application role function privileges do not match the allowlist';
   END IF;
 END

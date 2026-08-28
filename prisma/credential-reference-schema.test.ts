@@ -55,4 +55,26 @@ describe("connection credential database contract", () => {
     expect(preparationIndex).toBeLessThan(identityBindingIndex);
     expect(migration("20260811129900_prepare_definer_identity_binding")).toContain("pg_get_function_identity_arguments");
   });
+
+  it("limits Vault write functions to the broker permission role", () => {
+    const boundaryIndex = migrationNames.indexOf("20260827190000_vault_write_function_boundary");
+    expect(boundaryIndex).toBe(migrationNames.length - 1);
+
+    const sql = migration("20260827190000_vault_write_function_boundary");
+    expect(sql).toContain("ACCOUNT_CONNECTIONS_PERMISSION_ROLE_LOGIN_ENABLED");
+    expect(sql).toContain("rolname IN ('app_runtime', 'app_secret_broker')");
+    expect(sql).toContain("AND rolcanlogin");
+    expect(sql).toContain(
+      "REVOKE ALL ON FUNCTION vault.create_secret(text, text, text, uuid) FROM PUBLIC, anon, authenticated, service_role, app_runtime, app_secret_broker",
+    );
+    expect(sql).toContain(
+      "REVOKE ALL ON FUNCTION vault.update_secret(uuid, text, text, text, uuid) FROM PUBLIC, anon, authenticated, service_role, app_runtime, app_secret_broker",
+    );
+    expect(sql).toContain(
+      "GRANT EXECUTE ON FUNCTION vault.create_secret(text, text, text, uuid) TO app_secret_broker",
+    );
+    expect(sql).toContain(
+      "GRANT EXECUTE ON FUNCTION vault.update_secret(uuid, text, text, text, uuid) TO app_secret_broker",
+    );
+  });
 });

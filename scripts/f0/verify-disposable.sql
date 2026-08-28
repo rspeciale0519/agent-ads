@@ -3,18 +3,20 @@
 SELECT set_config('f0.expected_marker', :'f0_marker', false);
 
 DO $verification$
+DECLARE
+  database_comment text;
 BEGIN
   IF current_database() <> 'agent_ads_f0' THEN
     RAISE EXCEPTION 'F0 proof target has an unexpected database name';
   END IF;
 
-  IF to_regclass('public._f0_disposable_target') IS NULL
-     OR (SELECT count(*) FROM public._f0_disposable_target) <> 1
-     OR NOT EXISTS (
-       SELECT 1
-       FROM public._f0_disposable_target
-       WHERE marker::text = current_setting('f0.expected_marker')
-     ) THEN
+  SELECT shobj_description(oid, 'pg_database')
+  INTO database_comment
+  FROM pg_database
+  WHERE datname = current_database();
+
+  IF database_comment IS DISTINCT FROM
+     'agent_ads_f0_disposable:' || current_setting('f0.expected_marker') THEN
     RAISE EXCEPTION 'F0 proof target is missing its server-side disposable marker';
   END IF;
 
@@ -29,7 +31,6 @@ BEGIN
     WHERE relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
       AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
       AND namespace.nspname !~ '^pg_toast'
-      AND NOT (namespace.nspname = 'public' AND relation.relname = '_f0_disposable_target')
   ) THEN
     RAISE EXCEPTION 'F0 proof target is not empty';
   END IF;

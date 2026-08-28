@@ -4,6 +4,8 @@
 
 Use separate Supabase projects, Auth redirect URLs, provider applications, Vault root keys, Prisma URLs, and notification credentials for development, staging, pilot, and production. `DATABASE_URL` is the transaction-safe runtime pooler URL; `DIRECT_URL` is used only for migrations and controlled maintenance. Keep `pgbouncer=true`, disable prepared statements for transaction pooling, and use a conservative `connection_limit`/`pool_timeout`.
 
+`DATABASE_URL` must use an environment-specific login principal. That principal inherits only the `app_runtime` permission role. `SECRET_BROKER_DATABASE_URL` must use a different login principal. That principal inherits only the `app_secret_broker` permission role.
+
 Required deployment variables are documented in `.env.example`. Values are injected by the environment secret manager. The repository must contain names and safe placeholders only.
 
 ## Migration and backup procedure
@@ -46,7 +48,49 @@ The UUID conversion uses an `ACCESS EXCLUSIVE` lock. A failed transaction restor
 
 Run `pnpm run bootstrap:owner` only as a one-time controlled maintenance operation after the protected Supabase Auth subject and organization values have been approved. Supply `APP_BOOTSTRAP_DATABASE_URL` (or the migration-only `DIRECT_URL`) through the deployment secret manager; never point the command at the pooled `DATABASE_URL`, and never put the URL or any password in shell history, source control, logs, or support tickets. The command verifies that the database role is not `app_runtime`, refuses a second active owner, creates the organization/member/audit record without handling a password, and exits without printing credentials.
 
-The migration creates `app_secret_broker` as a non-superuser/non-`BYPASSRLS` role with no login by default. The database/security owner enables login and provisions its password through the approved secret manager, then supplies the resulting pooled URL only as `SECRET_BROKER_DATABASE_URL`. Do not put that password in SQL history, source control, logs, or support tickets.
+## Database login principals
+
+The migration creates `app_runtime` and `app_secret_broker` as `NOLOGIN` permission roles. Never enable `LOGIN` on these roles.
+
+The database/security owner creates two environment-specific login principals after the migration. Use names such as `app_runtime_login` and `app_secret_broker_login`. Add the project reference to each Supavisor username.
+
+Each login principal must use `LOGIN`, `INHERIT`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`, and `NOBYPASSRLS`. Grant `app_runtime` only to the runtime login. Grant `app_secret_broker` only to the broker login. Do not grant database-object permissions directly to either login principal.
+
+Create and rotate each password through the approved secret manager and controlled administration path. Never put a password in migration SQL, shell history, source control, logs, or support tickets.
+
+### Existing permission-role login transition
+
+An earlier operations draft allowed `LOGIN` on a stable permission role. The Vault boundary migration fails with `ACCOUNT_CONNECTIONS_PERMISSION_ROLE_LOGIN_ENABLED` when either permission role can still log in. The migration makes no grant change after this guard fails.
+
+Use this expand-and-contract transition before retrying the migration:
+
+1. Keep every Account Connections and provider flag disabled.
+2. Record the target fingerprint, current build, role attributes, memberships, active sessions, backup, operator, approver, and UTC time.
+3. Create separate runtime and broker login principals through the controlled administration path.
+4. Give each principal the safe attributes listed above.
+5. Grant only its matching permission role with `INHERIT TRUE`, `SET FALSE`, and `ADMIN FALSE`.
+6. Put both new connection URLs in the environment secret manager.
+7. Restart the previous compatible build without running the pending migration.
+8. Test both principals through Supavisor and the direct approved broker path.
+9. Prove tenant isolation, missing-context denial, broker separation, and allowed broker functions.
+10. Obtain approval for the login cutover.
+11. Set `app_runtime` and `app_secret_broker` to `NOLOGIN` through the controlled direct administration path.
+12. Confirm new connections work and old permission-role logins fail.
+13. Inspect `_prisma_migrations` for a failed `20260827190000_vault_write_function_boundary` row.
+14. Confirm the failed transaction changed no Vault grants or other database state.
+15. If Prisma recorded the failure, obtain repair approval and run `node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260827190000_vault_write_function_boundary` through the approved `DIRECT_URL` procedure.
+16. Run the pending migration through the approved `DIRECT_URL` procedure.
+17. Record the final role state, migration result, tests, and approver.
+
+Do not drop either permission role. Existing grants and ownership depend on those stable roles.
+
+Before step 11, recover by restoring the prior URLs and revoking the new login principals. After step 11, keep flags disabled if a new login fails. Under incident approval, temporarily restore only the affected old login and URL. Repair the new principal, repeat the proof, disable the old login again, confirm database rollback, resolve the failed migration record when present, and then retry the migration.
+
+Before deployment, verify the two login principals, role memberships, role attributes, and direct grants. Connect through Supavisor with each principal. Run the missing-context, cross-tenant, RLS, broker-denial, and allowed-function tests.
+
+If provisioning fails, keep all provider flags disabled. Revoke the affected login principal and restore the last approved connection URL. The `NOLOGIN` permission roles remain the stable grant boundary.
+
+The Vault boundary migration removes write-function access from public and non-broker roles. Its transaction rolls back after a migration failure. If broker calls fail after deployment, keep provider flags disabled and inspect the live function signatures and grants. Restore only the approved broker grant through a reviewed forward migration. Never restore public access.
 
 ## Restore / clone drill
 

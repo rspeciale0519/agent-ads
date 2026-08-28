@@ -74,17 +74,52 @@ function createDatabase(name, template = "template0") {
 }
 
 const markerResult = psqlResult(databaseUrl, {
-  sql: `SELECT marker FROM public._f0_disposable_target;\n`,
+  sql: `SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database();\n`,
 });
-if (markerResult.error || markerResult.status !== 0 || markerResult.stdout.trim() !== marker) {
+if (
+  markerResult.error ||
+  markerResult.status !== 0 ||
+  markerResult.stdout.trim() !== `agent_ads_f0_disposable:${marker}`
+) {
   throw new Error("The disposable database marker is missing or incorrect.");
 }
 
 const bootstrapFile = path.join(root, "scripts", "f0", "bootstrap.sql");
 const baseMigrationFile = path.join(root, "prisma", "migrations", "20260810120000_account_connections", "migration.sql");
 const repairMigration = readFileSync(path.join(root, "prisma", "migrations", "20260810120100_credential_reference_uuid", "migration.sql"), "utf8");
+const vaultBoundaryMigration = readFileSync(
+  path.join(
+    root,
+    "prisma",
+    "migrations",
+    "20260827190000_vault_write_function_boundary",
+    "migration.sql",
+  ),
+  "utf8",
+);
+
+function provePermissionRoleLoginGuard(roleName) {
+  if (!new Set(["app_runtime", "app_secret_broker"]).has(roleName)) {
+    throw new Error("Unsafe permission-role proof name.");
+  }
+  requireFailure(
+    `Permission-role login guard for ${roleName}`,
+    databaseUrl,
+    `BEGIN;\nALTER ROLE "${roleName}" LOGIN;\n${vaultBoundaryMigration}`,
+    "ACCOUNT_CONNECTIONS_PERMISSION_ROLE_LOGIN_ENABLED",
+  );
+  const state = psqlResult(databaseUrl, {
+    sql: `SELECT rolcanlogin FROM pg_roles WHERE rolname = '${roleName}';\n`,
+  });
+  if (state.error || state.status !== 0 || state.stdout.trim() !== "f") {
+    throw new Error(`Permission-role login guard did not roll back ${roleName}.`);
+  }
+}
 
 try {
+  provePermissionRoleLoginGuard("app_runtime");
+  provePermissionRoleLoginGuard("app_secret_broker");
+
   createDatabase(templateName);
   requireSuccess("Upgrade template bootstrap", urlFor(templateName), { file: bootstrapFile });
   requireSuccess("Upgrade template base migration", urlFor(templateName), { file: baseMigrationFile });
@@ -115,4 +150,4 @@ try {
   }
 }
 
-console.log("F0 upgrade proof passed: valid, null, malformed, orphan, cross-tenant, collision, rollback, and historical tenant-column paths are safe.");
+console.log("F0 upgrade proof passed: permission-role login guards, valid, null, malformed, orphan, cross-tenant, collision, rollback, and historical tenant-column paths are safe.");
