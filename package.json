@@ -2,6 +2,9 @@
   "name": "agent-ads",
   "private": true,
   "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "prebuild": "node node_modules/prisma/build/index.js generate",
@@ -11,6 +14,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "release:evidence:verify": "node scripts/release-evidence/verify-staging-record.mjs",
+    "release:staging-runtime:check": "node scripts/release-evidence/capture-staging-runtime-result.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "security:rls-audit": "node scripts/rls-audit.mjs",
     "security:mutation-audit": "node scripts/mutation-contract-audit.mjs",
@@ -47,6 +51,12 @@
     "vitest": "4.1.10"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "unrs-resolver"
+    ],
     "overrides": {
       "deepmerge-ts": "8.0.0",
       "nanoid": "3.3.18",

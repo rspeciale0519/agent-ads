@@ -42,21 +42,22 @@ Keep project references, deployment URLs, backup identifiers, and owner details 
 - Supavisor mode and port;
 - approved callback origins;
 - enabled feature flags;
-- backup identifier and recovery-manifest revision;
+- backup identifier and recovery-manifest content hash;
 - release, database, security, and rollback owners.
 
 ## Supabase preflight
 
 1. Confirm the target is the approved isolated environment.
 2. Capture the target fingerprint and migration inventory.
-3. Stop on an unknown, changed, missing, or failed migration.
-4. Inspect column types, constraints, indexes, RLS, roles, memberships, and grants.
-5. Confirm tenant tables use enabled and forced RLS.
-6. Confirm `app_runtime` and `app_secret_broker` are `NOLOGIN` permission roles.
-7. Confirm each login principal has only its approved permission-role membership.
-8. Confirm the runtime principal cannot call Vault functions.
-9. Confirm the broker principal cannot read application or Vault tables directly.
-10. Confirm a complete recovery set exists before migration.
+3. Enable Supabase SSL enforcement and confirm that the target rejects non-SSL database connections.
+4. Stop on an unknown, changed, missing, or failed migration.
+5. Inspect column types, constraints, indexes, RLS, roles, memberships, and grants.
+6. Confirm tenant tables use enabled and forced RLS.
+7. Confirm `app_runtime` and `app_secret_broker` are `NOLOGIN` permission roles.
+8. Confirm each login principal has only its approved permission-role membership.
+9. Confirm the runtime principal cannot call Vault functions.
+10. Confirm the broker principal cannot read application or Vault tables directly.
+11. Confirm a complete recovery set exists before migration.
 
 Run Prisma migrations only with the direct database route:
 
@@ -75,7 +76,7 @@ Never run migrations through Supavisor transaction mode.
 2. Keep the build command as `pnpm run build`.
 3. Add only variables from the Vercel runtime allowlist below.
 4. Never copy a real value into documentation, Git, logs, support records, or browser-safe variables.
-5. Keep the service-role key server-only for the contained onboarding boundary.
+5. Keep the Supabase secret key server-only for the contained onboarding boundary.
 6. Use the low-privilege Prisma runtime URL for application database access.
 7. Use the separate broker URL only through `SecretBroker`.
 8. Start with account connections, provider flags, and mutation features disabled.
@@ -83,11 +84,20 @@ Never run migrations through Supavisor transaction mode.
 The core Vercel runtime allowlist is:
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET`;
-- `DATABASE_URL` with the low-privilege runtime principal;
-- `SECRET_BROKER_BACKEND`, `SECRET_BROKER_KEY_VERSION`, and `SECRET_BROKER_DATABASE_URL`;
+- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `SUPABASE_STORAGE_BUCKET`;
+- `SUPABASE_SERVICE_ROLE_KEY` only as a temporary server-only migration fallback;
+- `DATABASE_URL` with the low-privilege runtime principal and strict TLS parameters;
+- `SECRET_BROKER_BACKEND`, `SECRET_BROKER_KEY_VERSION`, and a strict-TLS `SECRET_BROKER_DATABASE_URL`;
 - `SECRET_FINGERPRINT_KEY`, `OAUTH_STATE_HMAC_KEY`, `RATE_LIMIT_HMAC_KEY`, and `IDEMPOTENCY_HMAC_KEY`;
-- approved `ACCOUNT_CONNECTIONS_*_ENABLED` flags, `ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH`, and `ACCOUNT_CONNECTIONS_ALLOWED_ORGANIZATION_IDS`.
+- approved `ACCOUNT_CONNECTIONS_*_ENABLED` flags, `ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH`, and `ACCOUNT_CONNECTIONS_ALLOWED_ORGANIZATION_IDS`;
+- `STAGING_RUNTIME_TARGET_FINGERPRINT` after the configuration-only check;
+- `EMAIL_DELIVERY_MODE=disabled` until the approved email test starts.
+
+Add `SUPABASE_SECRET_KEY` and verify the deployment. Then remove `SUPABASE_SERVICE_ROLE_KEY` from the environment.
+
+After every consumer uses the secret key, disable the legacy JWT keys in Supabase.
+
+Prove that each disabled legacy key is rejected. Remove the compatibility fallback in a later release.
 
 Add `ACCOUNT_CONNECTIONS_MAINTENANCE_TOKEN` only after the scheduler gate passes.
 
@@ -99,7 +109,117 @@ Never add `DIRECT_URL`, `APP_BOOTSTRAP_*`, database-owner credentials, migration
 
 Do not copy all `.env.example` entries into Vercel. Omit unused and unapproved variables.
 
+Run the core staging preflight before you add migration, provider, maintenance, or Resend variables.
+
+Run it only from a checkout linked to the exact isolated staging Vercel project.
+
+The isolated project uses its Vercel Production environment as staging.
+
+First, get the safe target fingerprint without writing a result file.
+
+```text
+vercel env run -e production -- node scripts/release-evidence/check-staging-runtime-config.mjs
+```
+
+Add that fingerprint as the server-only `STAGING_RUNTIME_TARGET_FINGERPRINT` value.
+
+Create a new deployment for the exact Git revision after this variable changes.
+
+Then prepare a private binding file with the exact Git revision, Vercel project ID, and new deployment ID.
+
+```text
+vercel env run -e production -- node scripts/release-evidence/capture-staging-runtime-result.mjs --binding-file <private-binding.json> --result-file <private-result.json>
+```
+
+The checker writes the result once. It refuses to replace an existing result file.
+
+Verify the release record with the private result file.
+
+```text
+pnpm run release:evidence:verify -- <record.json> --expected-revision <sha> --runtime-result <private-result.json>
+```
+
+Treat `vercel env run` as a predeployment configuration check only. It does not verify an existing deployment.
+
+Use the unique Vercel deployment ID and generated deployment URL. Do not use a branch alias or custom domain.
+
+Compare the deployment ID, project ID, target environment, Git revision, URL, and ready state with the private release record.
+
+```powershell
+$revision = (git rev-parse HEAD).Trim()
+$deployment = vercel api "/v13/deployments/$env:STAGING_DEPLOYMENT_ID" | ConvertFrom-Json
+
+if (
+  $deployment.id -ne $env:STAGING_DEPLOYMENT_ID -or
+  $deployment.projectId -ne $env:STAGING_VERCEL_PROJECT_ID -or
+  $deployment.meta.githubCommitSha -ne $revision -or
+  $deployment.readyState -ne "READY" -or
+  $deployment.target -ne "production"
+) {
+  throw "STAGING_DEPLOYMENT_BINDING_MISMATCH"
+}
+```
+
+Run a protected, no-store runtime attestation on the unique deployment URL.
+
+```text
+vercel curl "https://<unique-deployment-url>/api/internal/release-attestation"
+```
+
+Require Vercel Deployment Protection before this check.
+
+Require `VERCEL_PROJECT_ID`, `VERCEL_DEPLOYMENT_ID`, `VERCEL_GIT_COMMIT_SHA`, and `VERCEL_TARGET_ENV` at runtime.
+
+Compare every returned hash with the private release binding and runtime result.
+
+The attestation rebuilds the target fingerprint from the deployed Supabase and database URLs.
+
+It fails when the rebuilt fingerprint differs from `STAGING_RUNTIME_TARGET_FINGERPRINT`.
+
+The attestation returns no raw project, deployment, database, host, principal, URL, or secret value.
+
+Require `sslmode=require&sslaccept=strict` on both Prisma Supavisor URLs.
+
+Do not run this command from a checkout linked to the pilot or production Vercel project.
+
 Do not replace `pnpm run build` with `next build`. The direct command skips Prisma client generation.
+
+## Database SSL enforcement
+
+Client TLS settings do not prove server SSL enforcement.
+
+Check the isolated Supabase project setting through the approved operator session.
+
+```text
+supabase ssl-enforcement get --project-ref <staging-ref> --experimental
+```
+
+Load PostgreSQL connection fields through the approved nonlogging secret process.
+
+First, prove that a non-SSL connection fails.
+
+```powershell
+$env:PGSSLMODE = "disable"
+psql -X --no-psqlrc --no-password --command "select 1"
+
+if ($LASTEXITCODE -eq 0) {
+  throw "STAGING_SSL_ENFORCEMENT_NOT_ACTIVE"
+}
+```
+
+Next, prove that strict certificate and hostname verification succeeds.
+
+```powershell
+$env:PGSSLMODE = "verify-full"
+$env:PGSSLROOTCERT = "<approved-ca-path>"
+psql -X --no-psqlrc --no-password --command "select 1"
+
+if ($LASTEXITCODE -ne 0) {
+  throw "STAGING_SSL_VERIFY_FULL_FAILED"
+}
+```
+
+Record only Boolean results, observation time, and one restricted evidence reference.
 
 ## Supabase Auth and Storage
 
@@ -112,11 +232,15 @@ Do not replace `pnpm run build` with `next build`. The direct command skips Pris
 
 ## Resend
 
+- `EMAIL_DELIVERY_MODE` defaults to `disabled` when it is absent.
+- Use `resend-test` only with the official `resend.dev` test recipients.
+- Use `live` only in an approved customer-message environment.
 - Use a nonproduction domain or approved test mode in staging.
 - Use Resend test addresses such as `delivered@resend.dev` and `bounced@resend.dev` by default.
 - Require separate approval before sending to any real mailbox.
 - Do not send a real customer message during staging.
 - Verify delivery, failure handling, suppression, and sensitive-data removal.
+- Inspect Supabase Auth email and SMTP settings separately because the application policy does not control them.
 - Production sending needs the approved domain, sender, recipient rules, and incident owner.
 
 ## Deployment sequence
@@ -163,7 +287,21 @@ A staged Production promotion does not rebuild. Create it with `vercel --prod --
 
 Select one recovery mode before the operation. Do not mix their assumptions.
 
-Use a physical clone or logical restore with synthetic staging data for pre-pilot drills. Same-project restore is an incident procedure.
+Use a physical clone into a new project for the current pre-pilot drill.
+
+Logical restore stays blocked until the approved nonlogging Vault-key transfer tool passes testing.
+
+Same-project restore is an incident procedure.
+
+Hash the finalized private recovery manifest. Store its digest in the staging evidence record.
+
+```powershell
+(Get-FileHash .\docs\temp\release-evidence\2026-08-28-recovery-manifest.md -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+Bind the manifest to the Git revision, migration head, recovery mode, backup, rollback artifact, deployment ID, and Supabase target fingerprint.
+
+The `RECOVERY_SET` and `RESTORE_DRILL` checks must reference the same manifest digest.
 
 ### Same-project physical restore
 

@@ -38,6 +38,10 @@ describe("connection metadata boundaries", () => {
       process.env.ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH = "true";
       expect(connectionWorkspaceEnabled()).toBe(true);
       expect(providerAuthorizationEnabled("google_ads", organizationId)).toBe(false);
+      delete process.env.ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH;
+      expect(providerAuthorizationEnabled("google_ads", organizationId)).toBe(false);
+      process.env.ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH = "invalid";
+      expect(providerAuthorizationEnabled("google_ads", organizationId)).toBe(false);
     } finally {
       restoreEnv("ACCOUNT_CONNECTIONS_ENABLED", previous.enabled);
       restoreEnv("ACCOUNT_CONNECTIONS_GOOGLE_ENABLED", previous.google);

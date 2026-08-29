@@ -118,7 +118,7 @@ export function connectionWorkspaceEnabled() {
 }
 
 export function providerAuthorizationEnabled(provider: ConnectionProvider, organizationId: string) {
-  if (!connectionWorkspaceEnabled() || process.env.ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH === "true") return false;
+  if (!connectionWorkspaceEnabled() || process.env.ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH !== "false") return false;
   const key = `ACCOUNT_CONNECTIONS_${provider.split("_")[0].toUpperCase()}_ENABLED`;
   if (process.env[key] !== "true") return false;
   const allowedOrganizations = (process.env.ACCOUNT_CONNECTIONS_ALLOWED_ORGANIZATION_IDS ?? "")

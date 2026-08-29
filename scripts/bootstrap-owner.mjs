@@ -7,12 +7,13 @@ const organizationName = process.env.APP_BOOTSTRAP_ORGANIZATION_NAME;
 const organizationSlug = process.env.APP_BOOTSTRAP_ORGANIZATION_SLUG;
 const databaseUrl = process.env.APP_BOOTSTRAP_DATABASE_URL || process.env.DIRECT_URL;
 const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!authSubject || !organizationName || !organizationSlug || !supabaseUrl || !serviceRoleKey || !databaseUrl) {
+const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+  || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+if (!authSubject || !organizationName || !organizationSlug || !supabaseUrl || !secretKey || !databaseUrl) {
   throw new Error("Bootstrap requires APP_BOOTSTRAP_AUTH_SUBJECT, APP_BOOTSTRAP_ORGANIZATION_NAME, APP_BOOTSTRAP_ORGANIZATION_SLUG, Supabase server variables, and APP_BOOTSTRAP_DATABASE_URL or DIRECT_URL.");
 }
 
-const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+const supabase = createClient(supabaseUrl, secretKey, { auth: { autoRefreshToken: false, persistSession: false } });
 const { data: authResult, error: authError } = await supabase.auth.admin.getUserById(authSubject);
 if (authError || !authResult.user) throw new Error("The protected bootstrap subject is not a Supabase Auth user.");
 

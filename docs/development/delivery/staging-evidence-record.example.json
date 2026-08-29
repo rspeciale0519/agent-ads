@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "recordType": "AGENT_ADS_STAGING_EVIDENCE",
   "verificationScope": "DECLARED_RECORD_ONLY",
   "environment": "staging",
@@ -11,13 +11,21 @@
   },
   "target": {
     "deploymentOrigin": "https://staging.example.invalid",
-    "vercelProjectIdentifier": "synthetic-vercel-project",
-    "supabaseProjectReference": "synthetic-supabase-project",
+    "vercelProjectIdentifier": "prj_syntheticproject",
+    "vercelDeploymentIdentifier": "dpl_syntheticdeployment",
+    "vercelProjectLinkSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "supabaseProjectReference": "abcdefghijklmnopqrst",
+    "supabaseTargetFingerprintSha256": "2222222222222222222222222222222222222222222222222222222222222222",
     "postgresMajor": 17,
     "expectedMigrationHead": "20260827190000_vault_write_function_boundary",
     "currentMigrationHead": "20260827190000_vault_write_function_boundary",
     "supavisorMode": "transaction",
     "supavisorPort": 6543
+  },
+  "runtimeCheck": {
+    "observedAt": "2026-08-28T11:55:00Z",
+    "resultRef": "restricted:staging/runtime/3333333333333333333333333333333333333333333333333333333333333333",
+    "resultSha256": "3333333333333333333333333333333333333333333333333333333333333333"
   },
   "safety": {
     "dataClass": "synthetic-only",
@@ -26,9 +34,10 @@
     "customerMessages": "disabled"
   },
   "recovery": {
-    "mode": "logical",
+    "mode": "unselected",
     "backupIdentifier": "synthetic-backup",
     "manifestRevision": "synthetic-manifest",
+    "manifestSha256": "4444444444444444444444444444444444444444444444444444444444444444",
     "rollbackArtifactIdentifier": "synthetic-rollback-artifact"
   },
   "approverRole": "operations-reviewer",
@@ -40,6 +49,18 @@
       "ownerRole": "release-owner",
       "implementationRef": ".github/workflows/validate.yml",
       "testRef": "restricted:staging/test-plan/exact-commit-ci",
+      "status": "not_run",
+      "observedAt": null,
+      "evidenceRef": null,
+      "limitationCodes": []
+    },
+    {
+      "id": "DEPLOYMENT_RUNTIME_ATTESTATION",
+      "requirementIds": ["OPS-006", "SEC-003"],
+      "gate": "STAGING",
+      "ownerRole": "release-owner",
+      "implementationRef": "app/api/internal/release-attestation/route.ts",
+      "testRef": "restricted:staging/test-plan/deployment-runtime-attestation",
       "status": "not_run",
       "observedAt": null,
       "evidenceRef": null,
@@ -118,6 +139,18 @@
       "limitationCodes": []
     },
     {
+      "id": "DATABASE_SSL_ENFORCEMENT",
+      "requirementIds": ["OPS-006", "SEC-011"],
+      "gate": "STAGING",
+      "ownerRole": "database-owner",
+      "implementationRef": "docs/development/delivery/vercel-supabase-resend-deployment.md",
+      "testRef": "restricted:staging/test-plan/database-ssl-enforcement",
+      "status": "not_run",
+      "observedAt": null,
+      "evidenceRef": null,
+      "limitationCodes": []
+    },
+    {
       "id": "AUTH_SESSION_AAL2",
       "requirementIds": ["SEC-003"],
       "gate": "STAGING",
@@ -146,7 +179,7 @@
       "requirementIds": ["ONB-013", "SEC-005"],
       "gate": "STAGING",
       "ownerRole": "security-owner",
-      "implementationRef": "lib/onboarding-email.ts",
+      "implementationRef": "lib/email-delivery-policy.ts",
       "testRef": "restricted:staging/test-plan/email-test-mode",
       "status": "not_run",
       "observedAt": null,

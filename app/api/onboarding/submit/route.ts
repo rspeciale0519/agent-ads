@@ -1,7 +1,11 @@
 import { Prisma } from "@prisma/client";
-import { Resend } from "resend";
 import { z } from "zod";
 import { buildOnboardingEmail } from "../../../../lib/onboarding-email";
+import {
+  getOnboardingNotificationConfig,
+  OnboardingNotificationError,
+  sendOnboardingNotification,
+} from "../../../../lib/onboarding-notification";
 import { formatOnboardingValidationIssues, onboardingSubmissionSchema } from "../../../../lib/onboarding-schema";
 import { errorResponse, noStoreJson, requireSameOrigin } from "../../../../lib/api/http";
 import { getStorageBucket } from "../../../../lib/supabase-admin";
@@ -36,10 +40,10 @@ export async function POST(request: Request) {
     return noStoreJson({ error: "One or more uploaded files could not be verified." }, { status: 400 });
   }
 
-  const notificationEmail = process.env.ONBOARDING_NOTIFICATION_EMAIL;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!notificationEmail || !fromEmail || !resendApiKey) {
+  let notificationConfig;
+  try {
+    notificationConfig = getOnboardingNotificationConfig();
+  } catch {
     return noStoreJson({ error: "Submission delivery is not configured yet." }, { status: 503 });
   }
 
@@ -84,24 +88,25 @@ export async function POST(request: Request) {
     if (pendingRows.data.length === 0) return noStoreJson({ ok: true, duplicate: true });
 
     const { html, text } = buildOnboardingEmail(input);
-    const resend = new Resend(resendApiKey);
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: [notificationEmail],
-      subject: `New MioDio marketing onboarding · ${input.form.businessName}`,
-      html,
-      text,
-      headers: { "X-MioDio-Submission-ID": input.submissionId },
-    }, { idempotencyKey: `onboarding-${input.submissionId}` });
-    if (result.error) {
-      await withApplicantContext(user.id, (tx) => tx.onboardingSubmission.update({ where: { id: input.submissionId }, data: { applicantId: user.id, notificationStatus: "failed", notificationError: result.error?.message ?? "Delivery failed" } }));
-      return noStoreJson({ error: "The submission was saved, but the notification email could not be sent." }, { status: 502 });
+    try {
+      await sendOnboardingNotification(notificationConfig, {
+        html,
+        subject: `New MioDio marketing onboarding · ${input.form.businessName}`,
+        submissionId: input.submissionId,
+        text,
+      });
+    } catch (error) {
+      await withApplicantContext(user.id, (tx) => tx.onboardingSubmission.update({ where: { id: input.submissionId }, data: { applicantId: user.id, notificationStatus: "failed", notificationError: "ONBOARDING_NOTIFICATION_FAILED" } }));
+      if (error instanceof OnboardingNotificationError) {
+        return noStoreJson({ error: "The submission was saved, but the notification email could not be sent." }, { status: error.status });
+      }
+      throw error;
     }
 
-    try { await withApplicantContext(user.id, (tx) => tx.onboardingSubmission.update({ where: { id: input.submissionId }, data: { applicantId: user.id, notificationStatus: "sent", notificationSentAt: new Date() } })); } catch (updateError) { console.error("Submission saved but notification status could not be updated", updateError instanceof Error ? updateError.message : "unknown error"); }
+    try { await withApplicantContext(user.id, (tx) => tx.onboardingSubmission.update({ where: { id: input.submissionId }, data: { applicantId: user.id, notificationStatus: "sent", notificationSentAt: new Date() } })); } catch { console.error("Submission saved but notification status could not be updated"); }
     return noStoreJson({ ok: true });
-  } catch (error) {
-    console.error("Onboarding submission failed", error instanceof Error ? error.message : "unknown error");
+  } catch {
+    console.error("Onboarding submission failed");
     return noStoreJson({ error: "We could not save this submission. Please try again." }, { status: 500 });
   }
 }

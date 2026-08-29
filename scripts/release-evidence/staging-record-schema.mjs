@@ -8,6 +8,13 @@ const stagingCheckContract = {
     implementationRef: ".github/workflows/validate.yml",
     testRef: "restricted:staging/test-plan/exact-commit-ci",
   },
+  DEPLOYMENT_RUNTIME_ATTESTATION: {
+    requirementIds: ["OPS-006", "SEC-003"],
+    gate: "STAGING",
+    ownerRole: "release-owner",
+    implementationRef: "app/api/internal/release-attestation/route.ts",
+    testRef: "restricted:staging/test-plan/deployment-runtime-attestation",
+  },
   TARGET_FINGERPRINT: {
     requirementIds: ["OPS-006"],
     gate: "F0",
@@ -50,6 +57,13 @@ const stagingCheckContract = {
     implementationRef: "lib/db/client.ts",
     testRef: "restricted:staging/test-plan/supavisor-runtime",
   },
+  DATABASE_SSL_ENFORCEMENT: {
+    requirementIds: ["OPS-006", "SEC-011"],
+    gate: "STAGING",
+    ownerRole: "database-owner",
+    implementationRef: "docs/development/delivery/vercel-supabase-resend-deployment.md",
+    testRef: "restricted:staging/test-plan/database-ssl-enforcement",
+  },
   AUTH_SESSION_AAL2: {
     requirementIds: ["SEC-003"],
     gate: "STAGING",
@@ -68,7 +82,7 @@ const stagingCheckContract = {
     requirementIds: ["ONB-013", "SEC-005"],
     gate: "STAGING",
     ownerRole: "security-owner",
-    implementationRef: "lib/onboarding-email.ts",
+    implementationRef: "lib/email-delivery-policy.ts",
     testRef: "restricted:staging/test-plan/email-test-mode",
   },
   EXTERNAL_OPERATIONS_DISABLED: {
@@ -240,6 +254,47 @@ const safeReference = z.string().min(1).max(512).refine((value) => {
 });
 
 const migrationHead = z.string().regex(/^\d{14}_[a-z0-9_]+$/u);
+const sha256Digest = z.string().regex(/^[0-9a-f]{64}$/u);
+const vercelProjectIdentifier = z.string()
+  .min(8)
+  .max(200)
+  .regex(/^prj_[A-Za-z0-9]+$/u);
+const vercelDeploymentIdentifier = z.string()
+  .min(8)
+  .max(200)
+  .regex(/^dpl_[A-Za-z0-9]+$/u);
+const supabaseProjectReference = z.string().regex(/^[a-z0-9]{20}$/u);
+
+export const stagingRuntimeResultSchema = z.object({
+  schemaVersion: z.literal(1),
+  resultType: z.literal("AGENT_ADS_STAGING_RUNTIME_CONFIG_RESULT"),
+  status: z.literal("pass"),
+  observedAt: utcTimestamp,
+  source: z.object({
+    gitRevision: z.string().regex(/^[0-9a-f]{40}$/u),
+  }).strict(),
+  bindings: z.object({
+    vercelProjectIdentifierSha256: sha256Digest,
+    vercelDeploymentIdentifierSha256: sha256Digest,
+    vercelProjectLinkSha256: sha256Digest,
+    supabaseProjectReferenceSha256: sha256Digest,
+    supabaseTargetFingerprintSha256: sha256Digest,
+  }).strict(),
+  counts: z.object({
+    failed: z.literal(0),
+    passed: z.number().int().positive(),
+    skipped: z.literal(0),
+    total: z.number().int().positive(),
+  }).strict(),
+}).strict().superRefine((result, context) => {
+  if (result.counts.passed !== result.counts.total) {
+    context.addIssue({
+      code: "custom",
+      message: "Runtime check counts do not match.",
+      path: ["counts"],
+    });
+  }
+});
 
 const stagingCheckSchema = z.object({
   id: z.enum(REQUIRED_STAGING_CHECK_IDS),
@@ -255,7 +310,7 @@ const stagingCheckSchema = z.object({
 }).strict();
 
 export const stagingEvidenceRecordSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   recordType: z.literal("AGENT_ADS_STAGING_EVIDENCE"),
   verificationScope: z.literal("DECLARED_RECORD_ONLY"),
   environment: z.literal("staging"),
@@ -267,13 +322,21 @@ export const stagingEvidenceRecordSchema = z.object({
   }).strict(),
   target: z.object({
     deploymentOrigin: z.string().max(2048).refine((value) => isSafeHttpsUrl(value, true)),
-    vercelProjectIdentifier: safeIdentifier,
-    supabaseProjectReference: safeIdentifier,
+    vercelProjectIdentifier,
+    vercelDeploymentIdentifier,
+    vercelProjectLinkSha256: sha256Digest,
+    supabaseProjectReference,
+    supabaseTargetFingerprintSha256: sha256Digest,
     postgresMajor: z.number().int().min(15).max(99),
     expectedMigrationHead: migrationHead,
     currentMigrationHead: migrationHead,
     supavisorMode: z.enum(["transaction", "session"]),
     supavisorPort: z.number().int().min(1).max(65535),
+  }).strict(),
+  runtimeCheck: z.object({
+    observedAt: utcTimestamp,
+    resultRef: safeReference,
+    resultSha256: sha256Digest,
   }).strict(),
   safety: z.object({
     dataClass: z.literal("synthetic-only"),
@@ -282,9 +345,10 @@ export const stagingEvidenceRecordSchema = z.object({
     customerMessages: z.literal("disabled"),
   }).strict(),
   recovery: z.object({
-    mode: z.enum(["same-project-physical", "new-project-physical", "logical"]),
+    mode: z.enum(["unselected", "same-project-physical", "new-project-physical", "logical"]),
     backupIdentifier: safeIdentifier,
     manifestRevision: safeIdentifier,
+    manifestSha256: sha256Digest,
     rollbackArtifactIdentifier: safeIdentifier,
   }).strict(),
   approverRole: ownerRole,

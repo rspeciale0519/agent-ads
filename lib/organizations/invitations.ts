@@ -5,6 +5,7 @@ import { getAssuranceStatus, requireAal2 } from "../auth/assurance";
 import { getAuthenticatedUser, withApplicantContext, withTenantContext, type OrganizationContext } from "../auth/organization-context";
 import { hasPermission, normalizeRole, permissionsForRole, type OrganizationRole } from "../auth/permissions";
 import { runIdempotentMutation, type MutationMetadata } from "../api/idempotency";
+import { assertEmailDeliveryAllowed } from "../email-delivery-policy";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const allowedRoles: OrganizationRole[] = ["member", "operator", "administrator"];
@@ -47,12 +48,13 @@ export async function createOrganizationInvitation(context: OrganizationContext,
 export async function deliverInvitationWithCompensation(deliver: () => Promise<void>, compensate: () => Promise<void>) {
   try {
     await deliver();
-  } catch {
+  } catch (error) {
     try {
       await compensate();
     } catch {
       throw new InvitationError("INVITATION_DELIVERY_COMPENSATION_FAILED", 503);
     }
+    if (error instanceof InvitationError) throw error;
     throw new InvitationError("INVITATION_EMAIL_FAILED", 502);
   }
 }
@@ -108,10 +110,15 @@ export async function revokeOrganizationInvitation(context: OrganizationContext,
   });
 }
 
-async function sendInvitationEmail(email: string, organizationName: string, code: string, invitationId: string) {
+export async function sendInvitationEmail(email: string, organizationName: string, code: string, invitationId: string) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from) throw new InvitationError("INVITATION_EMAIL_NOT_CONFIGURED", 503);
+  try {
+    assertEmailDeliveryAllowed(email);
+  } catch {
+    throw new InvitationError("INVITATION_EMAIL_NOT_CONFIGURED", 503);
+  }
   const result = await new Resend(apiKey).emails.send(
     { from, to: [email], subject: `Your ${organizationName} MioDio workspace invitation`, text: `Use this one-time invitation code in the MioDio workspace:\n\n${code}\n\nThe code expires in seven days.` },
     { idempotencyKey: `organization-invitation-${invitationId}` },
