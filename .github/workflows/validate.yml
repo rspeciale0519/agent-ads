@@ -51,7 +51,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run test -- scripts/f0/network-proof-runner.test.ts -t "real Windows"
+      - run: pnpm run test scripts/f0/network-proof-runner.test.ts -t "real Windows"
         env:
           F0_TEST_WINDOWS_TASKKILL: "1"
 
