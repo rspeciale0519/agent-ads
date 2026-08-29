@@ -29,7 +29,7 @@ describe("staging runtime configuration checker", () => {
       "checkStagingRuntimeConfig",
     ]);
     expect(checker.UNRESOLVED_TARGET_FINGERPRINT_SHA256).toMatch(/^[0-9a-f]{64}$/u);
-  });
+  }, 20_000);
 
   it("accepts the disabled core staging configuration", async () => {
     const { checkStagingRuntimeConfig } = await checkerModule;

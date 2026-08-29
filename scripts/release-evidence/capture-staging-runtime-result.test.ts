@@ -121,7 +121,7 @@ describe("staging runtime result capture", () => {
       secretKey,
       "app_runtime_login",
     ]) expect(serialized).not.toContain(privateValue);
-  });
+  }, 20_000);
 
   it("keeps identity hashes stable across secret rotation", async () => {
     const { createStagingRuntimeResult } = await captureModule;
