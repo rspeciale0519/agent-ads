@@ -16,7 +16,7 @@ export function getProviderAdapter(provider: ConnectionProvider): ProviderAdapte
   if (provider === "google_ads" || provider === "google_analytics" || provider === "google_tag_manager") return new GoogleReadOnlyAdapter(provider);
   if (provider === "meta") return new MetaReadOnlyAdapter();
   if (provider === "tiktok") return new TikTokReadOnlyAdapter();
-  if (provider === "dubsado" || provider === "wordpress" || provider === "videoask" || provider === "organic_social" || provider === "asset_source") return new ManualInventoryAdapter(provider);
+  if (provider === "google_search_console" || provider === "dubsado" || provider === "wordpress" || provider === "videoask" || provider === "organic_social" || provider === "asset_source") return new ManualInventoryAdapter(provider);
   throw new ProviderAdapterError("PROVIDER_ADAPTER_NOT_ENABLED");
 }
 

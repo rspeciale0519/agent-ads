@@ -23,6 +23,7 @@ type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connec
 export function buildAiReachBriefing(data: BriefingInput): AiReachBriefing {
   const google = data.connections.find((connection) => connection.provider.toLowerCase().includes("google"));
   const analytics = data.connections.find((connection) => connection.provider.toLowerCase() === "google_analytics");
+  const searchConsole = data.connections.find((connection) => connection.provider.toLowerCase() === "google_search_console");
   const website = data.connections.find((connection) => connection.provider.toLowerCase() === "wordpress");
   const dubsado = data.connections.find((connection) => connection.provider.toLowerCase().includes("dubsado"));
   const sources = [
@@ -43,8 +44,8 @@ export function buildAiReachBriefing(data: BriefingInput): AiReachBriefing {
     },
     {
       name: "Search Console",
-      state: "missing" as const,
-      detail: "Read-only property access is not connected.",
+      state: searchConsole?.status === "active_read_only" ? "connected" as const : "missing" as const,
+      detail: searchConsole?.status === "active_read_only" ? "Read-only property access is active." : "Read-only property access is not connected.",
     },
     {
       name: "Dubsado outcomes",
