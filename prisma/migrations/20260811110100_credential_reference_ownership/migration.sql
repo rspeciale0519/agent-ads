@@ -5,6 +5,47 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '120s';
 
+ALTER TABLE private.credential_references
+  ADD COLUMN IF NOT EXISTS connection_id UUID;
+
+UPDATE private.credential_references AS reference
+SET connection_id = connection.id
+FROM public.connections AS connection
+WHERE connection.credential_reference_id = reference.id
+  AND reference.connection_id IS NULL;
+
+DO $migration$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM private.credential_references
+    WHERE connection_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'credential reference connection backfill incomplete';
+  END IF;
+END
+$migration$;
+
+ALTER TABLE private.credential_references
+  ALTER COLUMN connection_id SET NOT NULL;
+
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'credential_references_organization_connection_fkey'
+      AND conrelid = 'private.credential_references'::regclass
+  ) THEN
+    ALTER TABLE private.credential_references
+      ADD CONSTRAINT credential_references_organization_connection_fkey
+      FOREIGN KEY (organization_id, connection_id)
+      REFERENCES public.connections (organization_id, id)
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END
+$migration$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS credential_references_organization_id_connection_id_id_key
   ON private.credential_references (organization_id, connection_id, id);
 

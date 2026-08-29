@@ -41,6 +41,10 @@ describe("connection credential database contract", () => {
 
   it("binds the current pointer to its owning connection", () => {
     const sql = migration("20260811110100_credential_reference_ownership");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS connection_id UUID");
+    expect(sql).toContain("SET connection_id = connection.id");
+    expect(sql).toContain("credential reference connection backfill incomplete");
+    expect(sql).toContain("credential_references_organization_connection_fkey");
     expect(sql).toContain("FOREIGN KEY (organization_id, id, credential_reference_id)");
     expect(sql).toContain("REFERENCES private.credential_references (organization_id, connection_id, id)");
     expect(sql).toContain("VALIDATE CONSTRAINT connections_credential_owner_fkey");
@@ -79,6 +83,10 @@ describe("connection credential database contract", () => {
     const laterSql = migrationNames.slice(boundaryIndex + 1).map(migration).join("\n");
     expect(laterSql).not.toContain("GRANT EXECUTE ON FUNCTION vault.create_secret");
     expect(laterSql).not.toContain("GRANT EXECUTE ON FUNCTION vault.update_secret");
+  });
+
+  it("does not require managed Supabase roles to alter role attributes", () => {
+    expect(migrationNames.map(migration).join("\n")).not.toContain("ALTER ROLE");
   });
 
   it("keeps idempotency foreign-key update actions aligned with Prisma", () => {
