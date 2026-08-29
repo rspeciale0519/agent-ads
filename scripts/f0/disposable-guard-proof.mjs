@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  assertNetworkProofMutex,
   networkDatabaseEnvironment,
   psqlBaseArguments,
   resolveNetworkProofContext,
@@ -10,6 +11,7 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
+assertNetworkProofMutex(context);
 const { databaseUrl, marker, psql } = context;
 const psqlArgs = psqlBaseArguments();
 const clusterGuard = readFileSync(

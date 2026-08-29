@@ -64,9 +64,7 @@ jobs:
         with:
           node-version: 22
       - run: psql --version
-      - run: node scripts/f0/disposable-mark-guard-proof.mjs
-      - run: node scripts/f0/network-mark-disposable.mjs
-      - run: node scripts/f0/disposable-guard-proof.mjs
+      - run: node scripts/f0/network-guard-proof.mjs
 
   schema-proof:
     runs-on: ubuntu-24.04
@@ -100,5 +98,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: psql --version
-      - run: pnpm run security:f0-schema:mark
-      - run: pnpm run security:f0-schema
+      - run: pnpm run security:f0-network

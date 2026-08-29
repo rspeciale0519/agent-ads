@@ -208,6 +208,7 @@ describe("F0 disposable target marker", () => {
     expect(networkSafety).toContain("-c event_triggers=false -c search_path=pg_catalog,pg_temp");
     expect(clusterGuard).toContain("SET search_path = pg_catalog, pg_temp");
     for (const source of networkProofSources) {
+      expect(source).toContain("assertNetworkProofMutex(context)");
       expect(source).toContain("psqlBaseArguments");
       expect(source).not.toContain('["-X", "--set", "ON_ERROR_STOP=1"');
       expect(source).not.toContain("--dbname");

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  assertNetworkProofMutex,
   networkDatabaseEnvironment,
   psqlBaseArguments,
   resolveNetworkProofContext,
@@ -11,6 +12,7 @@ import { upgradeScenarios } from "./upgrade-fixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
+assertNetworkProofMutex(context);
 const { marker, psql } = context;
 const createdDatabases = [];
 const templateName = "agent_ads_f0_upgrade_template";

@@ -29,20 +29,21 @@ The shared guard rejects altered PostgreSQL 17 roles and memberships. It also re
 
 The network proof requires `F0_ALLOW_DISPOSABLE_DATABASE=1`, `F0_DATABASE_URL`, and a canonical lowercase UUIDv4 `F0_DISPOSABLE_MARKER`. `PSQL_BIN` is optional when `psql` is on `PATH`. `F0_DATABASE_URL` must use a numeric loopback address, an explicit valid port, an explicit username and password, and the `agent_ads_f0` database. It must contain no query or fragment.
 
-Run these commands in order on a new disposable cluster:
+Run `pnpm run security:f0-network` once on a new disposable cluster.
 
-1. Run `pnpm run security:f0-mark-guard` before the marker exists.
-2. Run `pnpm run security:f0-schema:mark`.
-3. Run `pnpm run security:f0-guard`.
-4. Run `pnpm run security:f0-schema`.
+The wrapper runs the mark guard, target marker, dirty-target guard, fresh migration, and upgrade proof in order. Raw network scripts are internal stages. They fail before database access when the wrapper mutex context is absent. Legacy single-stage package commands keep their old behavior under separate mutex runs. Do not use them for a complete proof.
 
 The wrapper removes ambient libpq variables and rebuilds them from validated fields. It disables password prompts and passfiles, and it sets a five-second connection timeout. Guard connections disable login event triggers and search trusted catalogs first.
+
+The wrapper holds one fixed, database-local PostgreSQL advisory session mutex in `agent_ads_f0`. It binds every child to the holder backend, two-part key, database, application name, and PostgreSQL system identifier. It stops the active process tree when the holder fails or the wrapper receives `SIGINT` or `SIGTERM`.
+
+A successful proof terminates the holder and confirms that exact backend is gone. After acquisition, a failed proof does not release a live holder. The detached holder remains while its session stays active. Target shutdown ends the session. A 24-day safety limit also ends it. If the holder itself fails, PostgreSQL already released its session mutex.
 
 The URL check cannot detect a local proxy or tunnel that forwards traffic to another server.
 
 Use a trusted PostgreSQL client installation and a trusted `PATH`. The wrapper cannot detect a malicious executable that copies the `psql` name and output.
 
-Use a cluster that you own exclusively. Do not allow another session to change state during either proof. Readiness probes are allowed. The network proof has check-to-write race windows between connections and processes.
+Use a cluster that you own exclusively. Readiness probes are allowed. The cooperative mutex prevents overlap between tracked runs in one cluster's `agent_ads_f0` database. It does not block administrators, raw SQL, schedulers, hostile sessions, or other writers. The proof still has check-to-write race windows against those writers.
 
 Discard the complete disposable cluster after every successful or failed proof. Never reuse its databases, roles, files, or server process. The proof scripts do not claim general cleanup.
 
