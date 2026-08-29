@@ -4,7 +4,17 @@
 
 Collect the business, account, data, risk, and operating context required to implement and validate the system using the first client without embedding pilot-specific assumptions into the product.
 
-Phase 0 uses the [client onboarding form](../product/client-onboarding-form.md) as the default intake surface. Staff may supplement it with a review call, but the client should not need to answer the same questionnaire manually in chat or email.
+The current form remains the pre-login intake surface. AI Reach becomes the primary guided onboarding surface after sign-in.
+
+The client submission is not a prerequisite for official API research, inventory preparation, internal owner roles, metric-workshop design, or reversible architecture defaults. Use the [Phase 0 readiness workbook](./phase-0-readiness-workbook.md) to complete those items in parallel. Client-specific facts, account eligibility, metric approval, claims, rights, and final connector priority remain `awaiting pilot response` until supported by client or account evidence.
+
+## Pilot profile
+
+The reference pilot is a sales trainer, public speaker, or similar expert-led service business.
+
+The approved funnel is discovery, website visit, qualified lead, booked call, closed-won deal, and booked revenue.
+
+The private Pilot Scope Record names the exact offer, audience, market, baseline, CRM, CMS, owners, sources, and action gates.
 
 ## Business intake
 
@@ -28,9 +38,9 @@ Phase 0 uses the [client onboarding form](../product/client-onboarding-form.md) 
 - Minimum decision volume and acceptable learning budget.
 - Guardrail and stop metrics.
 
-## Paid platform inventory
+## Pilot advertising inventory
 
-For Meta, Google, Microsoft, LinkedIn, TikTok, Reddit, and X:
+For Google Ads and Meta Ads:
 
 - advertiser/business account;
 - account owner and administrator;
@@ -44,7 +54,11 @@ For Meta, Google, Microsoft, LinkedIn, TikTok, Reddit, and X:
 - test/sandbox account availability;
 - read and mutation permission owners.
 
-## Organic platform inventory
+Each organization can connect Google only, Meta only, or both. The product still verifies both read adapters before pilot release.
+
+Microsoft, LinkedIn, TikTok, Reddit, and X remain expansion inventory and do not block the pilot.
+
+## Organic platform inventory — expansion
 
 For LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and Reddit:
 
@@ -59,7 +73,9 @@ For LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and Reddit:
 
 ## Business systems
 
-- CRM.
+- Website and selected CMS.
+- Google Analytics 4 and Google Search Console.
+- Selected CRM and approved funnel-stage map.
 - Ecommerce, billing, or payment processor.
 - Website analytics and tag manager.
 - Call tracking and booking systems.
@@ -69,6 +85,22 @@ For LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and Reddit:
 - Identity provider and notification channels.
 
 For each, record owner, environment, API/export capability, identifiers, data quality, retention, and permissions.
+
+## Hosting and service profile
+
+Default the pilot to the Vercel and managed Supabase pooled service under D-030. Record:
+
+- pooled pilot profile; record a dedicated or hybrid reason only after an approved trigger;
+- region and data-residency requirements;
+- operator-owned or client-owned AWS account for a dedicated profile;
+- identity/MFA/SSO and authorized administrator requirements;
+- expected user, workflow, storage, model, media, and connector usage;
+- manual pilot payment terms, support ownership, internal cost limits, and budget owners;
+- required SLO/SLA, support hours, incident contacts, retention, export, and offboarding terms;
+- local/private systems that cannot use a direct cloud integration and the approved minimum data flow;
+- client technical owner, network prerequisites, and physical host owner only when a hybrid connector is approved.
+
+A client device is not proposed simply as a privacy feature. The data-flow review must include hosted models, marketing platforms, telemetry, support access, and all subprocessors regardless of connector location.
 
 ## Policy and risk workshop
 
@@ -97,6 +129,10 @@ Agree on:
 - Media assets have rights/provenance.
 - Time zone and currency conflicts documented.
 - Platform capability matrix populated from current official sources.
+- Pooled hosting, region, account owner, support tier, cost limits, and offboarding owner approved.
+- Vercel and Supabase environments isolated with tenant and recovery evidence.
+- Internal usage and provider-cost records verified. Test automated invoices only after billing is enabled.
+- Any hybrid connector passes outbound-only identity, update, allowlist, health, buffering, audit, expiry, revocation, and remote-disable tests.
 
 ## Launch stages and gates
 
@@ -112,19 +148,19 @@ Agree on:
 - Humans record what they would do and why.
 - Exit when recommendation/eval thresholds are met.
 
-### Approved organic
+### Supervised website draft and lead follow-up
 
-- Exact variants require approval.
-- Begin with low-risk content and verify receipts/analytics.
-- Exit when publishing reliability and brand/policy review pass.
+- Create an approved CMS draft without public publishing.
+- Send one approved lead follow-up after consent and suppression checks.
+- Exit when destination, execution, reconciliation, audit, and failure tests pass.
 
-### Approved paid
+### Supervised advertising
 
-- Start with a bounded real campaign/experiment selected by the pilot owner.
-- Every mutation approved and reconciled.
-- Exit when execution, audit, spend, attribution, and incident controls pass.
+- Start with one campaign pause through one approved provider and account.
+- Test resume as rollback when current platform state permits it.
+- Every action uses current AAL2, exact destination binding, approval, and reconciliation.
 
-### Bounded autonomy
+### Bounded autonomy — expansion
 
 - Only evidence-qualified, reversible action classes.
 - Explicit scope, cap, expiry, notifications, and kill switch.
@@ -137,9 +173,10 @@ Agree on:
 - Data reconciliation report.
 - Agent eval report.
 - Security and tenant test report.
-- Organic and paid E2E execution records.
+- CMS draft, lead follow-up, and campaign pause/resume execution records.
 - Audit reconstruction.
 - Incident/kill-switch exercise.
+- Pooled deployment, backup/restore, internal cost-limit, and offboarding evidence.
 - User-journey usability results.
 - Pilot outcome and lessons report.
 
@@ -147,6 +184,7 @@ Agree on:
 
 - Disable schedules and mutations.
 - Revoke platform and provider credentials.
+- Revoke deployment roles and deregister any approved hybrid connector.
 - Export requested data and audit records.
 - Enforce retention/deletion obligations.
 - Confirm no orphaned campaigns, content schedules, webhooks, or agent jobs.

@@ -14,6 +14,18 @@ Make the system optimize trustworthy business outcomes while clearly separating 
 
 The optimization target is defined per organization and goal. Lower-level metrics are useful leading indicators but cannot silently replace the target.
 
+## Narrow pilot outcome model
+
+The pilot uses one approved business outcome and one selected CRM.
+
+The default sales-trainer funnel is qualified lead, booked call, closed-won deal, and booked revenue.
+
+`Booked revenue` is the approved CRM amount at the configured closed-won stage. It is not cash received.
+
+GA4, Search Console, Google Ads, and Meta Ads link source activity to that funnel where evidence permits it.
+
+Each briefing shows one outcome snapshot, its freshness and reconciliation state, and exactly three evidence-linked actions.
+
 ## Canonical metric contract
 
 Every metric has:
@@ -30,6 +42,28 @@ Every metric has:
 - allowed decision uses.
 
 Examples include spend, qualified leads, qualified acquisition cost, customer acquisition cost, contribution margin, pipeline value, return on ad spend, creative fatigue, content-assisted pipeline, and budget pacing.
+
+## AI Reach measurement
+
+| Layer | Measures | Does not prove |
+|---|---|---|
+| Crawl access | robots rules, fetch status, server access | indexing or citation |
+| Index evidence | Search Console status, impressions, clicks | AI answer inclusion |
+| Controlled answer samples | brand mention, recommendation, citation, factual accuracy | rank or market share |
+| Referral evidence | GA4 and server referral sessions | complete AI traffic |
+| Outcome evidence | CRM-qualified outcomes and booked revenue | causality without a controlled design |
+
+AI Reach rates include answer coverage, brand mention, recommendation, owned citation, factual accuracy, and referral outcome rates.
+
+Each rate shows its numerator, denominator, time window, question-set version, sample method, and limitations.
+
+Do not combine these layers into one unexplained visibility or GEO score.
+
+### Observation classes
+
+Keep official platform facts, first-party observations, controlled AI samples, deterministic classifications, human reviews, agent interpretations, and business outcomes separate.
+
+Do not scrape consumer result interfaces or claim access to unavailable private metrics.
 
 ## Data reconciliation
 
@@ -98,10 +132,26 @@ Optimization is blocked when:
 - CRM qualification is incomplete for the decision window;
 - identity/deduplication failure materially affects results;
 - experiment assignment or treatment integrity is broken.
+- AI Reach question-set versions differ inside one comparison;
+- the provider, surface, method, locale, or sample count is missing;
+- an observation run is partial but presented as complete;
+- crawl or index evidence exceeds its freshness limit;
+- factual assessment lacks approved business truth;
+- referral lineage or CRM outcome mapping is incomplete for the claim.
 
 The system may still report descriptive platform data with a clear warning.
 
 ## Reporting
+
+The pilot dashboard shows:
+
+- the primary outcome;
+- available source contribution;
+- AI Reach status;
+- the most important data limitation;
+- exactly three recommended actions.
+
+A broad analytics workspace is expansion scope.
 
 ### Daily operational report
 
@@ -125,4 +175,3 @@ The system may still report descriptive platform data with a clear warning.
 ## Promotion rule
 
 A tactic may move from experiment to supported practice only when its effect is meaningful, data quality passes, guardrails remain acceptable, the result is reproducible or sufficiently credible for the risk, and the applicable business/platform conditions are recorded. Promotion to supported practice is separate from promotion to autonomous execution.
-

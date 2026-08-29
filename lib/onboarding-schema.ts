@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, isAllowedUpload } from "./upload-rules";
+import { findSecretPattern, isUnsafeCredentialDocumentName } from "./security/secret-material";
 
 const paidChannels = ["Meta Ads", "Google Ads", "Microsoft Advertising", "LinkedIn Ads", "TikTok Ads", "Reddit Ads", "X Ads"] as const;
 const organicChannels = ["LinkedIn", "X", "Instagram", "TikTok", "Facebook", "YouTube", "Reddit"] as const;
 export const ONBOARDING_LONG_TEXT_MAX_LENGTH = 5000;
 
-export const onboardingFormSchema = z.object({
+const onboardingFormObjectSchema = z.object({
   businessName: z.string().trim().min(1, "Enter the business name.").max(180, "Keep the business name under 180 characters."),
   website: z.string().trim().min(1, "Enter the business website.").url("Enter a full website address, including https://").max(500, "Keep the website address under 500 characters."),
   description: z.string().trim().max(ONBOARDING_LONG_TEXT_MAX_LENGTH, "Keep the offer and audience description at 5,000 characters or fewer."),
@@ -28,13 +29,54 @@ export const onboardingFormSchema = z.object({
   notes: z.string().trim().max(6000, "Keep the current marketing notes under 6,000 characters."),
 });
 
+const onboardingSecretFields = [
+  "businessName", "website", "description", "locations", "goalDetails", "monthlyBudget",
+  "qualifiedOutcome", "salesCycle", "brandVoice", "prohibitedTopics", "existingAssets",
+  "crm", "analytics", "revenueSource", "teamApprovers", "notes",
+] as const;
+
+type OnboardingFormValue = z.infer<typeof onboardingFormObjectSchema>;
+
+function addOnboardingSecretIssues(value: Partial<OnboardingFormValue>, context: z.RefinementCtx, prefix: string[] = []) {
+  for (const field of onboardingSecretFields) {
+    const finding = findSecretPattern(value[field]);
+    if (!finding) continue;
+    context.addIssue({
+      code: "custom",
+      path: [...prefix, field],
+      message: `Remove the ${finding}. Credentials and access codes are collected only through approved connection routes.`,
+    });
+  }
+}
+
+export const onboardingFormSchema = onboardingFormObjectSchema.superRefine((value, context) => {
+  addOnboardingSecretIssues(value, context);
+});
+
+const onboardingDraftFormSchema = z.preprocess((candidate) => {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
+  return Object.fromEntries(Object.entries(candidate).filter(([, value]) => value !== ""));
+}, onboardingFormObjectSchema.partial());
+
 export const onboardingAttachmentSchema = z.object({
   id: z.string().uuid("Remove the file that needs attention and upload it again."),
-  name: z.string().trim().min(1, "Remove the unnamed file and upload it again.").max(180, "Use a file name under 180 characters.").refine((value) => !/[\\/]/.test(value), "File names cannot contain path separators."),
+  name: z.string().trim().min(1, "Remove the unnamed file and upload it again.").max(180, "Use a file name under 180 characters.")
+    .refine((value) => !/[\\/]/.test(value), "File names cannot contain path separators.")
+    .refine((value) => !isUnsafeCredentialDocumentName(value), "Do not upload password, credential, token, cookie, MFA, or recovery-code files."),
   size: z.number().int().positive().max(MAX_UPLOAD_BYTES, `Choose a file no larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`),
   type: z.string().max(120),
   storagePath: z.string().min(1, "Wait for the file upload to finish, or remove the file.").max(500),
   status: z.literal("uploaded", { error: "Wait for the file upload to finish, or remove the file that needs attention." }),
+});
+
+export const onboardingDraftStructureSchema = z.object({
+  submissionId: z.string().uuid(),
+  form: onboardingDraftFormSchema,
+  attachments: z.array(onboardingAttachmentSchema).max(MAX_UPLOAD_FILES),
+});
+
+export const onboardingDraftSchema = onboardingDraftStructureSchema.superRefine((value, context) => {
+  addOnboardingSecretIssues(value.form, context, ["form"]);
 });
 
 export const onboardingSubmissionSchema = z.object({
@@ -98,7 +140,10 @@ export function formatOnboardingValidationIssues(error: z.ZodError): OnboardingV
 
 export const uploadRequestSchema = z.object({
   submissionId: z.string().uuid(),
-  fileName: z.string().trim().min(1).max(180).refine((value) => !/[\\/]/.test(value), "File names cannot contain path separators"),
+  attachmentId: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(180)
+    .refine((value) => !/[\\/]/.test(value), "File names cannot contain path separators")
+    .refine((value) => !isUnsafeCredentialDocumentName(value), "Credential and access-code files are not accepted"),
   contentType: z.string().max(120),
   size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
 }).superRefine((value, context) => {

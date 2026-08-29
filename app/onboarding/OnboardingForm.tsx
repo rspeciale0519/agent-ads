@@ -1,5 +1,7 @@
 "use client";
 
+import { mutationFetch, useMutationIdentityStore } from "../../lib/api/client-mutation";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { organicChannels, paidChannels, steps } from "./data";
 import { StepPanels } from "./StepPanels";
@@ -7,7 +9,8 @@ import { Icon } from "./ui";
 import styles from "./validation.module.css";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, isAllowedUpload } from "../../lib/upload-rules";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
-import { formatOnboardingValidationIssues, onboardingSubmissionSchema, type OnboardingValidationField, type OnboardingValidationIssue } from "../../lib/onboarding-schema";
+import { formatOnboardingValidationIssues, onboardingDraftSchema, onboardingDraftStructureSchema, onboardingSubmissionSchema, type OnboardingValidationField, type OnboardingValidationIssue } from "../../lib/onboarding-schema";
+import { isUnsafeCredentialDocumentName } from "../../lib/security/secret-material";
 import { AttachmentStatus, FormData, initialFormData, OnboardingAttachment, OrganicChannel, PaidChannel, StepId } from "./types";
 
 const STORAGE_KEY_PREFIX = "agent-ads-pilot-onboarding-draft";
@@ -18,6 +21,7 @@ type OnboardingFormProps = {
 };
 
 export default function OnboardingForm({ applicantId, applicantEmail }: OnboardingFormProps) {
+  const mutations = useMutationIdentityStore();
   const [form, setForm] = useState<FormData>(initialFormData);
   const [stepIndex, setStepIndex] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -28,33 +32,48 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   const [submitError, setSubmitError] = useState("");
   const [validationIssues, setValidationIssues] = useState<OnboardingValidationIssue[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const storageKey = useMemo(() => `${STORAGE_KEY_PREFIX}:${applicantId}`, [applicantId]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as Partial<FormData>;
-        const attachments = Array.isArray(parsed.attachments) ? parsed.attachments.map((attachment) => ({ ...attachment, status: attachment.status === "uploaded" ? "uploaded" : "error", error: attachment.status === "uploaded" ? undefined : "Upload needs to be restarted." })) as OnboardingAttachment[] : [];
-        setForm({ ...initialFormData, ...parsed, attachments });
-      } catch {
-        window.localStorage.removeItem(storageKey);
-      }
-    }
+    let canceled = false;
     const storedSubmissionId = window.localStorage.getItem(`${storageKey}-id`) || crypto.randomUUID();
     window.localStorage.setItem(`${storageKey}-id`, storedSubmissionId);
     setSubmissionId(storedSubmissionId);
-    setHydrated(true);
-  }, [storageKey]);
+    const legacyText = window.localStorage.getItem(storageKey);
+    window.localStorage.removeItem(storageKey);
 
-  useEffect(() => {
-    if (!hydrated || complete) return;
-    const timeout = window.setTimeout(() => {
-      window.localStorage.setItem(storageKey, JSON.stringify(form));
-      setSaved(true);
-    }, 300);
-    return () => window.clearTimeout(timeout);
-  }, [complete, form, hydrated, storageKey]);
+    const hydrate = async () => {
+      let candidate = legacyDraftCandidate(storedSubmissionId, legacyText);
+      const legacyUnreadable = Boolean(legacyText && !candidate);
+      let loadedFromServer = false;
+      try {
+        const response = await fetch(`/api/onboarding/draft?submissionId=${encodeURIComponent(storedSubmissionId)}`, { cache: "no-store" });
+        const body = await response.json() as { draft?: unknown; error?: string };
+        if (!response.ok) throw new Error(body.error ?? "Your saved draft could not be loaded.");
+        if (body.draft) {
+          const parsed = onboardingDraftSchema.safeParse(body.draft);
+          if (!parsed.success) throw new Error("Your saved draft requires a secure review before it can be loaded.");
+          candidate = parsed.data;
+          loadedFromServer = true;
+        }
+      } catch (error) {
+        if (!candidate && !canceled) setSubmitError(error instanceof Error ? error.message : "Your saved draft could not be loaded.");
+      }
+      if (canceled) return;
+      if (candidate) {
+        setForm({ ...initialFormData, ...candidate.form, attachments: candidate.attachments as OnboardingAttachment[] });
+        const secure = onboardingDraftSchema.safeParse(candidate);
+        if (!secure.success) setValidationIssues(formatOnboardingValidationIssues(secure.error));
+        if (legacyText && !loadedFromServer) setSubmitError("A legacy device draft was moved into this session and removed from browser storage. Review it, remove any credentials or access codes, then save it securely.");
+        setSaved(loadedFromServer);
+      }
+      if (legacyUnreadable) setSubmitError("A legacy device draft was removed from browser storage because it could not pass structural validation. Start a new draft and do not enter credentials or access codes.");
+      setHydrated(true);
+    };
+    void hydrate();
+    return () => { canceled = true; };
+  }, [storageKey]);
 
   const currentStep = steps[stepIndex];
   const completion = useMemo(() => Math.round(((stepIndex + 1) / steps.length) * 100), [stepIndex]);
@@ -120,9 +139,32 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     setStepIndex((index) => Math.min(index + 1, steps.length - 1));
   };
 
-  const saveDraft = () => {
-    window.localStorage.setItem(storageKey, JSON.stringify(form));
-    setSaved(true);
+  const saveDraft = async () => {
+    const draftPayload = { ...getSubmissionPayload(), attachments: form.attachments.filter((attachment) => attachment.status === "uploaded") };
+    const parsed = onboardingDraftSchema.safeParse(draftPayload);
+    if (!parsed.success) {
+      showValidationIssues(formatOnboardingValidationIssues(parsed.error));
+      return false;
+    }
+    const intent = `onboarding-draft:${submissionId}`;
+    setSaving(true);
+    setSubmitError("");
+    try {
+      const response = await mutationFetch(mutations, intent, "/api/onboarding/draft", { method: "PUT", body: JSON.stringify(parsed.data) });
+      const body = await response.json() as { error?: string; validationIssues?: OnboardingValidationIssue[] };
+      if (!response.ok && body.validationIssues?.length) showValidationIssues(body.validationIssues);
+      if (!response.ok) {
+        if (response.status < 500) mutations.reset(intent);
+        throw new Error(body.error ?? "Your draft could not be saved securely.");
+      }
+      setSaved(true);
+      return true;
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Your draft could not be saved securely.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateAttachment = (id: string, patch: Partial<OnboardingAttachment>) => {
@@ -133,7 +175,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
 
   const uploadAttachment = async (file: File, attachment: OnboardingAttachment) => {
     try {
-      const response = await fetch("/api/onboarding/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId, fileName: file.name, contentType: file.type, size: file.size }) });
+      const response = await mutationFetch(mutations, `onboarding-upload:${attachment.id}`, "/api/onboarding/upload-url", { method: "POST", body: JSON.stringify({ submissionId, attachmentId: attachment.id, fileName: file.name, contentType: file.type, size: file.size }) });
       const data = await response.json() as { bucket?: string; path?: string; token?: string; error?: string };
       if (!response.ok || !data.bucket || !data.path || !data.token) throw new Error(data.error || "Could not prepare the upload.");
       const { error } = await getSupabaseBrowser().storage.from(data.bucket).uploadToSignedUrl(data.path, data.token, file);
@@ -152,7 +194,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
       return;
     }
     const selected = Array.from(fileList).slice(0, availableSlots);
-    const invalid = selected.find((file) => file.size > MAX_UPLOAD_BYTES || !isAllowedUpload(file.name, file.type));
+    const invalid = selected.find((file) => file.size > MAX_UPLOAD_BYTES || !isAllowedUpload(file.name, file.type) || isUnsafeCredentialDocumentName(file.name));
     if (invalid) {
       setUploadError(`${invalid.name} is not supported. Choose an approved file type up to ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`);
       return;
@@ -170,7 +212,6 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   };
 
   const submit = async () => {
-    saveDraft();
     const issues = getValidationIssues();
     if (issues.length > 0) {
       showValidationIssues(issues);
@@ -180,7 +221,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
     setSubmitError("");
     setSubmitting(true);
     try {
-      const response = await fetch("/api/onboarding/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(getSubmissionPayload()) });
+      const response = await mutationFetch(mutations, `onboarding-submit:${submissionId}`, "/api/onboarding/submit", { method: "POST", body: JSON.stringify(getSubmissionPayload()) });
       const data = await response.json() as { error?: string; validationIssues?: OnboardingValidationIssue[] };
       if (!response.ok && data.validationIssues?.length) {
         showValidationIssues(data.validationIssues);
@@ -204,7 +245,7 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
   };
 
   const signOut = async () => {
-    saveDraft();
+    if (!await saveDraft()) return;
     await getSupabaseBrowser().auth.signOut();
     window.location.assign("/auth");
   };
@@ -220,14 +261,31 @@ export default function OnboardingForm({ applicantId, applicantEmail }: Onboardi
       <div className="sidebar-footer"><span className="mini-avatar">M</span><span><strong>Prepared for your marketing team</strong><small>Private · takes about 8 minutes</small></span></div>
     </aside>
     <section className="onboarding-main">
-      <header className="topbar"><div className="mobile-brand"><span className="brand-orb"><Icon name="spark" size={16} /></span>MioDio<span className="brand-dot">.</span></div><div className="topbar-actions"><span className="account-email">{applicantEmail}</span><button type="button" className="save-button" onClick={saveDraft}>{saved ? <><Icon name="check" size={15} /> Saved</> : "Save and finish later"}</button><button type="button" className="sign-out-button" onClick={() => void signOut()}>Sign out</button><button type="button" className="help-button" aria-label="Get help"><Icon name="help" size={18} /></button></div></header>
+      <header className="topbar"><div className="mobile-brand"><span className="brand-orb"><Icon name="spark" size={16} /></span>MioDio<span className="brand-dot">.</span></div><div className="topbar-actions"><span className="account-email">{applicantEmail}</span><button type="button" className="save-button" onClick={() => void saveDraft()} disabled={saving || submitting}>{saving ? "Saving…" : saved ? <><Icon name="check" size={15} /> Saved securely</> : "Save and finish later"}</button><button type="button" className="sign-out-button" onClick={() => void signOut()}>Sign out</button><button type="button" className="help-button" aria-label="Get help"><Icon name="help" size={18} /></button></div></header>
       <div className="main-content"><div className="progress-mobile"><span>Step {stepIndex + 1} of {steps.length}</span><div><span style={{ width: `${completion}%` }} /></div></div><form noValidate onSubmit={handleSubmit}><StepPanels form={form} activeStep={currentStep.id} setField={setField} toggleChannel={toggleChannel} goTo={goTo} onFilesSelected={handleFilesSelected} removeAttachment={removeAttachment} uploadError={uploadError} validationIssues={validationIssues} />{validationIssues.length > 0 && <ValidationSummary issues={validationIssues} onSelect={focusValidationIssue} />}{submitError && <p className="submit-error" role="alert">{submitError}</p>}<footer className="form-footer"><div className="footer-trust"><Icon name="lock" size={15} /><span>Your answers are private and used only to prepare your marketing workspace.</span></div><div className="footer-actions">{stepIndex > 0 && <button type="button" className="back-button" onClick={() => setStepIndex((index) => index - 1)}><Icon name="back" size={16} />Back</button>}{stepIndex < steps.length - 1 ? <button type="button" className="primary-button" onClick={next}>Continue <Icon name="arrow" size={16} /></button> : <button type="button" className="primary-button" onClick={() => void submit()} disabled={submitting}>{submitting ? "Sending…" : "Send onboarding"} {!submitting && <Icon name="arrow" size={16} />}</button>}</div></footer></form></div>
     </section>
   </main>;
 }
 
 function ValidationSummary({ issues, onSelect }: { issues: OnboardingValidationIssue[]; onSelect: (issue: OnboardingValidationIssue) => void }) {
-  return <section className="validation-summary" role="alert" aria-labelledby="validation-summary-title"><strong id="validation-summary-title">{issues.length} {issues.length === 1 ? "answer needs" : "answers need"} attention</strong><p>Your progress is saved. Select a field below to complete or correct it.</p><ul>{issues.map((issue) => <li key={issue.field}><button type="button" onClick={() => onSelect(issue)}><span>{issue.label}</span>{issue.message}</button></li>)}</ul></section>;
+  return <section className="validation-summary" role="alert" aria-labelledby="validation-summary-title"><strong id="validation-summary-title">{issues.length} {issues.length === 1 ? "answer needs" : "answers need"} attention</strong><p>Correct the fields below, then save again. Credentials and access codes are never persisted with onboarding.</p><ul>{issues.map((issue) => <li key={issue.field}><button type="button" onClick={() => onSelect(issue)}><span>{issue.label}</span>{issue.message}</button></li>)}</ul></section>;
+}
+
+function legacyDraftCandidate(submissionId: string, legacyText: string | null) {
+  if (!legacyText) return null;
+  try {
+    const legacy = JSON.parse(legacyText) as unknown;
+    if (!legacy || typeof legacy !== "object" || Array.isArray(legacy)) return null;
+    const record = legacy as Record<string, unknown>;
+    const attachments = Array.isArray(record.attachments)
+      ? record.attachments.filter((attachment) => attachment && typeof attachment === "object" && !Array.isArray(attachment) && (attachment as Record<string, unknown>).status === "uploaded")
+      : [];
+    const form = Object.fromEntries(Object.entries(record).filter(([key]) => key !== "attachments"));
+    const parsed = onboardingDraftStructureSchema.safeParse({ submissionId, form, attachments });
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function SuccessState({ businessName }: { businessName: string }) {

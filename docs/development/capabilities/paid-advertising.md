@@ -2,9 +2,33 @@
 
 ## Objective
 
-Allow a client to plan, approve, launch, monitor, and improve a campaign on any one or any combination of Meta, Google, Microsoft, LinkedIn, TikTok, Reddit, and X from a single product while preserving platform-native behavior.
+Use Google Ads and Meta Ads as pilot read sources. Explain performance through business outcomes before enabling any write.
 
-## Campaign brief
+The full paid connector catalog remains an expansion target.
+
+## Pilot boundary
+
+### Read-only release
+
+- Discover eligible accounts and resources.
+- Read campaign hierarchy, status, spend, delivery, performance, conversions, creative metadata, and landing-page links.
+- Show freshness, completeness, capability, and reconciliation status.
+- Explain tracking gaps, waste, creative fatigue, message mismatch, and lead follow-up gaps.
+- Create recommendations without external side effects.
+
+### Supervised action
+
+Enable only `paid.campaign.pause` for one approved provider and account. Use `paid.campaign.resume` as rollback when current state permits it.
+
+The action needs a current capability check, immutable proposal, AAL2 approval, destination binding, idempotency, reconciliation, audit, and kill switch.
+
+### Expansion
+
+Campaign creation, budget or bid changes, audience changes, creative upload, cross-platform allocation, and five additional ad platforms remain outside the pilot MVP.
+
+## Campaign brief — supervised and expansion work
+
+The read-only release does not require campaign construction.
 
 Required inputs:
 
@@ -20,9 +44,9 @@ Required inputs:
 - approval/autonomy profile;
 - maximum loss and stopping rules.
 
-## Cross-channel planning
+## Cross-channel planning — expansion
 
-Hermes coordinates strategy, budget, creative, measurement, and selected platform specialists. The output must identify:
+The later orchestrator coordinates strategy, budget, creative, measurement, and selected platform profiles. The output must identify:
 
 - the role of each platform in the funnel;
 - per-platform budget range and rationale;
@@ -42,21 +66,35 @@ The user can remove a platform, lock an allocation, or request an alternative wi
 
 No draft reaches a platform before proposal authorization.
 
-## Common capabilities
+## Pilot read capabilities
 
 - Connect and verify advertiser accounts.
 - Import existing campaign hierarchy and history.
-- Create campaign drafts without external side effects.
-- Manage supported text, image, video, destination, tracking, schedule, and budget fields.
-- Display platform validation and policy feedback.
-- Launch approved campaigns.
-- Pause, resume, and edit supported properties through approved actions.
 - Ingest delivery, spend, performance, creative, and available conversion data.
 - Detect anomalies, fatigue, pacing, and tracking failures.
 - Record external edits and reconcile actual state.
 - Compare platform results through canonical qualified outcomes.
+- Display capability limits and provider errors in plain language.
 
-## Platform specialist responsibilities
+## Supervised pause and resume
+
+- Allowlist one provider, account, action type, and destination class first.
+- Show the exact current and proposed state.
+- Recheck current state immediately before execution.
+- Reconcile before any retry.
+- Resume only through a separate approved proposal unless the original approval explicitly binds a valid rollback.
+
+## Expansion capabilities
+
+- Create campaign drafts without external side effects.
+- Manage supported text, image, video, destination, tracking, schedule, and budget fields.
+- Display platform validation and policy feedback.
+- Launch approved campaigns.
+- Edit supported properties through approved actions.
+
+## Platform analysis responsibilities
+
+Meta Ads and Google Ads are pilot analysis profiles. The other platform profiles are expansion work.
 
 ### Meta Ads
 
@@ -129,18 +167,24 @@ No draft reaches a platform before proposal authorization.
 Supported recommendation classes include:
 
 - pause/resume;
-- budget and bid changes;
-- negative keyword/query proposals;
-- audience expansion or exclusion;
 - creative refresh and variant tests;
-- placement or schedule changes;
 - destination or message-match improvements;
 - conversion tracking repair;
-- cross-platform budget experiments.
+- lead follow-up repair;
+- AI Reach content-gap repair.
+
+Budget, bid, keyword, audience, placement, schedule, and cross-platform changes remain recommendation-only expansion classes.
 
 Recommendations must state the authoritative metric window, sample sufficiency, expected benefit, risk, and alternate explanation.
 
-## Minimum platform readiness gate
+## Read readiness gate
 
-A platform counts as MVP-ready when an eligible test account can complete connection, capability discovery, historical read, draft validation, approved campaign creation, status change, insight ingestion, external-state reconciliation, audit reconstruction, failure handling, and kill-switch verification.
+A pilot platform is read-ready when an eligible test account completes connection, capability discovery, historical read, insight ingestion, reconciliation, tenant tests, failure handling, and revocation.
 
+## Pause and resume readiness gate
+
+The selected provider and account must pass AAL2 approval, scope separation, destination binding, drift, idempotency, unknown-result, reconciliation, kill-switch, pause, and resume tests.
+
+## Full mutation readiness gate — expansion
+
+Each later action needs its own official capability, account eligibility, validation, approval, execution, reconciliation, audit, and rollback evidence.

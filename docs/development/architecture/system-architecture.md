@@ -2,25 +2,36 @@
 
 ## Architectural objective
 
-Build a multi-tenant, multiplatform marketing operating system in which Hermes and specialist agents can reason broadly but can act only through narrow, typed, policy-controlled application services.
+Build a multi-tenant marketing operating system that turns plain-language goals into measured, supervised work.
+
+The pilot proves one narrow outcome loop before broad platform execution. One supervisor uses typed read and proposal tools through an application-owned AI gateway.
+
+The application remains the authority for identity, data, metrics, policy, approval, execution, audit, and recovery.
+
+## Current implementation boundary
+
+The repository currently implements the Next.js control plane, onboarding, identity, and Account Connections work.
+
+AI Reach, canonical marketing outcomes, advertising insights, CRM outcomes, supervised actions, Hermes, Temporal, and broad publishing remain target work.
+
+Documentation status never substitutes for implementation and target-environment evidence.
 
 ## Context diagram
 
 ```mermaid
 flowchart LR
-    U["Client users and agency operators"] --> W["Web application"]
-    W --> API["Application API and control plane"]
-    API --> H["Hermes orchestration adapter"]
-    H --> SA["Specialist agent roles and skills"]
-    H --> T["Read and proposal tools"]
-    T --> API
-    API --> P["Policy and approval services"]
-    P --> E["Typed paid and organic executors"]
-    E --> X["Advertising and social platforms"]
-    X --> I["Ingestion and reconciliation"]
-    I --> D["Canonical data and metric layer"]
-    D --> API
-    API --> O["Audit, evaluation, and observability"]
+    U["Nontechnical owner"] --> W["AI Reach chat and outcome dashboard"]
+    W --> C["Application control plane"]
+    C --> R["Pilot read connectors"]
+    R --> D["Canonical metrics and evidence"]
+    D --> A["AI Reach assessment"]
+    A --> G["Application-owned AI gateway"]
+    G --> B["Briefing and three recommendations"]
+    B --> W
+    C --> P["Policy and approval services"]
+    P -. supervised stage .-> E["Typed, gated executors"]
+    E -. reconcile .-> R
+    C --> O["Audit, evaluation, and observability"]
 ```
 
 ## Core boundaries
@@ -28,7 +39,8 @@ flowchart LR
 ### Experience plane
 
 - Next.js web application and authenticated APIs.
-- Onboarding, command center, campaigns, content, approvals, analytics, knowledge, and settings.
+- AI Reach chat, one outcome dashboard, Work, Decisions, Connections, and Settings.
+- Campaign builders, broad content calendars, deep analytics, and agency views are expansion surfaces.
 - No browser-held platform secrets beyond short-lived secure authorization handoffs.
 
 ### Control plane
@@ -36,19 +48,21 @@ flowchart LR
 - Organizations, users, roles, policies, capability registry, proposals, approvals, executions, and audit.
 - Final authority for every action.
 - Performs tenant, resource, policy, budget, freshness, and capability validation.
-- Exposes typed tools to Hermes; never exposes a general database or shell mutation tool.
+- Exposes typed tools through the application-owned AI gateway; never exposes a general database or shell mutation tool.
 
 ### Intelligence plane
 
-- Hermes orchestration adapter.
-- Versioned specialist profiles, skills, prompts, and evaluation suites.
+- One versioned supervisor profile behind an application-owned, replaceable gateway for the pilot.
+- Versioned instructions, tools, evidence rules, model settings, and evaluation suites.
 - Research, interpretation, strategy, drafting, and recommendation.
 - Produces artifacts and proposals but does not own authoritative application state.
+- Hermes and separate specialist profiles remain trigger-based expansion components behind the same contract.
 
 ### Workflow plane
 
-- Durable orchestration for syncs, approvals, scheduled publications, campaign execution, retries, reconciliation, and long-running agent tasks.
-- Recommended default: Temporal for durable workflows; preserve an abstraction if an equivalent service is selected.
+- Durable jobs for connector sync, website crawl, AI Reach samples, briefing refresh, approval, execution, retry, and reconciliation.
+- The pilot can use application-owned database state, an outbox, and bounded scheduled jobs.
+- Temporal remains a later option when measured workflow complexity or reliability needs justify it.
 - Deterministic timers and scripts do not invoke a model unnecessarily.
 
 ### Data plane
@@ -61,29 +75,31 @@ flowchart LR
 
 ### Integration plane
 
-- Paid connectors: Meta, Google, Microsoft, LinkedIn, TikTok, Reddit, and X.
-- Organic connectors: LinkedIn, X, Instagram, TikTok, Facebook, YouTube, and Reddit.
-- CRM, commerce, analytics, billing, email/notification, and asset-provider adapters.
+- Pilot connectors: website/CMS, GA4, Search Console, Google Ads, Meta Ads, and one selected CRM.
+- Conditional pilot connectors: calendar and email when needed for outcome evidence.
+- AI Reach observation adapters with labeled provider, method, version, locale, time, and limitations.
+- Other paid, organic, commerce, publishing, and asset adapters are expansion work.
 - Official APIs or authorized providers; no access-control circumvention.
 
 ### Trust plane
 
-- Managed secrets and key management.
+- Managed or operator-controlled secrets and key management appropriate to the deployment plane.
 - Authentication, authorization, tenant isolation, policy, consent/provenance, audit, threat detection, and incident controls.
 - Separate read and mutation principals where the platform supports them.
 
-## Recommended deployment shape
+## Initial deployment shape
 
-Start as a modular monolith with independently deployable workers:
+Start with the current modular Next.js control plane and managed data services:
 
 - `web`: Next.js UI and server endpoints.
 - `api`: application services if separated from the web runtime.
-- `worker`: Temporal activities, connectors, publishing, reconciliation, and notifications.
-- `hermes-gateway`: isolated adapter process that brokers Hermes runs and tool calls.
+- `jobs`: bounded connector, crawl, observation, briefing, notification, and reconciliation jobs.
+- `ai-gateway`: application-owned provider adapter and typed tool boundary.
 - `postgres`: transactional/canonical data.
 - `object-store`: raw payloads and creative artifacts.
-- `temporal`: durable workflow state.
-- `otel-collector`: traces, metrics, and logs.
+- `telemetry`: vendor-neutral application events, metrics, and traces.
+
+Separate workers, Hermes, Temporal, Postiz, Coolify, and a collector are later deployment options. Each needs a recorded trigger.
 
 Module boundaries must be enforced in code even when initially deployed together. Agents and connectors must not import database internals across module boundaries.
 
@@ -93,7 +109,13 @@ Module boundaries must be enforced in code even when initially deployed together
 |---|---|---|
 | Identity and tenancy | organizations, memberships, roles, sessions | platform permissions |
 | Business context | offers, audiences, brand, goals, claims, corrections | raw agent memory |
+| Conversations | threads, messages, evidence links, proposal links | canonical business state |
+| Briefings | saved outcome summaries and three ranked recommendations | metric calculations |
 | Connections | OAuth grants, account mapping, capabilities, health | campaign strategy |
+| Connector evidence | sync runs, immutable evidence references, collection metadata | metric interpretation |
+| AI Reach | question sets, observations, citations, factual assessments, discovery findings | business truth, content drafts, or authorization |
+| Website content | page snapshots, source briefs, draft versions, CMS draft receipts | public publication authority |
+| Lead follow-up | minimized lead references, drafts, consent evidence, delivery receipts | CRM source records |
 | Campaigns | briefs, cross-channel plans, platform drafts, state projections | unrestricted platform writes |
 | Content | source briefs, variants, calendar, publication records | permission decisions |
 | Creative | asset metadata, provenance, rights, transformations, reviews | opaque generated files without lineage |
@@ -108,11 +130,15 @@ Module boundaries must be enforced in code even when initially deployed together
 
 ## Write path
 
+The first useful release does not use this path and has no external mutation principal.
+
+The pilot MVP enables only CMS draft creation, approved lead follow-up, and one campaign pause with a resume path.
+
 ```mermaid
 sequenceDiagram
     participant User
     participant UI
-    participant Hermes
+    participant Gateway
     participant Proposal
     participant Policy
     participant Approval
@@ -121,8 +147,8 @@ sequenceDiagram
     participant Audit
 
     User->>UI: Request or approve marketing action
-    UI->>Hermes: Create strategy or draft
-    Hermes->>Proposal: Submit typed proposal with evidence
+    UI->>Gateway: Request strategy or draft
+    Gateway->>Proposal: Submit typed proposal with evidence
     Proposal->>Policy: Evaluate current scope and risk
     Policy-->>Approval: Require approval or bounded-autonomy decision
     User->>Approval: Approve immutable snapshot
@@ -137,12 +163,13 @@ sequenceDiagram
 
 ## Read and analysis path
 
-1. Connector records raw response and request metadata.
-2. Normalizer maps platform data into canonical entities and observations.
-3. Data-quality service calculates freshness, completeness, duplication, and reconciliation status.
-4. Semantic metric service computes versioned business metrics.
-5. Hermes receives only authorized, scoped tool results with evidence references.
-6. Recommendations preserve the exact metric snapshot and definitions used.
+1. Read connectors store raw evidence and request metadata.
+2. Normalizers create tenant-scoped entities and observations.
+3. AI Reach stores labeled website, answer, citation, and factual observations.
+4. Data-quality services calculate freshness, completeness, duplication, and reconciliation status.
+5. Metric services create a versioned outcome snapshot.
+6. The supervisor receives only authorized, scoped tool results with evidence references.
+7. The briefing stores the exact evidence, definitions, and three selected recommendations.
 
 ## Multi-tenancy
 
@@ -151,7 +178,7 @@ sequenceDiagram
 - Database-level row security should provide defense in depth where practical.
 - Object-storage keys are tenant-prefixed and access is mediated by short-lived signed URLs.
 - Queue/workflow payloads carry opaque IDs, not raw secrets.
-- Hermes sessions, workspaces, memory, and files are isolated per organization and role.
+- Agent sessions, workspaces, memory, and files are isolated per organization and role.
 - Shared skill templates are immutable inputs; organization-specific configuration is separately stored.
 
 ## State machines
@@ -167,6 +194,20 @@ sequenceDiagram
 ### Experiment
 
 `draft -> design_review -> approved -> running -> stopped -> analyzing -> concluded -> adopted | inconclusive | rejected`
+
+### AI Reach observation run
+
+`scheduled -> collecting -> normalizing -> assessing -> completed | partial | failed`
+
+### Website draft
+
+`opportunity -> brief -> drafting -> validating -> awaiting_approval -> cms_draft_created -> reviewed -> published | rejected | expired`
+
+### Lead follow-up
+
+`draft -> eligibility_check -> awaiting_approval -> approved -> sending -> delivered | failed | uncertain | canceled`
+
+The read-only release stops before every mutation state.
 
 Transitions occur through domain services and append audit events. Direct status edits are prohibited.
 
@@ -187,12 +228,27 @@ Transitions occur through domain services and append audit events. Direct status
 - Next.js for the web application.
 - Zod at API, event, tool, and connector boundaries.
 - PostgreSQL with Prisma.
-- Temporal for durable workflows.
-- S3-compatible object storage.
-- Hermes behind an application-owned gateway.
+- Application-owned job state and outbox patterns for the narrow pilot; Temporal remains behind a later workflow abstraction.
+- Supabase Storage initially and S3-compatible object storage behind an application-owned storage contract.
+- An application-owned AI gateway and one supervisor profile; Hermes remains compatible with the stable adapter contract.
 - OpenTelemetry for tracing and metrics.
-- Managed secrets and KMS from the selected cloud.
+- OpenAI as the managed model provider and Resend as the managed transactional email provider.
+- Vercel for the client-facing Next.js application and managed Supabase for initial PostgreSQL, Auth, and Storage.
+- Trigger-based deployment definitions for Hermes, Temporal, Postiz, Coolify, workers, and the OpenTelemetry collector.
+- Stripe is the post-pilot payment candidate behind an application-owned billing boundary.
+- Managed secrets for Vercel/Supabase and an encrypted, access-controlled secret store for the self-hosted automation plane; AWS Secrets Manager/KMS applies when AWS is provisioned.
 - REST/JSON for public application APIs initially; internal events use versioned schemas.
 
 These are defaults, not permission to couple domain contracts to a vendor.
 
+## Hosting and service-delivery model
+
+The initial pooled service uses Vercel for the client-facing application and managed Supabase for PostgreSQL, Auth, and Storage. OpenAI and Resend remain managed.
+
+GitHub and Sentry can remain managed when their limits meet environment requirements. Stripe can remain managed after billing is enabled.
+
+The pilot does not provision a separate self-hosted automation plane by default. A service is added only after a recorded reliability, capacity, compliance, cost, or workflow trigger.
+
+AWS is the scale, compliance, and dedicated-deployment target. It is provisioned when measured traffic, isolation, residency, SLO, or enterprise requirements justify it, rather than duplicated alongside the initial services by default. Higher-isolation clients may purchase an operator-owned or client-owned AWS deployment. An outbound-only client-site connector is available only for approved local/private integrations and never owns canonical state, authorization, approvals, or audit.
+
+Infrastructure remains reproducible and vendor-specific details stay behind application-owned contracts. See [Cloud Hosting and Service Delivery](cloud-hosting-and-service-delivery.md), [Hermes Multi-Agent Architecture](hermes-multi-agent-architecture.md), and [Agent Gateway and Orchestration Boundary](agent-orchestration-architecture.md).

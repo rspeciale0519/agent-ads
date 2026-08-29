@@ -5,9 +5,10 @@ let adminClient: SupabaseClient | undefined;
 export function getSupabaseAdmin() {
   if (adminClient) return adminClient;
   const url = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) throw new Error("Supabase server environment variables are not configured.");
-  adminClient = createClient(url, serviceRoleKey, {
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim()
+    || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !secretKey) throw new Error("Supabase server environment variables are not configured.");
+  adminClient = createClient(url, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   return adminClient;

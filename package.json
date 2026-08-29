@@ -2,17 +2,38 @@
   "name": "agent-ads",
   "private": true,
   "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node node_modules/prisma/build/index.js generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "release:evidence:verify": "node scripts/release-evidence/verify-staging-record.mjs",
+    "release:staging-runtime:check": "node scripts/release-evidence/capture-staging-runtime-result.mjs",
+    "security:scan": "node scripts/security-scan.mjs",
+    "security:rls-audit": "node scripts/rls-audit.mjs",
+    "security:mutation-audit": "node scripts/mutation-contract-audit.mjs",
+    "security:f0-network": "node scripts/f0/network-proof.mjs",
+    "security:f0-guard-suite": "node scripts/f0/network-guard-proof.mjs",
+    "security:f0-mark-guard": "node scripts/f0/network-stage-proof.mjs mark-guard",
+    "security:f0-schema:mark": "node scripts/f0/network-stage-proof.mjs mark",
+    "security:f0-schema": "node scripts/f0/network-stage-proof.mjs schema",
+    "security:f0-upgrade": "node scripts/f0/network-stage-proof.mjs upgrade",
+    "security:f0-guard": "node scripts/f0/network-stage-proof.mjs guard",
+    "security:f0-schema-single:mark": "node scripts/f0/single-user-mark-disposable.mjs",
+    "security:f0-schema-single": "node scripts/f0/single-user-migration-proof.mjs",
+    "bootstrap:owner": "node scripts/bootstrap-owner.mjs"
   },
   "dependencies": {
+    "@prisma/client": "6.19.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
-    "next": "^15.0.0",
+    "next": "^15.5.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.18.1",
@@ -24,7 +45,23 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.0.0",
-    "typescript": "^5.0.0"
+    "eslint-config-next": "^15.5.23",
+    "prisma": "6.19.3",
+    "typescript": "^5.0.0",
+    "vitest": "4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "deepmerge-ts": "8.0.0",
+      "nanoid": "3.3.18",
+      "postcss": "8.5.23",
+      "sharp": "0.35.2"
+    }
   }
 }

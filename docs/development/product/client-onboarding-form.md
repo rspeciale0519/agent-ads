@@ -2,9 +2,11 @@
 
 ## Purpose
 
-Provide a friendly, branded, shareable intake experience that collects the pilot company's non-secret business context and prepares the inputs used to configure its AI agent-driven digital marketing system.
+Provide a friendly, shareable intake path that collects non-secret business context before the owner enters the product.
 
 This is a client-facing form, not a credential-collection surface. Platform, CRM, analytics, and billing credentials are connected later through authorized sign-in or administrator-mediated connection workflows.
+
+The form is not the target in-product onboarding experience. AI Reach becomes the primary guide after sign-in.
 
 ## Experience goals
 
@@ -35,18 +37,29 @@ This is a client-facing form, not a credential-collection surface. Platform, CRM
 
 Staff can see request status, last saved time, completion percentage, unanswered required fields, attachments, audit history, and submission state. Staff cannot silently edit client answers; corrections are separate attributed revisions.
 
-## Six-step flow
+## Current six-step form flow
 
 1. **Your business** — name, website, plain-English description, locations, model.
 2. **Goals and outcomes** — primary goal, goal details, budget range, qualified outcome, sales cycle.
-3. **Your channels** — multi-select paid and organic channels.
+3. **Your channels** — current marketing sources and known accounts.
 4. **Brand and creative** — voice, guardrails, assets, claims, topics to avoid.
 5. **Systems and team** — CRM, analytics, revenue source, approvers, context notes.
 6. **Review and send** — section summaries, edit links, privacy reminder, submit.
 
+## Target AI Reach onboarding flow
+
+1. **Business** — website, offer, audience, location, and approved facts.
+2. **Outcome** — qualified lead, booked call, closed-won stage, and booked revenue.
+3. **Sources** — website, GA4, Search Console, Google Ads, Meta Ads, and selected CRM.
+4. **Rules** — brand, claims, budget, consent, approvers, and prohibited actions.
+5. **Diagnosis** — connection status, data gaps, assumptions, and first three actions.
+6. **Confirm** — Pilot Scope Record, metric definitions, and read-only activation.
+
+AI Reach uses short questions and structured cards. It saves progress and explains why each required answer matters.
+
 ## Question behavior
 
-- Required questions are limited to business name, website, primary goal, qualified outcome, and at least one channel.
+- Required questions are limited to business name, website, primary goal, qualified outcome, and the selected CRM outcome map.
 - All other questions are optional or can be answered with “Not sure yet.”
 - Conditional questions may ask for a CRM-specific detail after the client selects a CRM.
 - The form explains that estimates and ranges are welcome.
@@ -94,8 +107,9 @@ The form must state:
 4. Freeze a submitted form version.
 5. Create a review task for the onboarding owner.
 6. Generate a proposed Business and Marketing Profile; do not silently make it authoritative.
-7. Send confirmation to the client and staff owner.
-8. Route missing questions or contradictions into an attributed clarification thread.
+7. Create the first AI Reach diagnosis and loop-readiness summary.
+8. Send confirmation to the client and staff owner.
+9. Route missing questions or contradictions into an attributed clarification thread.
 
 ## Staff review states
 
@@ -109,7 +123,10 @@ The form must state:
 - The form visibly communicates progress and preserves answers between sessions.
 - The client can navigate back and edit any completed section.
 - Required validation catches missing business context without blocking optional detail.
-- At least one paid or organic channel is required.
+- No advertising or organic channel is required to submit the intake form.
+- The pilot can activate with Google Ads only, Meta Ads only, or both.
+- Missing optional sources show a useful degraded mode.
+- The selected CRM outcome map is approved before booked-revenue reporting begins.
 - No form field or upload accepts passwords, API keys, refresh tokens, or secret values.
 - Client can submit a brand asset or advertising-data spreadsheet and see its upload state.
 - Staff can see status, version, completion, and audit history.
@@ -119,4 +136,6 @@ The form must state:
 
 ## Current implementation boundary
 
-The current build includes the visual flow, client-side validation, channel selection, email-confirmed Supabase Auth accounts, cookie-based sessions, applicant-scoped browser drafts, protected API routes, signed private uploads, durable applicant-owned Supabase submission storage, and Resend staff notification wiring. Before collecting real client data, it still needs the authenticated expiring invitation/resume model, rate limiting/bot protection, malware scanning, attachment review state, and retention/correction/export/deletion operations described above.
+The current build includes the visual flow, client-side validation, channel selection, email-confirmed Supabase Auth accounts, cookie-based sessions, applicant-bound server drafts, protected rate-limited API routes, signed private uploads, durable applicant-owned Supabase submission storage, and Resend staff notification wiring. Before wider data collection, it still needs the authenticated expiring invitation/resume model, malware scanning, attachment review acceptance, and the retention/correction/export/deletion operations described above.
+
+The chat-first AI Reach onboarding flow is target work. The current form remains the safe intake path until that flow is implemented and verified.

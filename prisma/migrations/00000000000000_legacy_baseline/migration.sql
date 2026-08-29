@@ -1,0 +1,3 @@
+-- Legacy Supabase migrations own auth, storage, onboarding_submissions, and
+-- pre-existing application tables. This empty baseline records the Prisma
+-- migration cutoff without recreating or dropping legacy data.

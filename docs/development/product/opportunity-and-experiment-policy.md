@@ -4,6 +4,8 @@
 
 Preserve and evaluate every legal, potentially performance-improving tactic without presenting speculation as proof or exposing production accounts to uncontrolled risk.
 
+The registry is not a pilot connector list or release gate. The approved Pilot Scope Record controls implementation.
+
 ## Opportunity states
 
 - `discovered`: captured but not yet assessed.
@@ -40,6 +42,7 @@ An opportunity may be tested when:
 - required data rights and consent are documented;
 - the experiment has a bounded population, budget, duration, and stop condition;
 - measurement can distinguish meaningful business outcomes;
+- the pilot can link the result to the selected CRM's qualified outcomes and booked revenue when the claim requires it;
 - an authorized user approves the risk and test plan.
 
 Legal uncertainty is not interpreted as permission. The system records the uncertainty and routes it to a qualified human owner.
@@ -86,3 +89,6 @@ Every experiment must define:
 
 An experiment becomes a reusable tactic only when the evidence states where it worked, the effect is practically meaningful, guardrails stayed within bounds, data quality was adequate, and the procedure has an owner, skill version, monitoring, and rollback path. Promotion does not automatically grant autonomy.
 
+For AI Reach work, evaluation also covers evidence accuracy, factual accuracy, approval acceptance, execution correctness, and later CRM outcomes.
+
+Controlled answer presence, citation, or referral changes remain observational unless a valid design supports a stronger claim.
