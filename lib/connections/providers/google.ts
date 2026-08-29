@@ -6,7 +6,7 @@ import { withRefreshLock } from "../refresh-lock";
 
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_HOSTS = ["oauth2.googleapis.com", "accounts.google.com", "googleads.googleapis.com", "analyticsadmin.googleapis.com", "tagmanager.googleapis.com"] as const;
+const GOOGLE_HOSTS = ["oauth2.googleapis.com", "accounts.google.com", "googleads.googleapis.com", "analyticsadmin.googleapis.com", "tagmanager.googleapis.com", "www.googleapis.com"] as const;
 const SUPPORTED_GOOGLE_ADS_API_VERSIONS = ["v25"] as const;
 
 function googleAdsApiVersion() {
@@ -51,9 +51,9 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
   readonly requestedScopes: readonly string[];
   readonly supportsWriteOperations = false as const;
 
-  constructor(provider: Extract<ConnectionProvider, "google_ads" | "google_analytics" | "google_tag_manager">) {
+  constructor(provider: Extract<ConnectionProvider, "google_ads" | "google_analytics" | "google_tag_manager" | "google_search_console">) {
     this.provider = provider;
-    this.requestedScopes = provider === "google_analytics" ? ["https://www.googleapis.com/auth/analytics.readonly"] : provider === "google_tag_manager" ? ["https://www.googleapis.com/auth/tagmanager.readonly"] : ["https://www.googleapis.com/auth/adwords"];
+    this.requestedScopes = provider === "google_analytics" ? ["https://www.googleapis.com/auth/analytics.readonly"] : provider === "google_tag_manager" ? ["https://www.googleapis.com/auth/tagmanager.readonly"] : provider === "google_search_console" ? ["https://www.googleapis.com/auth/webmasters.readonly"] : ["https://www.googleapis.com/auth/adwords"];
   }
 
   buildAuthorizationUrl(context: AuthorizationContext) {
@@ -108,6 +108,7 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
     const token = await this.accessToken(secret, credentialKind);
     if (this.provider === "google_ads") return this.discoverAds(token);
     if (this.provider === "google_analytics") return this.discoverAnalytics(token);
+    if (this.provider === "google_search_console") return this.discoverSearchConsole(token);
     return this.discoverTagManager(token);
   }
 
@@ -163,6 +164,17 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
       }
     }
     return resources;
+  }
+
+  private async discoverSearchConsole(token: string) {
+    const payload = await requestJson("https://www.googleapis.com/webmasters/v3/sites", { headers: { Authorization: `Bearer ${token}` } }, "GOOGLE_SEARCH_CONSOLE_DISCOVERY", GOOGLE_HOSTS);
+    const entries = isJsonObject(payload) && Array.isArray(payload.siteEntry) ? payload.siteEntry.filter(isJsonObject) : [];
+    return entries.slice(0, 100).flatMap((entry) => {
+      const siteUrl = stringValue(entry.siteUrl)?.trim();
+      if (!siteUrl) return [];
+      const permissionLevel = stringValue(entry.permissionLevel);
+      return [{ resourceType: "search_console_site", externalId: siteUrl, displayName: siteUrl, eligibility: "eligible" as const, metadata: { permissionLevel: permissionLevel ?? "unknown" } }];
+    });
   }
 
   async verify(secret: string, resources: ProviderResource[], credentialKind: ProviderCredentialKind): Promise<ProviderVerification> {

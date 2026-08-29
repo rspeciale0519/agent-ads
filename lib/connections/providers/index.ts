@@ -13,10 +13,10 @@ export function getProviderAdapter(provider: ConnectionProvider): ProviderAdapte
     if (process.env.NODE_ENV === "production") throw new ProviderAdapterError("MOCK_PROVIDER_FORBIDDEN");
     return new MockProviderAdapter();
   }
-  if (provider === "google_ads" || provider === "google_analytics" || provider === "google_tag_manager") return new GoogleReadOnlyAdapter(provider);
+  if (provider === "google_ads" || provider === "google_analytics" || provider === "google_tag_manager" || provider === "google_search_console") return new GoogleReadOnlyAdapter(provider);
   if (provider === "meta") return new MetaReadOnlyAdapter();
   if (provider === "tiktok") return new TikTokReadOnlyAdapter();
-  if (provider === "google_search_console" || provider === "dubsado" || provider === "wordpress" || provider === "videoask" || provider === "organic_social" || provider === "asset_source") return new ManualInventoryAdapter(provider);
+  if (provider === "dubsado" || provider === "wordpress" || provider === "videoask" || provider === "organic_social" || provider === "asset_source") return new ManualInventoryAdapter(provider);
   throw new ProviderAdapterError("PROVIDER_ADAPTER_NOT_ENABLED");
 }
 

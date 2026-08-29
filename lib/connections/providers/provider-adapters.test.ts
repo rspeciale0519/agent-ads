@@ -50,6 +50,25 @@ describe("Google read-only adapter", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("discovers Search Console sites with the read-only scope", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ siteEntry: [
+      { siteUrl: "https://example.test/", permissionLevel: "siteOwner" },
+      { siteUrl: "sc-domain:example.test", permissionLevel: "siteFullUser" },
+      { permissionLevel: "siteRestrictedUser" },
+    ] }));
+    const adapter = new GoogleReadOnlyAdapter("google_search_console");
+
+    expect(adapter.requestedScopes).toEqual(["https://www.googleapis.com/auth/webmasters.readonly"]);
+    const resources = await adapter.discoverResources("access", "oauth_access_token");
+
+    expect(resources).toEqual([
+      { resourceType: "search_console_site", externalId: "https://example.test/", displayName: "https://example.test/", eligibility: "eligible", metadata: { permissionLevel: "siteOwner" } },
+      { resourceType: "search_console_site", externalId: "sc-domain:example.test", displayName: "sc-domain:example.test", eligibility: "eligible", metadata: { permissionLevel: "siteFullUser" } },
+    ]);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://www.googleapis.com/webmasters/v3/sites");
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization")).toBe("Bearer access");
+  });
+
   it("uses the lifetime that belongs to the stored Google credential", async () => {
     process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
