@@ -7,5 +7,5 @@ export default async function Page() {
   const supabase = await getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth");
-  redirect("/dashboard");
+  redirect("/ai-reach");
 }
