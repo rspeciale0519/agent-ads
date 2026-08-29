@@ -22,17 +22,29 @@ type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connec
 
 export function buildAiReachBriefing(data: BriefingInput): AiReachBriefing {
   const google = data.connections.find((connection) => connection.provider.toLowerCase().includes("google"));
+  const analytics = data.connections.find((connection) => connection.provider.toLowerCase() === "google_analytics");
+  const website = data.connections.find((connection) => connection.provider.toLowerCase() === "wordpress");
   const dubsado = data.connections.find((connection) => connection.provider.toLowerCase().includes("dubsado"));
   const sources = [
     {
       name: "Website and onboarding",
-      state: data.onboarding.status === "submitted" ? "connected" as const : "needs_review" as const,
-      detail: data.onboarding.status === "submitted" ? "Business context is saved." : "Business context is not complete.",
+      state: data.onboarding.status === "submitted" && website?.status === "active_read_only" ? "connected" as const : "needs_review" as const,
+      detail: data.onboarding.status === "submitted" && website?.status === "active_read_only" ? "Business context and a read-only site route are ready." : "Business context or a read-only site route needs review.",
     },
     {
       name: "Google Ads",
       state: google?.status === "active_read_only" ? "connected" as const : "missing" as const,
       detail: google?.status === "active_read_only" ? "Read-only access is active." : "No verified read-only resource is available.",
+    },
+    {
+      name: "Google Analytics 4",
+      state: analytics?.status === "active_read_only" ? "connected" as const : "missing" as const,
+      detail: analytics?.status === "active_read_only" ? "Read-only property access is active." : "No verified read-only property is available.",
+    },
+    {
+      name: "Search Console",
+      state: "missing" as const,
+      detail: "Read-only property access is not connected.",
     },
     {
       name: "Dubsado outcomes",

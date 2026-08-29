@@ -13,6 +13,7 @@ describe("buildAiReachBriefing", () => {
     const briefing = buildAiReachBriefing(base);
     expect(briefing.status).toBe("limited");
     expect(briefing.recommendations).toHaveLength(3);
+    expect(briefing.sources).toHaveLength(5);
     expect(briefing.sources.some((source) => source.state !== "connected")).toBe(true);
   });
 
@@ -25,7 +26,7 @@ describe("buildAiReachBriefing", () => {
       ],
       verifiedResourceCount: 2,
     });
-    expect(briefing.status).toBe("ready");
+    expect(briefing.status).toBe("limited");
     expect(briefing.recommendations).toHaveLength(3);
     expect(briefing.recommendations[2].title).toContain("Map");
   });
