@@ -10,55 +10,87 @@ const STAGE_CLOSE_TIMEOUT_MS = 5_000;
 const STAGE_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 
 export const guardNetworkProofStages = Object.freeze([
-  Object.freeze({ label: "F0 mark guard proof", script: "disposable-mark-guard-proof.mjs" }),
   Object.freeze({ label: "F0 network target marking", script: "network-mark-disposable.mjs" }),
-  Object.freeze({ label: "F0 disposable guard proof", script: "disposable-guard-proof.mjs" }),
+  Object.freeze({
+    label: "F0 mark guard proof",
+    requiresRunningMarker: true,
+    script: "disposable-mark-guard-proof.mjs",
+  }),
+  Object.freeze({
+    label: "F0 disposable guard proof",
+    requiresRunningMarker: true,
+    script: "disposable-guard-proof.mjs",
+  }),
 ]);
 
 export const fullNetworkProofStages = Object.freeze([
   ...guardNetworkProofStages,
-  Object.freeze({ label: "F0 fresh migration proof", script: "fresh-migration-proof.mjs" }),
+  Object.freeze({
+    label: "F0 fresh migration proof",
+    requiresRunningMarker: true,
+    script: "fresh-migration-proof.mjs",
+  }),
 ]);
+
+function errorCauses(error) {
+  return error instanceof AggregateError
+    ? error.errors.flatMap((cause) => errorCauses(cause))
+    : [error];
+}
+
+export function formatNetworkProofFailure(error, environment, fallback) {
+  const messages = errorCauses(error)
+    .filter((cause) => cause instanceof Error && cause.message.length > 0)
+    .map((cause) => cause.message);
+  const output = [...new Set(messages)].join("\n") || fallback;
+  return redactNetworkProofOutput(output, environment);
+}
 
 export async function executeNetworkProofStages(stages, dependencies) {
   const mutex = await dependencies.acquireMutex();
+  let targetArmed = false;
   let proofError;
   try {
     for (const stage of stages) {
       mutex.assertAlive();
+      if (stage.requiresRunningMarker === true && !targetArmed) {
+        await mutex.armTarget();
+        targetArmed = true;
+        mutex.assertAlive();
+      }
       await dependencies.runStage(stage, mutex);
       mutex.assertAlive();
     }
     dependencies.assertContinue?.();
+    if (targetArmed) {
+      await mutex.completeTarget();
+      targetArmed = false;
+      mutex.assertAlive();
+    }
     dependencies.prepareRelease?.();
   } catch (error) {
     proofError = error;
   }
 
-  if (proofError) {
-    let retainError;
-    try {
-      await mutex.retainAfterFailure();
-    } catch (error) {
-      retainError = error;
-    }
-    if (retainError) {
-      throw new AggregateError(
-        [proofError, retainError],
-        "F0 network proof failed and could not retain its cooperative mutex.",
-      );
-    }
-    throw proofError;
-  }
-
-  let releaseError;
+  let cleanupError;
   try {
-    await mutex.release();
+    if (proofError && targetArmed) {
+      await mutex.quarantineAndRelease();
+    } else {
+      await mutex.release();
+    }
   } catch (error) {
-    releaseError = error;
+    cleanupError = error;
   }
 
-  if (releaseError) throw releaseError;
+  if (proofError && cleanupError) {
+    throw new AggregateError(
+      [proofError, ...errorCauses(cleanupError)],
+      "F0 network proof failed and target containment was incomplete.",
+    );
+  }
+  if (proofError) throw proofError;
+  if (cleanupError) throw cleanupError;
 }
 
 function childResult(child) {
@@ -101,6 +133,66 @@ function appendStageOutput(state, chunk, streamName) {
     return;
   }
   state[streamName] += text;
+}
+
+export function redactNetworkProofOutput(value, environment) {
+  const databaseUrl = environment.F0_DATABASE_URL;
+  if (!databaseUrl) return value;
+
+  let parsed;
+  let decodedPassword;
+  try {
+    parsed = new URL(databaseUrl);
+    decodedPassword = decodeURIComponent(parsed.password);
+  } catch {
+    return "[REDACTED_INVALID_DATABASE_OUTPUT]\n";
+  }
+
+  const authorityStart = databaseUrl.indexOf("//") + 2;
+  const authorityEnd = databaseUrl.lastIndexOf("@");
+  const passwordStart = databaseUrl.indexOf(":", authorityStart) + 1;
+  const rawPassword = passwordStart > authorityStart && authorityEnd > passwordStart
+    ? databaseUrl.slice(passwordStart, authorityEnd)
+    : parsed.password;
+  const replacements = new Map([
+    [databaseUrl, "[REDACTED_DATABASE_URL]"],
+    [parsed.href, "[REDACTED_DATABASE_URL]"],
+  ]);
+  const passwordVariants = new Set([
+    rawPassword,
+    parsed.password,
+    decodedPassword,
+    encodeURIComponent(decodedPassword),
+  ]);
+  for (const password of passwordVariants) {
+    if (password.length === 0) continue;
+    replacements.set(password, "[REDACTED_DATABASE_SECRET]");
+    replacements.set(
+      password.replace(/%[0-9a-f]{2}/giu, (match) => match.toUpperCase()),
+      "[REDACTED_DATABASE_SECRET]",
+    );
+    replacements.set(
+      password.replace(/%[0-9a-f]{2}/giu, (match) => match.toLowerCase()),
+      "[REDACTED_DATABASE_SECRET]",
+    );
+  }
+  const pattern = new RegExp(
+    [...replacements.keys()]
+      .sort((left, right) => right.length - left.length)
+      .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
+      .join("|"),
+    "gu",
+  );
+  return value.replace(pattern, (secret) => replacements.get(secret));
+}
+
+function writeStageOutput(output, mutex) {
+  if (output.stdout) {
+    process.stdout.write(redactNetworkProofOutput(output.stdout, mutex.childEnvironment));
+  }
+  if (output.stderr) {
+    process.stderr.write(redactNetworkProofOutput(output.stderr, mutex.childEnvironment));
+  }
 }
 
 async function terminateActiveStage(state) {
@@ -149,6 +241,7 @@ export async function runChildStage(stage, mutex, state) {
       state.activeTermination = null;
     }
     if (terminationError) {
+      writeStageOutput(output, mutex);
       throw new AggregateError(
         [outcome.error, terminationError],
         `${stage.label} cancellation could not confirm process-tree termination.`,
@@ -184,17 +277,18 @@ export async function runChildStage(stage, mutex, state) {
       state.activeTermination = null;
     }
     if (terminationError) {
+      writeStageOutput(output, mutex);
       throw new AggregateError(
         [stageError, terminationError],
         `${stage.label} failed and process-tree termination was not confirmed.`,
       );
     }
+    writeStageOutput(output, mutex);
     throw stageError;
   }
   state.activeChild = null;
   state.activeTermination = null;
-  if (output.stdout) process.stdout.write(output.stdout);
-  if (output.stderr) process.stderr.write(output.stderr);
+  writeStageOutput(output, mutex);
 }
 
 export async function runNetworkProof(stages) {
@@ -211,7 +305,7 @@ export async function runNetworkProof(stages) {
     releaseStarted: false,
     resolveInterruption,
   };
-  const signalHandlers = ["SIGINT", "SIGTERM"].map((signal) => {
+  const signalHandlers = networkProofInterruptionSignals().map((signal) => {
     const handler = () => recordNetworkProofInterruption(state, signal);
     process.on(signal, handler);
     return { handler, signal };
@@ -232,6 +326,12 @@ export async function runNetworkProof(stages) {
   } finally {
     for (const { handler, signal } of signalHandlers) process.off(signal, handler);
   }
+}
+
+export function networkProofInterruptionSignals(platform = process.platform) {
+  return platform === "win32"
+    ? Object.freeze(["SIGINT", "SIGTERM", "SIGBREAK"])
+    : Object.freeze(["SIGINT", "SIGTERM", "SIGHUP"]);
 }
 
 export function recordNetworkProofInterruption(state, signal) {

@@ -12,6 +12,17 @@ function isMissingProcessError(error) {
   return error && typeof error === "object" && error.code === "ESRCH";
 }
 
+function processIdentifierExists(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isMissingProcessError(error)) return false;
+    if (error && typeof error === "object" && error.code === "EPERM") return true;
+    throw error;
+  }
+}
+
 function processGroupExists(pid) {
   try {
     process.kill(-pid, 0);
@@ -43,15 +54,21 @@ async function waitForCondition(predicate, timeoutMs) {
 export function waitForProcessExit(child, timeoutMs) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
   return new Promise((resolve) => {
-    const onExit = () => {
-      clearTimeout(timer);
-      resolve(true);
-    };
-    const timer = setTimeout(() => {
+    let settled = false;
+    let timer;
+    const finish = (exited) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      child.off("close", onExit);
       child.off("exit", onExit);
-      resolve(false);
-    }, timeoutMs);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
     child.once("exit", onExit);
+    child.once("close", onExit);
+    timer = setTimeout(() => finish(false), timeoutMs);
+    if (child.exitCode !== null || child.signalCode !== null) finish(true);
   });
 }
 
@@ -61,6 +78,10 @@ export function processTreeTerminationStrategy(platform = process.platform) {
 
 export function requiresDetachedProcessGroup(platform = process.platform) {
   return processTreeTerminationStrategy(platform) === "process-group";
+}
+
+export function windowsProcessTreeTerminationConfirmed(taskkillStatus, rootStopped) {
+  return taskkillStatus === 0 && rootStopped === true;
 }
 
 export function windowsTaskkillInvocation(pid, environment = process.env) {
@@ -106,10 +127,21 @@ export async function terminateProcessTree(child, options = {}) {
   const forceTimeoutMs = options.forceTimeoutMs ?? DEFAULT_FORCE_TIMEOUT_MS;
 
   if (processTreeTerminationStrategy() === "taskkill") {
+    if (
+      child.exitCode !== null
+      || child.signalCode !== null
+      || !processIdentifierExists(pid)
+    ) {
+      throw new Error(
+        "F0 stage process tree did not stop (taskkill=not-run, rootStopped=true).",
+      );
+    }
     const taskkillStatus = await runWindowsTaskkill(pid, forceTimeoutMs);
-    const exited = await waitForProcessExit(child, forceTimeoutMs);
-    if (!exited || (taskkillStatus !== 0 && child.exitCode === null && child.signalCode === null)) {
-      throw new Error("F0 stage process tree did not stop.");
+    const rootStopped = await waitForCondition(() => !processIdentifierExists(pid), forceTimeoutMs);
+    if (!windowsProcessTreeTerminationConfirmed(taskkillStatus, rootStopped)) {
+      throw new Error(
+        `F0 stage process tree did not stop (taskkill=${taskkillStatus}, rootStopped=${rootStopped}).`,
+      );
     }
     return;
   }

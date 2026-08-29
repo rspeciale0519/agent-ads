@@ -13,6 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const context = resolveNetworkProofContext();
 assertNetworkProofMutex(context);
 const { databaseUrl, marker, psql } = context;
+const mutexToken = context.mutex.token;
 const psqlArgs = psqlBaseArguments();
 const clusterGuard = readFileSync(
   path.join(root, "scripts", "f0", "disposable-cluster-guard.sql"),
@@ -51,6 +52,8 @@ function verifyGuard(label, selectedMarker = marker) {
     ...psqlArgs,
     "--set",
     `f0_marker=${selectedMarker}`,
+    "--set",
+    `f0_mutex_token=${mutexToken}`,
     "--file",
     verifyScript,
   ]);
@@ -61,6 +64,8 @@ function verifyGuardFailure(label, expectedMessage, selectedMarker = marker) {
     ...psqlArgs,
     "--set",
     `f0_marker=${selectedMarker}`,
+    "--set",
+    `f0_mutex_token=${mutexToken}`,
     "--file",
     verifyScript,
   ], {

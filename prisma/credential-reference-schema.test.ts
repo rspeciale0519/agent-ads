@@ -58,7 +58,7 @@ describe("connection credential database contract", () => {
 
   it("limits Vault write functions to the broker permission role", () => {
     const boundaryIndex = migrationNames.indexOf("20260827190000_vault_write_function_boundary");
-    expect(boundaryIndex).toBe(migrationNames.length - 1);
+    expect(boundaryIndex).toBeGreaterThanOrEqual(0);
 
     const sql = migration("20260827190000_vault_write_function_boundary");
     expect(sql).toContain("ACCOUNT_CONNECTIONS_PERMISSION_ROLE_LOGIN_ENABLED");
@@ -76,5 +76,19 @@ describe("connection credential database contract", () => {
     expect(sql).toContain(
       "GRANT EXECUTE ON FUNCTION vault.update_secret(uuid, text, text, text, uuid) TO app_secret_broker",
     );
+    const laterSql = migrationNames.slice(boundaryIndex + 1).map(migration).join("\n");
+    expect(laterSql).not.toContain("GRANT EXECUTE ON FUNCTION vault.create_secret");
+    expect(laterSql).not.toContain("GRANT EXECUTE ON FUNCTION vault.update_secret");
+  });
+
+  it("keeps idempotency foreign-key update actions aligned with Prisma", () => {
+    const ledgerIndex = migrationNames.indexOf("20260811140000_mutation_idempotency");
+    const alignmentIndex = migrationNames.indexOf("20260829010000_idempotency_fk_update_cascade");
+    expect(alignmentIndex).toBeGreaterThan(ledgerIndex);
+
+    const sql = migration("20260829010000_idempotency_fk_update_cascade");
+    expect(sql).toContain("DROP CONSTRAINT idempotency_records_organization_id_fkey");
+    expect(sql).toContain("DROP CONSTRAINT idempotency_records_user_id_fkey");
+    expect(sql.match(/ON UPDATE CASCADE/gu)).toHaveLength(2);
   });
 });

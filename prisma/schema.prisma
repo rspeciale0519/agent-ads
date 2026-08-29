@@ -180,7 +180,7 @@ model Connection {
   capabilitySnapshots   CapabilitySnapshot[]
   accessInvitations     AccessInvitation[]
   credentialReferences       CredentialReference[] @relation("OwnedCredentialReferences")
-  currentCredentialReference CredentialReference?  @relation("CurrentCredentialReference", fields: [organizationId, id, credentialReferenceId], references: [organizationId, connectionId, id], onDelete: Restrict, onUpdate: Cascade)
+  currentCredentialReference CredentialReference?  @relation("CurrentCredentialReference", fields: [organizationId, id, credentialReferenceId], references: [organizationId, connectionId, id], onDelete: Restrict, onUpdate: Cascade, map: "connections_credential_owner_fkey")
 
   @@unique([organizationId, id])
   @@index([organizationId, status, updatedAt])
@@ -227,7 +227,7 @@ model CapabilitySnapshot {
   supportLevel     String              @map("support_level")
   limitation       String?
   evidenceSource   String?             @map("evidence_source")
-  sourceDate       DateTime?           @map("source_date")
+  sourceDate       DateTime?           @map("source_date") @db.Timestamptz(6)
   evidenceAt       DateTime            @map("evidence_at")
   expiresAt        DateTime?           @map("expires_at")
   createdAt        DateTime            @default(now()) @map("created_at")
@@ -243,10 +243,10 @@ model CapabilitySnapshot {
 model RateLimitBucket {
   keyHash         String   @id @map("key_hash")
   organizationId  String?  @map("organization_id") @db.Uuid
-  windowStartedAt DateTime @map("window_started_at")
+  windowStartedAt DateTime @map("window_started_at") @db.Timestamptz(6)
   hitCount        Int      @map("hit_count")
-  expiresAt       DateTime @map("expires_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([expiresAt])
   @@index([organizationId])
@@ -262,17 +262,17 @@ model IdempotencyRecord {
   keyHash        String       @map("key_hash")
   requestHash    String       @map("request_hash")
   status         String       @default("pending")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  expiresAt      DateTime     @map("expires_at")
-  completedAt    DateTime?    @map("completed_at")
-  failedAt       DateTime?    @map("failed_at")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  expiresAt      DateTime     @map("expires_at") @db.Timestamptz(6)
+  completedAt    DateTime?    @map("completed_at") @db.Timestamptz(6)
+  failedAt       DateTime?    @map("failed_at") @db.Timestamptz(6)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   user           AppUser      @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, userId, action, keyHash])
-  @@index([organizationId, userId, expiresAt])
-  @@index([organizationId, status, updatedAt])
+  @@unique([organizationId, userId, action, keyHash], map: "idempotency_records_scope_key_key")
+  @@index([organizationId, userId, expiresAt], map: "idempotency_records_organization_user_expires_idx")
+  @@index([organizationId, status, updatedAt], map: "idempotency_records_organization_status_updated_idx")
   @@index([userId])
   @@index([expiresAt])
   @@map("idempotency_records")
@@ -335,7 +335,7 @@ model AccessInvitation {
   expiresAt          DateTime?    @map("expires_at")
   revokedAt          DateTime?    @map("revoked_at")
   verificationSource String?      @map("verification_source")
-  sourceDate         DateTime?    @map("source_date")
+  sourceDate         DateTime?    @map("source_date") @db.Timestamptz(6)
   organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   connection         Connection?  @relation(fields: [connectionId], references: [id], onDelete: Restrict)
   createdBy          AppUser      @relation("AccessInvitationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -356,20 +356,19 @@ model CredentialReference {
   credentialKind        String         @map("credential_kind")
   keyVersion            String         @map("key_version")
   cleanupStatus         String         @default("active") @map("cleanup_status")
-  cleanupLeaseExpiresAt DateTime?      @map("cleanup_lease_expires_at")
+  cleanupLeaseExpiresAt DateTime?      @map("cleanup_lease_expires_at") @db.Timestamptz(6)
   expiresAt             DateTime?      @map("expires_at")
   revokedAt             DateTime?      @map("revoked_at")
   fingerprint           String?
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
   organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  connection            Connection     @relation("OwnedCredentialReferences", fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade)
+  connection            Connection     @relation("OwnedCredentialReferences", fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "credential_references_organization_connection_fkey")
   currentForConnections Connection[]   @relation("CurrentCredentialReference")
 
   @@unique([organizationId, id])
   @@unique([organizationId, connectionId, id])
-  @@index([organizationId, connectionId, cleanupStatus])
-  @@index([cleanupStatus, cleanupLeaseExpiresAt])
+  @@index([organizationId, connectionId, cleanupStatus], map: "credential_references_connection_cleanup_idx")
   @@map("credential_references")
   @@schema("private")
 }
@@ -406,8 +405,8 @@ model OnboardingSubmission {
   storageBucket      String    @map("storage_bucket")
   notificationStatus String    @map("notification_status")
   notificationError  String?   @map("notification_error")
-  submittedAt        DateTime  @map("submitted_at")
-  notificationSentAt DateTime? @map("notification_sent_at")
+  submittedAt        DateTime  @map("submitted_at") @db.Timestamptz(6)
+  notificationSentAt DateTime? @map("notification_sent_at") @db.Timestamptz(6)
   applicantId        String?   @map("applicant_id") @db.Uuid
 
   @@map("onboarding_submissions")

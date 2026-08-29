@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertNetworkProofMutex,
   networkDatabaseEnvironment,
+  networkProofRunningMarker,
   psqlBaseArguments,
   resolveNetworkProofContext,
 } from "./network-safety.mjs";
@@ -14,6 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const context = resolveNetworkProofContext();
 assertNetworkProofMutex(context);
 const { databaseUrl, marker, psql, spawnEnvironment } = context;
+const expectedMarker = networkProofRunningMarker(marker, context.mutex.token);
 const guardEnvironment = networkDatabaseEnvironment(
   context,
   "agent_ads_f0",
@@ -44,7 +46,7 @@ const markerResult = spawnSync(psql, [
 if (
   markerResult.error
   || markerResult.status !== 0
-  || markerResult.stdout.trim() !== `agent_ads_f0_disposable:${marker}`
+  || markerResult.stdout.trim() !== expectedMarker
 ) {
   throw new Error("F0 network target marker is missing or incorrect.");
 }
@@ -55,6 +57,8 @@ run(
     ...psqlArgs,
     "--set",
     `f0_marker=${marker}`,
+    "--set",
+    `f0_mutex_token=${context.mutex.token}`,
     "--file",
     path.join(root, "scripts", "f0", "verify-disposable.sql"),
   ],
@@ -83,6 +87,11 @@ run(
   process.execPath,
   [path.join(root, "node_modules", "prisma", "build", "index.js"), "migrate", "deploy"],
   { ...spawnEnvironment, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl },
+);
+run(
+  "Prisma-visible catalog proof",
+  process.execPath,
+  [path.join(root, "scripts", "f0", "prisma-catalog-proof.mjs")],
 );
 run(
   "F0 assertions",
@@ -137,4 +146,4 @@ for (const name of migrationNames) {
 
 run("F0 upgrade proof", process.execPath, [path.join(root, "scripts", "f0", "upgrade-proof.mjs")]);
 
-console.log("F0 fresh migration proof passed: marked empty target, Prisma history, UUID upgrades, permission-role login guards, foreign keys, indexes, forced RLS, tenant isolation, roles, and ownership are valid.");
+console.log("F0 fresh migration proof passed: marked target, migration history, Prisma application catalog, upgrade, tenant-isolation, role, RLS, and ownership checks are valid.");

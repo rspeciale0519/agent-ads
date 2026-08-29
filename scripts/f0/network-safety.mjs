@@ -11,11 +11,56 @@ const mutexEnvironmentNames = Object.freeze([
 ]);
 const allowedHosts = new Set(["127.0.0.1", "[::1]"]);
 const allowedProtocols = new Set(["postgres:", "postgresql:"]);
+const safeProcessEnvironmentNames = Object.freeze(new Map([
+  ["COMSPEC", "ComSpec"],
+  ["LANG", "LANG"],
+  ["LC_ALL", "LC_ALL"],
+  ["LC_CTYPE", "LC_CTYPE"],
+  ["PATH", "PATH"],
+  ["PATHEXT", "PATHEXT"],
+  ["SYSTEMROOT", "SystemRoot"],
+  ["TEMP", "TEMP"],
+  ["TMP", "TMP"],
+  ["TMPDIR", "TMPDIR"],
+  ["TZ", "TZ"],
+  ["WINDIR", "WINDIR"],
+]));
 const mutexDigest = createHash("sha256").update("agent-ads:f0-network-proof:v1").digest();
 export const NETWORK_PROOF_MUTEX_KEYS = Object.freeze([
   mutexDigest.readUInt32BE(0) & 0x7fff_ffff,
   mutexDigest.readUInt32BE(4) & 0x7fff_ffff,
 ]);
+
+export function safeProcessEnvironment(environment = process.env) {
+  const safeEnvironment = {};
+  for (const [name, value] of Object.entries(environment)) {
+    const canonicalName = safeProcessEnvironmentNames.get(name.toUpperCase());
+    if (!canonicalName || typeof value !== "string") continue;
+    if (
+      Object.hasOwn(safeEnvironment, canonicalName)
+      && safeEnvironment[canonicalName] !== value
+    ) {
+      throw new Error(`Conflicting F0 process environment variants for ${canonicalName}.`);
+    }
+    safeEnvironment[canonicalName] = value;
+  }
+  return safeEnvironment;
+}
+
+export function networkProofStageEnvironment(options) {
+  return {
+    ...options.processEnvironment,
+    F0_ALLOW_DISPOSABLE_DATABASE: "1",
+    F0_DATABASE_URL: options.databaseUrl,
+    F0_DISPOSABLE_MARKER: options.marker,
+    ...(options.psqlBin ? { PSQL_BIN: options.psqlBin } : {}),
+    ...(options.mutex ? {
+      F0_NETWORK_MUTEX_TOKEN: options.mutex.token,
+      F0_NETWORK_MUTEX_BACKEND_PID: String(options.mutex.backendPid),
+      F0_NETWORK_MUTEX_SYSTEM_IDENTIFIER: options.mutex.systemIdentifier,
+    } : {}),
+  };
+}
 
 export function resolveNetworkProofContext(environment = process.env) {
   if (environment.F0_ALLOW_DISPOSABLE_DATABASE !== "1") {
@@ -84,29 +129,21 @@ export function resolveNetworkProofContext(environment = process.env) {
     mutex = { backendPid, systemIdentifier, token };
   }
 
-  const spawnEnvironment = {
-    ...Object.fromEntries(
-      Object.entries(environment).filter(([name]) => (
-        !name.toUpperCase().startsWith("PG")
-        && !mutexEnvironmentNames.includes(name.toUpperCase())
-      )),
-    ),
-    ...(mutex ? {
-      F0_NETWORK_MUTEX_TOKEN: mutex.token,
-      F0_NETWORK_MUTEX_BACKEND_PID: String(mutex.backendPid),
-      F0_NETWORK_MUTEX_SYSTEM_IDENTIFIER: mutex.systemIdentifier,
-    } : {}),
-  };
+  const processEnvironment = safeProcessEnvironment(environment);
+  const spawnEnvironment = networkProofStageEnvironment({
+    databaseUrl,
+    marker,
+    mutex,
+    processEnvironment,
+    psqlBin: environment.PSQL_BIN,
+  });
   const psql = environment.PSQL_BIN || "psql";
   if (!/^psql(?:\.exe)?$/iu.test(path.basename(psql))) {
     throw new Error("PSQL_BIN must resolve to the PostgreSQL psql executable.");
   }
-  const versionEnvironment = Object.fromEntries(
-    Object.entries(spawnEnvironment).filter(([name]) => name.toUpperCase() !== "F0_DATABASE_URL"),
-  );
   const versionResult = spawnSync(psql, ["--version"], {
     encoding: "utf8",
-    env: versionEnvironment,
+    env: processEnvironment,
     windowsHide: true,
   });
   const versionOutput = `${versionResult.stdout || ""}\n${versionResult.stderr || ""}`.trim();
@@ -128,6 +165,7 @@ export function resolveNetworkProofContext(environment = process.env) {
     databaseUrl,
     marker,
     mutex,
+    processEnvironment,
     psql,
     spawnEnvironment,
   };
@@ -136,6 +174,13 @@ export function resolveNetworkProofContext(environment = process.env) {
 export function networkProofMutexApplicationName(token) {
   if (!markerPattern.test(token)) throw new Error("Unsafe F0 network proof mutex token.");
   return `agent_ads_f0_mutex_${token.replaceAll("-", "")}`;
+}
+
+export function networkProofRunningMarker(marker, token) {
+  if (!markerPattern.test(marker) || !markerPattern.test(token)) {
+    throw new Error("Unsafe F0 network proof running marker.");
+  }
+  return `agent_ads_f0_running:${marker}:${token}`;
 }
 
 export function networkProofMutexChildEnvironment(context, mutex) {
@@ -161,11 +206,7 @@ export function networkDatabaseEnvironment(context, databaseName, options = {}) 
   }
 
   const environment = {
-    ...Object.fromEntries(
-      Object.entries(context.spawnEnvironment).filter(
-        ([name]) => name.toUpperCase() !== "F0_DATABASE_URL",
-      ),
-    ),
+    ...context.processEnvironment,
     PGDATABASE: databaseName,
     PGCONNECT_TIMEOUT: "5",
     PGHOST: context.connection.host,

@@ -37,6 +37,24 @@ jobs:
       - run: pnpm run security:mutation-audit
       - run: pnpm run build
 
+  windows-process-proof:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test -- scripts/f0/network-proof-runner.test.ts -t "real Windows"
+        env:
+          F0_TEST_WINDOWS_TASKKILL: "1"
+
   guard-proof:
     runs-on: ubuntu-24.04
     services:
@@ -99,3 +117,33 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: psql --version
       - run: pnpm run security:f0-network
+
+  holder-death-proof:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_DB: agent_ads_f0
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agent_ads_f0"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      F0_ALLOW_DISPOSABLE_DATABASE: "1"
+      F0_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/agent_ads_f0
+      F0_DISPOSABLE_MARKER: f0000000-0000-4000-8000-000000000001
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: psql --version
+      - run: node scripts/f0/network-stage-proof.mjs mark
+      - run: node scripts/f0/network-proof-mutex-holder-death-proof.mjs

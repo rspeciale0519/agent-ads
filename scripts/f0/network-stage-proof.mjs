@@ -1,38 +1,59 @@
-import { runNetworkProof } from "./network-proof-runner.mjs";
+import { formatNetworkProofFailure, runNetworkProof } from "./network-proof-runner.mjs";
 
-const stages = Object.freeze({
+const markStage = Object.freeze({
+  label: "F0 network target marking",
+  script: "network-mark-disposable.mjs",
+});
+const markGuardStage = Object.freeze({
+  label: "F0 mark guard proof",
+  requiresRunningMarker: true,
+  script: "disposable-mark-guard-proof.mjs",
+});
+const stageSequences = Object.freeze({
   "mark-guard": Object.freeze({
-    label: "F0 mark guard proof",
-    script: "disposable-mark-guard-proof.mjs",
+    label: markGuardStage.label,
+    stages: Object.freeze([markStage, markGuardStage]),
   }),
   mark: Object.freeze({
-    label: "F0 network target marking",
-    script: "network-mark-disposable.mjs",
+    label: markStage.label,
+    stages: Object.freeze([markStage]),
   }),
   guard: Object.freeze({
     label: "F0 disposable guard proof",
-    script: "disposable-guard-proof.mjs",
+    stages: Object.freeze([Object.freeze({
+      label: "F0 disposable guard proof",
+      requiresRunningMarker: true,
+      script: "disposable-guard-proof.mjs",
+    })]),
   }),
   schema: Object.freeze({
     label: "F0 fresh migration proof",
-    script: "fresh-migration-proof.mjs",
+    stages: Object.freeze([Object.freeze({
+      label: "F0 fresh migration proof",
+      requiresRunningMarker: true,
+      script: "fresh-migration-proof.mjs",
+    })]),
   }),
   upgrade: Object.freeze({
     label: "F0 upgrade proof",
-    script: "upgrade-proof.mjs",
+    stages: Object.freeze([Object.freeze({
+      label: "F0 upgrade proof",
+      requiresRunningMarker: true,
+      script: "upgrade-proof.mjs",
+    })]),
   }),
 });
 
 const stageName = process.argv[2];
-const stage = stages[stageName];
-if (!stage || process.argv.length !== 3) {
+const selected = stageSequences[stageName];
+if (!selected || process.argv.length !== 3) {
   throw new Error("F0 network stage name is missing or invalid.");
 }
 
 try {
-  await runNetworkProof([stage]);
-  console.log(`${stage.label} passed under one cooperative PostgreSQL session mutex.`);
+  await runNetworkProof(selected.stages);
+  console.log(`${selected.label} passed under one cooperative PostgreSQL session mutex.`);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "F0 network stage proof failed.");
+  console.error(formatNetworkProofFailure(error, process.env, "F0 network stage proof failed."));
   process.exitCode = 1;
 }

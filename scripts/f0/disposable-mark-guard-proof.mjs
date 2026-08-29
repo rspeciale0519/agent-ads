@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertNetworkProofMutex,
   networkDatabaseEnvironment,
+  networkProofRunningMarker,
   psqlBaseArguments,
   resolveNetworkProofContext,
 } from "./network-safety.mjs";
@@ -16,13 +17,13 @@ assertNetworkProofMutex(context);
 const { databaseUrl, marker, psql } = context;
 const psqlArgs = psqlBaseArguments();
 const markScript = path.join(root, "scripts", "f0", "mark-disposable.sql");
-const verifyScript = path.join(root, "scripts", "f0", "verify-disposable.sql");
 const clusterGuard = readFileSync(
   path.join(root, "scripts", "f0", "disposable-cluster-guard.sql"),
   "utf8",
 );
 const hiddenDatabase = `f0_mark_guard_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
 const templateSchema = `f0_mark_guard_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+const expectedMarker = networkProofRunningMarker(marker, context.mutex.token);
 
 function safeOutput(result) {
   return `${result.stdout || ""}\n${result.stderr || ""}`.replaceAll(databaseUrl, "[REDACTED_DATABASE_URL]");
@@ -78,13 +79,17 @@ ${clusterGuard}`,
 for (const database of ["postgres", "template1", "agent_ads_f0"]) {
   verifyBaselineDatabase(database);
 }
-if (readMarker() !== "") throw new Error("The isolated mark-guard target must begin without a database marker.");
+if (readMarker() !== expectedMarker) {
+  throw new Error("The mark-guard target must have its exact server-side disposable marker before setup writes.");
+}
 
 function expectScriptFailure(label, script, expectedMessage) {
   const result = spawnSync(psql, [
     ...psqlArgs,
     "--set",
     `f0_marker=${marker}`,
+    "--set",
+    `f0_mutex_token=${context.mutex.token}`,
     "--file",
     script,
   ], {
@@ -101,12 +106,6 @@ function expectScriptFailure(label, script, expectedMessage) {
   }
 }
 
-expectScriptFailure(
-  "Unmarked clean-target verification",
-  verifyScript,
-  "F0 proof target is missing its server-side disposable marker",
-);
-
 let hiddenDatabaseCreated = false;
 try {
   runSql("Hidden database creation", `CREATE DATABASE "${hiddenDatabase}" TEMPLATE template1`);
@@ -118,7 +117,9 @@ try {
     markScript,
     "F0 disposable guard found an unexpected database",
   );
-  if (readMarker() !== "") throw new Error("Failed dirty-target marking wrote a database marker.");
+  if (readMarker() !== expectedMarker) {
+    throw new Error("Failed dirty-target marking changed the existing database marker.");
+  }
 } finally {
   if (hiddenDatabaseCreated) {
     runSql("Hidden database cleanup", `DROP DATABASE "${hiddenDatabase}" WITH (FORCE)`);
@@ -134,13 +135,15 @@ try {
     markScript,
     "F0 disposable guard found an unexpected schema",
   );
-  if (readMarker() !== "") throw new Error("Failed dirty-template marking wrote a database marker.");
+  if (readMarker() !== expectedMarker) {
+    throw new Error("Failed dirty-template marking changed the existing database marker.");
+  }
 } finally {
   if (templateSchemaCreated) {
     runSql("Template schema cleanup", `DROP SCHEMA "${templateSchema}" CASCADE`, "template1");
   }
 }
 
-if (readMarker() !== "") throw new Error("The mark-guard proof left an unexpected database marker.");
+if (readMarker() !== expectedMarker) throw new Error("The mark-guard proof changed the database marker.");
 
-console.log("F0 mark guard proof passed: dirty-database and dirty-template marking failed without writing a marker.");
+console.log("F0 mark guard proof passed: dirty-database and dirty-template re-marking failed while preserving the marker.");

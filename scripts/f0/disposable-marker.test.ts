@@ -85,9 +85,10 @@ describe("F0 disposable target marker", () => {
   it("verifies the same server-side database comment", () => {
     expect(verify).toContain("shobj_description(oid, 'pg_database')");
     expect(verify).toContain("agent_ads_f0_disposable:");
+    expect(verify).toContain("agent_ads_f0_running:");
     expect(verify).toContain("\\ir disposable-cluster-guard.sql");
     expect(upgrade).toContain("shobj_description(oid, 'pg_database')");
-    expect(upgrade).toContain("agent_ads_f0_disposable:${marker}");
+    expect(upgrade).toContain("networkProofRunningMarker(marker, context.mutex.token)");
   });
 
   it("rejects dirty cluster state through one shared catalog guard", () => {
@@ -124,10 +125,15 @@ describe("F0 disposable target marker", () => {
     const inventoryIndex = markGuardProof.indexOf(
       'for (const database of ["postgres", "template1", "agent_ads_f0"])',
     );
+    const markerIndex = markGuardProof.indexOf("if (readMarker() !== expectedMarker)");
     const firstWriteIndex = markGuardProof.indexOf('runSql("Hidden database creation"');
     expect(markGuardProof).toContain("${clusterGuard}");
     expect(inventoryIndex).toBeGreaterThanOrEqual(0);
-    expect(firstWriteIndex).toBeGreaterThan(inventoryIndex);
+    expect(markerIndex).toBeGreaterThan(inventoryIndex);
+    expect(firstWriteIndex).toBeGreaterThan(markerIndex);
+    expect(markGuardProof).not.toContain('readMarker() !== ""');
+    expect(markGuardProof).toContain("Failed dirty-target marking changed the existing database marker");
+    expect(markGuardProof).toContain("Failed dirty-template marking changed the existing database marker");
   });
 
   it("rejects URL routing overrides before any network command starts", () => {
@@ -221,7 +227,7 @@ describe("F0 disposable target marker", () => {
     const verification = [
       `import { networkDatabaseEnvironment, psqlBaseArguments } from ${JSON.stringify(safetyUrl)};`,
       `const expectedDevNull = ${JSON.stringify(devNull)};`,
-      "const context = { spawnEnvironment: { PGHOST: 'unsafe', PGPASSFILE: 'unsafe' }, connection: { host: '127.0.0.1', port: '5432', username: 'f0', password: 'synthetic' } };",
+      "const context = { processEnvironment: {}, connection: { host: '127.0.0.1', port: '5432', username: 'f0', password: 'synthetic' } };",
       "const environment = networkDatabaseEnvironment(context, 'agent_ads_f0');",
       "const pgNames = Object.keys(environment).filter((name) => name.startsWith('PG')).sort();",
       "const expectedNames = ['PGCONNECT_TIMEOUT', 'PGDATABASE', 'PGHOST', 'PGPASSFILE', 'PGPASSWORD', 'PGPORT', 'PGUSER'];",

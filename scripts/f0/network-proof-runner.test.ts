@@ -4,12 +4,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
-type Stage = { label: string; script: string };
+type Stage = { label: string; requiresRunningMarker?: boolean; script: string };
 type Mutex = {
+  armTarget: () => Promise<void>;
   childEnvironment: NodeJS.ProcessEnv;
+  completeTarget: () => Promise<void>;
   failure: Promise<Error>;
   assertAlive: () => void;
-  retainAfterFailure: () => Promise<void>;
+  quarantineAndRelease: () => Promise<void>;
   release: () => Promise<void>;
 };
 type RunnerModule = {
@@ -22,8 +24,15 @@ type RunnerModule = {
       runStage: (stage: Stage, mutex: Mutex) => Promise<void>;
     },
   ) => Promise<void>;
+  formatNetworkProofFailure: (
+    error: unknown,
+    environment: NodeJS.ProcessEnv,
+    fallback: string,
+  ) => string;
   fullNetworkProofStages: readonly Stage[];
   guardNetworkProofStages: readonly Stage[];
+  networkProofInterruptionSignals: (platform?: NodeJS.Platform) => readonly string[];
+  redactNetworkProofOutput: (value: string, environment: NodeJS.ProcessEnv) => string;
   recordNetworkProofInterruption: (
     state: {
       interruption: Error | null;
@@ -41,6 +50,10 @@ const processTreePath = path.join(root, "network-process-tree.mjs");
 const safetyPath = path.join(root, "network-safety.mjs");
 const runnerSource = readFileSync(runnerPath, "utf8");
 const mutexSource = readFileSync(mutexPath, "utf8");
+const holderDeathProofSource = readFileSync(
+  path.join(root, "network-proof-mutex-holder-death-proof.mjs"),
+  "utf8",
+);
 const processTreeSource = readFileSync(processTreePath, "utf8");
 const safetySource = readFileSync(safetyPath, "utf8");
 const workflow = readFileSync(path.join(process.cwd(), ".github", "workflows", "validate.yml"), "utf8");
@@ -56,16 +69,16 @@ function pendingFailure() {
   return new Promise<Error>(() => undefined);
 }
 
-function fakeMutex(
-  release = vi.fn(async () => undefined),
-  retainAfterFailure = vi.fn(async () => undefined),
-): Mutex {
+function fakeMutex(overrides: Partial<Mutex> = {}): Mutex {
   return {
+    armTarget: vi.fn(async () => undefined),
     childEnvironment: { NODE_ENV: "test" },
+    completeTarget: vi.fn(async () => undefined),
     failure: pendingFailure(),
     assertAlive: vi.fn(),
-    retainAfterFailure,
-    release,
+    quarantineAndRelease: vi.fn(async () => undefined),
+    release: vi.fn(async () => undefined),
+    ...overrides,
   };
 }
 
@@ -132,16 +145,18 @@ describe("F0 network proof cooperative session mutex", () => {
     });
 
     expect(observed).toEqual([
-      "disposable-mark-guard-proof.mjs",
       "network-mark-disposable.mjs",
+      "disposable-mark-guard-proof.mjs",
       "disposable-guard-proof.mjs",
       "fresh-migration-proof.mjs",
     ]);
-    expect(mutex.assertAlive).toHaveBeenCalledTimes(observed.length * 2);
+    expect(mutex.armTarget).toHaveBeenCalledOnce();
+    expect(mutex.completeTarget).toHaveBeenCalledOnce();
+    expect(mutex.assertAlive).toHaveBeenCalledTimes(observed.length * 2 + 2);
     expect(mutex.release).toHaveBeenCalledOnce();
   });
 
-  it("stops later stages and retains the mutex after a stage failure", async () => {
+  it("stops later stages and quarantines the target after a stage failure", async () => {
     const runner = await runnerModule();
     const mutex = fakeMutex();
     const observed: string[] = [];
@@ -155,36 +170,41 @@ describe("F0 network proof cooperative session mutex", () => {
     })).rejects.toThrow("synthetic stage failure");
 
     expect(observed).toEqual([
-      "disposable-mark-guard-proof.mjs",
       "network-mark-disposable.mjs",
+      "disposable-mark-guard-proof.mjs",
     ]);
-    expect(mutex.retainAfterFailure).toHaveBeenCalledOnce();
+    expect(mutex.quarantineAndRelease).toHaveBeenCalledOnce();
+    expect(mutex.armTarget).toHaveBeenCalledOnce();
+    expect(mutex.completeTarget).not.toHaveBeenCalled();
     expect(mutex.release).not.toHaveBeenCalled();
   });
 
-  it("finishes stage cancellation before it retains the mutex", async () => {
+  it("finishes stage cancellation before it quarantines the target", async () => {
     const runner = await runnerModule();
     const events: string[] = [];
-    const mutex = fakeMutex(
-      vi.fn(async () => {
-        events.push("release");
+    let resolveFailure: (error: Error) => void = () => undefined;
+    const failure = new Promise<Error>((resolve) => {
+      resolveFailure = resolve;
+    });
+    const mutex = fakeMutex({
+      failure,
+      quarantineAndRelease: vi.fn(async () => {
+        events.push("quarantine");
       }),
-      vi.fn(async () => {
-        events.push("retain");
-      }),
-    );
+    });
 
-    await expect(runner.executeNetworkProofStages(runner.guardNetworkProofStages.slice(0, 1), {
+    await expect(runner.executeNetworkProofStages(runner.guardNetworkProofStages.slice(1, 2), {
       acquireMutex: async () => mutex,
       runStage: async () => {
         events.push("cancel-start");
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        resolveFailure(new Error("F0 network proof mutex holder exited during the proof."));
+        const error = await failure;
         events.push("cancel-finished");
-        throw new Error("synthetic holder failure");
+        throw error;
       },
-    })).rejects.toThrow("synthetic holder failure");
+    })).rejects.toThrow("F0 network proof mutex holder exited during the proof.");
 
-    expect(events).toEqual(["cancel-start", "cancel-finished", "retain"]);
+    expect(events).toEqual(["cancel-start", "cancel-finished", "quarantine"]);
   });
 
   it("does not start a stage when mutex acquisition fails", async () => {
@@ -201,11 +221,27 @@ describe("F0 network proof cooperative session mutex", () => {
     expect(runStage).not.toHaveBeenCalled();
   });
 
-  it("retains the mutex when interruption arrives before release", async () => {
+  it("releases an unarmed target when the safe mark stage fails", async () => {
     const runner = await runnerModule();
     const mutex = fakeMutex();
 
-    await expect(runner.executeNetworkProofStages([], {
+    await expect(runner.executeNetworkProofStages(runner.guardNetworkProofStages.slice(0, 1), {
+      acquireMutex: async () => mutex,
+      runStage: async () => {
+        throw new Error("synthetic mark failure");
+      },
+    })).rejects.toThrow("synthetic mark failure");
+
+    expect(mutex.armTarget).not.toHaveBeenCalled();
+    expect(mutex.quarantineAndRelease).not.toHaveBeenCalled();
+    expect(mutex.release).toHaveBeenCalledOnce();
+  });
+
+  it("quarantines the target when interruption arrives before release", async () => {
+    const runner = await runnerModule();
+    const mutex = fakeMutex();
+
+    await expect(runner.executeNetworkProofStages(runner.guardNetworkProofStages.slice(1, 2), {
       acquireMutex: async () => mutex,
       assertContinue: () => {
         throw new Error("synthetic late interruption");
@@ -213,8 +249,37 @@ describe("F0 network proof cooperative session mutex", () => {
       runStage: async () => undefined,
     })).rejects.toThrow("synthetic late interruption");
 
-    expect(mutex.retainAfterFailure).toHaveBeenCalledOnce();
+    expect(mutex.quarantineAndRelease).toHaveBeenCalledOnce();
     expect(mutex.release).not.toHaveBeenCalled();
+  });
+
+  it("preserves proof and mutex cleanup failures", async () => {
+    const runner = await runnerModule();
+    const mutex = fakeMutex({
+      quarantineAndRelease: vi.fn(async () => {
+        throw new AggregateError([
+          new Error("synthetic quarantine failure"),
+          new Error("synthetic release failure"),
+        ], "synthetic containment failure");
+      }),
+    });
+
+    try {
+      await runner.executeNetworkProofStages(runner.guardNetworkProofStages.slice(1, 2), {
+        acquireMutex: async () => mutex,
+        runStage: async () => {
+          throw new Error("synthetic proof failure");
+        },
+      });
+      throw new Error("Expected the combined proof failure.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors.map((cause) => (cause as Error).message)).toEqual([
+        "synthetic proof failure",
+        "synthetic quarantine failure",
+        "synthetic release failure",
+      ]);
+    }
   });
 
   it("ignores signals after safe mutex release starts", async () => {
@@ -230,6 +295,85 @@ describe("F0 network proof cooperative session mutex", () => {
 
     expect(state.interruption).toBeNull();
     expect(resolveInterruption).not.toHaveBeenCalled();
+  });
+
+  it("records only the first interruption before cleanup starts", async () => {
+    const runner = await runnerModule();
+    const resolveInterruption = vi.fn();
+    const state = {
+      interruption: null,
+      releaseStarted: false,
+      resolveInterruption,
+    };
+
+    runner.recordNetworkProofInterruption(state, "SIGTERM");
+    runner.recordNetworkProofInterruption(state, "SIGINT");
+
+    expect(state.interruption).toBeInstanceOf(Error);
+    expect((state.interruption as Error | null)?.message).toBe(
+      "F0 network proof was interrupted by SIGTERM.",
+    );
+    expect(resolveInterruption).toHaveBeenCalledOnce();
+    expect(resolveInterruption).toHaveBeenCalledWith(state.interruption);
+  });
+
+  it("uses the catchable interruption signals for each platform", async () => {
+    const runner = await runnerModule();
+
+    expect(runner.networkProofInterruptionSignals("win32")).toEqual([
+      "SIGINT",
+      "SIGTERM",
+      "SIGBREAK",
+    ]);
+    expect(runner.networkProofInterruptionSignals("linux")).toEqual([
+      "SIGINT",
+      "SIGTERM",
+      "SIGHUP",
+    ]);
+  });
+
+  it("redacts the database URL from bounded stage output", async () => {
+    const runner = await runnerModule();
+    const databaseUrl = "postgresql://f0:safe%4asecret@127.0.0.1:5432/agent_ads_f0";
+    const output = [
+      databaseUrl,
+      "safeJsecret",
+      "safe%4asecret",
+      "safe%4Asecret",
+    ].join("\n");
+
+    const redacted = runner.redactNetworkProofOutput(output, {
+      F0_DATABASE_URL: databaseUrl,
+      NODE_ENV: "test",
+    });
+    expect(redacted).toContain("[REDACTED_DATABASE_URL]");
+    expect(redacted).not.toContain(databaseUrl);
+    expect(redacted).not.toContain("safeJsecret");
+    expect(redacted).not.toContain("safe%4asecret");
+    expect(redacted).not.toContain("safe%4Asecret");
+    expect(runner.redactNetworkProofOutput("diagnostic", {
+      F0_DATABASE_URL: "not a URL",
+      NODE_ENV: "test",
+    })).toBe("[REDACTED_INVALID_DATABASE_OUTPUT]\n");
+  });
+
+  it("flattens proof causes and redacts their database secrets", async () => {
+    const runner = await runnerModule();
+    const databaseUrl = "postgresql://f0:safe%40secret@127.0.0.1:5432/agent_ads_f0";
+    const failure = new AggregateError([
+      new Error(`proof failed for ${databaseUrl}`),
+      new AggregateError([
+        new Error("cleanup exposed safe@secret"),
+      ], "nested cleanup failure"),
+    ], "combined failure");
+
+    const output = runner.formatNetworkProofFailure(failure, {
+      F0_DATABASE_URL: databaseUrl,
+      NODE_ENV: "test",
+    }, "fallback");
+    expect(output).toContain("proof failed for [REDACTED_DATABASE_URL]");
+    expect(output).toContain("cleanup exposed [REDACTED_DATABASE_SECRET]");
+    expect(output).not.toContain("safe@secret");
   });
 
   it("requires the wrapper mutex context before a raw stage can access PostgreSQL", () => {
@@ -263,26 +407,46 @@ describe("F0 network proof cooperative session mutex", () => {
     }
     expect(mutexSource).toContain("pg_catalog.pg_try_advisory_lock");
     expect(mutexSource).toContain("pg_catalog.pg_control_system");
-    expect(mutexSource).toContain("pg_catalog.pg_sleep");
+    expect(mutexSource).not.toContain("pg_catalog.pg_sleep");
     expect(mutexSource).toContain("pg_catalog.pg_terminate_backend");
-    expect(mutexSource).toContain("detached: true");
-    expect(mutexSource).toContain('stdio: "ignore"');
+    expect(mutexSource).toContain("detached: false");
+    expect(mutexSource).toContain('stdio: ["pipe", "ignore", "ignore"]');
+    expect(mutexSource).toContain("child.stdin.write(holderSql()");
+    expect(mutexSource).toContain("child.stdin.end()");
     expect(mutexSource).toContain("waitForProcessExit(child, HOLDER_EXIT_TIMEOUT_MS)");
     expect(mutexSource).toContain("waitForHolderGone(context, mutex)");
+    expect(mutexSource).toContain("holderMarkerTransitionSql");
+    expect(mutexSource).toContain("HOLDER_HEALTH_INTERVAL_MS");
+    expect(mutexSource).toContain("mutex holder lost its database lock");
+    expect(mutexSource).toContain("settleFailure(holderHealthError)");
+    expect(mutexSource).toContain("pg_catalog.pg_backend_pid() <> ${mutex.backendPid}");
+    expect(mutexSource).toContain("await writeHolderSql(");
+    expect(mutexSource).toContain("agent_ads_f0_complete:");
+    expect(mutexSource).toContain("agent_ads_f0_failed:");
+    expect(mutexSource).toContain("quarantineAndRelease()");
+    expect(mutexSource).not.toContain("quarantineTargetSql");
     expect(mutexSource).toContain("timeout: PROBE_TIMEOUT_MS");
-    expect(mutexSource.match(/child\.unref\(\)/gu)?.length).toBeGreaterThanOrEqual(3);
+    expect(mutexSource).not.toContain("child.unref()");
     expect(safetySource).toContain("JOIN pg_catalog.pg_locks AS held_mutex");
     expect(safetySource).toContain("held_mutex.objsubid = 2");
     expect(safetySource).toContain("held_mutex.mode = 'ExclusiveLock'");
     expect(safetySource).toContain("held_mutex.granted");
+    expect(safetySource).toContain("agent_ads_f0_running:");
     expect(runnerSource).toContain("terminateProcessTree(state.activeChild)");
-    expect(runnerSource).toContain("await mutex.retainAfterFailure()");
+    expect(runnerSource).toContain("await mutex.armTarget()");
+    expect(runnerSource).toContain("await mutex.completeTarget()");
+    expect(runnerSource).toContain("await mutex.release()");
+    expect(runnerSource).toContain("await mutex.quarantineAndRelease()");
   });
 
   it("selects exact process-tree termination commands for both platforms", async () => {
     const processTree = await import(pathToFileURL(processTreePath).href) as {
       processTreeTerminationStrategy: (platform: NodeJS.Platform) => string;
       requiresDetachedProcessGroup: (platform: NodeJS.Platform) => boolean;
+      windowsProcessTreeTerminationConfirmed: (
+        taskkillStatus: number | null,
+        rootStopped: boolean,
+      ) => boolean;
       windowsTaskkillInvocation: (
         pid: number,
         environment: Record<string, string>,
@@ -297,9 +461,28 @@ describe("F0 network proof cooperative session mutex", () => {
       args: ["/PID", "321", "/T", "/F"],
       command: "C:\\Windows\\System32\\taskkill.exe",
     });
+    expect(processTree.windowsProcessTreeTerminationConfirmed(0, true)).toBe(true);
+    expect(processTree.windowsProcessTreeTerminationConfirmed(128, true)).toBe(false);
+    expect(processTree.windowsProcessTreeTerminationConfirmed(0, false)).toBe(false);
     expect(processTreeSource).toContain("shell: false");
+    expect(processTreeSource).toContain("taskkill=not-run");
     expect(processTreeSource).toContain('signalProcessGroup(pid, "SIGTERM")');
     expect(processTreeSource).toContain('signalProcessGroup(pid, "SIGKILL")');
+  });
+
+  it("fails closed for a Windows dead-root taskkill result", async () => {
+    const processTree = await import(pathToFileURL(processTreePath).href) as {
+      windowsProcessTreeTerminationConfirmed: (
+        taskkillStatus: number | null,
+        rootStopped: boolean,
+      ) => boolean;
+    };
+    const deadRootFixture = { rootStopped: true, taskkillStatus: 128 };
+
+    expect(processTree.windowsProcessTreeTerminationConfirmed(
+      deadRootFixture.taskkillStatus,
+      deadRootFixture.rootStopped,
+    )).toBe(false);
   });
 
   it.skipIf(process.platform === "win32")(
@@ -348,53 +531,58 @@ describe("F0 network proof cooperative session mutex", () => {
         }
       }
     },
+    15_000,
   );
 
   it.skipIf(
     process.platform !== "win32" || process.env.F0_TEST_WINDOWS_TASKKILL !== "1",
-  )("stops a real Windows stage process and its stubborn descendant", async () => {
-    const processTree = await import(pathToFileURL(processTreePath).href) as {
-      terminateProcessTree: (
-        child: ChildProcess,
-        options: { forceTimeoutMs: number; graceTimeoutMs: number },
-      ) => Promise<void>;
-    };
-    const descendantSource = "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)";
-    const rootSource = [
-      "const {spawn}=require('node:child_process')",
-      `const child=spawn(process.execPath,['-e',${JSON.stringify(descendantSource)}],{stdio:'ignore'})`,
-      "process.stdout.write(String(child.pid)+'\\n')",
-      "setInterval(()=>{},1000)",
-    ].join(";");
-    const child = spawn(process.execPath, ["-e", rootSource], {
-      stdio: ["ignore", "pipe", "ignore"],
-      windowsHide: true,
-    });
-    let descendantPid: number | null = null;
-
-    try {
-      descendantPid = Number(await firstOutputLine(child));
-      expect(Number.isSafeInteger(descendantPid)).toBe(true);
-      await processTree.terminateProcessTree(child, {
-        forceTimeoutMs: 5_000,
-        graceTimeoutMs: 100,
+  )(
+    "stops a real Windows stage process and its stubborn descendant",
+    async () => {
+      const processTree = await import(pathToFileURL(processTreePath).href) as {
+        terminateProcessTree: (
+          child: ChildProcess,
+          options: { forceTimeoutMs: number; graceTimeoutMs: number },
+        ) => Promise<void>;
+      };
+      const descendantSource = "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)";
+      const rootSource = [
+        "const {spawn}=require('node:child_process')",
+        `const child=spawn(process.execPath,['-e',${JSON.stringify(descendantSource)}],{stdio:'ignore'})`,
+        "process.stdout.write(String(child.pid)+'\\n')",
+        "setInterval(()=>{},1000)",
+      ].join(";");
+      const child = spawn(process.execPath, ["-e", rootSource], {
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
       });
-      expect(await waitForProcessToStop(descendantPid)).toBe(true);
-      expect(processExists(child.pid as number)).toBe(false);
-    } finally {
-      if (descendantPid && processExists(descendantPid)) process.kill(descendantPid, "SIGKILL");
-      if (child.pid && processExists(child.pid)) {
-        try {
-          await processTree.terminateProcessTree(child, {
-            forceTimeoutMs: 3_000,
-            graceTimeoutMs: 100,
-          });
-        } catch {
-          child.kill("SIGKILL");
+      let descendantPid: number | null = null;
+
+      try {
+        descendantPid = Number(await firstOutputLine(child));
+        expect(Number.isSafeInteger(descendantPid)).toBe(true);
+        await processTree.terminateProcessTree(child, {
+          forceTimeoutMs: 5_000,
+          graceTimeoutMs: 100,
+        });
+        expect(await waitForProcessToStop(descendantPid)).toBe(true);
+        expect(processExists(child.pid as number)).toBe(false);
+      } finally {
+        if (descendantPid && processExists(descendantPid)) process.kill(descendantPid, "SIGKILL");
+        if (child.pid && processExists(child.pid)) {
+          try {
+            await processTree.terminateProcessTree(child, {
+              forceTimeoutMs: 3_000,
+              graceTimeoutMs: 100,
+            });
+          } catch {
+            child.kill("SIGKILL");
+          }
         }
       }
-    }
-  });
+    },
+    15_000,
+  );
 
   it("routes official CI network proofs through the mutex wrappers", () => {
     expect(packageJson.scripts["security:f0-network"]).toBe("node scripts/f0/network-proof.mjs");
@@ -410,6 +598,13 @@ describe("F0 network proof cooperative session mutex", () => {
     }
     expect(workflow).toContain("node scripts/f0/network-guard-proof.mjs");
     expect(workflow).toContain("pnpm run security:f0-network");
+    expect(workflow).toContain("node scripts/f0/network-stage-proof.mjs mark");
+    expect(workflow).toContain("node scripts/f0/network-proof-mutex-holder-death-proof.mjs");
+    expect(holderDeathProofSource).toContain("pg_catalog.pg_terminate_backend");
+    expect(holderDeathProofSource).toContain("F0_HOLDER_DEATH_CONTAINED");
+    expect(holderDeathProofSource).toContain("mutex holder lost its database lock");
+    expect(holderDeathProofSource).toContain("fresh wrapped reuse attempt");
+    expect(holderDeathProofSource).toContain("await mutex.quarantineAndRelease()");
     expect(workflow).not.toContain("node scripts/f0/disposable-mark-guard-proof.mjs");
   });
 });

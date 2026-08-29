@@ -31,13 +31,15 @@ The network proof requires `F0_ALLOW_DISPOSABLE_DATABASE=1`, `F0_DATABASE_URL`, 
 
 Run `pnpm run security:f0-network` once on a new disposable cluster.
 
-The wrapper runs the mark guard, target marker, dirty-target guard, fresh migration, and upgrade proof in order. Raw network scripts are internal stages. They fail before database access when the wrapper mutex context is absent. Legacy single-stage package commands keep their old behavior under separate mutex runs. Do not use them for a complete proof.
+The wrapper runs the target marker, mark guard, dirty-target guard, fresh migration, and upgrade proof in order. Raw network scripts are internal stages. They fail before database access when the wrapper mutex context is absent. Legacy single-stage package commands keep their old behavior under separate mutex runs. Do not use them for a complete proof.
 
 The wrapper removes ambient libpq variables and rebuilds them from validated fields. It disables password prompts and passfiles, and it sets a five-second connection timeout. Guard connections disable login event triggers and search trusted catalogs first.
 
-The wrapper holds one fixed, database-local PostgreSQL advisory session mutex in `agent_ads_f0`. It binds every child to the holder backend, two-part key, database, application name, and PostgreSQL system identifier. It stops the active process tree when the holder fails or the wrapper receives `SIGINT` or `SIGTERM`.
+The wrapper holds one fixed, database-local PostgreSQL advisory session mutex in `agent_ads_f0`. It binds every child to the holder backend, two-part key, database, application name, and PostgreSQL system identifier. It stops the active process tree when the holder fails or the wrapper receives a supported interruption signal. Windows supports `SIGINT`, `SIGTERM`, and `SIGBREAK`. Other systems support `SIGINT`, `SIGTERM`, and `SIGHUP`.
 
-A successful proof terminates the holder and confirms that exact backend is gone. After acquisition, a failed proof does not release a live holder. The detached holder remains while its session stays active. Target shutdown ends the session. A 24-day safety limit also ends it. If the holder itself fails, PostgreSQL already released its session mutex.
+Before the first risky stage, the lock-owning session changes the marker to `agent_ads_f0_running:<marker>:<mutex-token>`. A successful proof changes it to `agent_ads_f0_complete:<marker>:<mutex-token>`. The wrapper then closes the holder and confirms that exact backend is gone.
+
+On failure, the live holder changes the running marker to `agent_ads_f0_failed:<marker>`. If the holder stops first, the running marker remains. Every later proof rejects complete, failed, and orphaned running markers. Recreate the complete disposable cluster after every result.
 
 The URL check cannot detect a local proxy or tunnel that forwards traffic to another server.
 

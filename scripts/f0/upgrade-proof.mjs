@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertNetworkProofMutex,
   networkDatabaseEnvironment,
+  networkProofRunningMarker,
   psqlBaseArguments,
   resolveNetworkProofContext,
 } from "./network-safety.mjs";
@@ -14,6 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const context = resolveNetworkProofContext();
 assertNetworkProofMutex(context);
 const { marker, psql } = context;
+const expectedMarker = networkProofRunningMarker(marker, context.mutex.token);
 const createdDatabases = [];
 const templateName = "agent_ads_f0_upgrade_template";
 
@@ -64,7 +66,7 @@ const markerResult = psqlResult("agent_ads_f0", {
 if (
   markerResult.error ||
   markerResult.status !== 0 ||
-  markerResult.stdout.trim() !== `agent_ads_f0_disposable:${marker}`
+  markerResult.stdout.trim() !== expectedMarker
 ) {
   throw new Error("The disposable database marker is missing or incorrect.");
 }
