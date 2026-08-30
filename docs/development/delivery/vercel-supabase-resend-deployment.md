@@ -143,6 +143,14 @@ Treat `vercel env run` as a predeployment configuration check only. It does not 
 
 Use the unique Vercel deployment ID and generated deployment URL. Do not use a branch alias or custom domain.
 
+Run the public smoke check against the unique deployment URL. It verifies the anonymous root redirect, `/auth` response, required security headers, and no-store caching without printing response content.
+
+```text
+pnpm run release:staging-http:check -- --url https://<unique-deployment-url>/
+```
+
+Require `STAGING_HTTP_VALID` before continuing with authenticated staging checks.
+
 Compare the deployment ID, project ID, target environment, Git revision, URL, and ready state with the private release record.
 
 ```powershell
