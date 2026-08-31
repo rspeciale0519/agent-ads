@@ -19,3 +19,4 @@ scripts/*
 !scripts/release-evidence
 scripts/release-evidence/*
 !scripts/release-evidence/staging-runtime-targets.mjs
+!scripts/release-evidence/staging-runtime-environment-policy.mjs
