@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildAiReachBriefing } from "./briefing";
 import { answerAiReachQuestion } from "./chat";
+import { parseReadOnlyEvidenceSnapshot } from "./evidence-contract";
 
 const now = new Date("2026-08-30T12:00:00.000Z");
 const base = {
@@ -15,6 +16,20 @@ const accessRecords = ["google_ads", "google_analytics", "google_search_console"
   principal: null, selectedResourceCount: 1, resourceCount: 1,
   lastVerifiedAt: "2026-08-30T11:00:00.000Z", expiresAt: null, nextAction: "No action needed",
 }));
+const evidenceSnapshot = parseReadOnlyEvidenceSnapshot({
+  snapshotId: "snapshot-synthetic-1",
+  organizationId: "org-1",
+  primaryOutcomeKey: "qualified_leads",
+  reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" },
+  capturedAt: "2026-08-30T10:00:00.000Z",
+  collectorVersion: "fixture-1.0.0",
+  status: "complete",
+  freshness: { state: "fresh", checkedAt: "2026-08-30T10:00:00.000Z", maxAgeHours: 48 },
+  reconciliation: { state: "passed", limitation: "Synthetic fixture only." },
+  evidence: [{ id: "evidence-synthetic-1", sourceClass: "business_outcome_observation", provider: "synthetic-crm", method: "authorized_export", collectedAt: "2026-08-30T10:00:00.000Z", collectorVersion: "fixture-1.0.0", limitations: ["Synthetic fixture only."] }],
+  metrics: [{ key: "qualified_leads", value: 12, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "direct_first_party", evidenceIds: ["evidence-synthetic-1"], limitations: ["Synthetic fixture only."] }],
+  limitations: ["Synthetic fixture only."],
+});
 
 describe("answerAiReachQuestion", () => {
   it("explains the read-only boundary", () => {
@@ -27,6 +42,14 @@ describe("answerAiReachQuestion", () => {
 
   it("does not promise business outcomes", () => {
     expect(answerAiReachQuestion("Will this make more revenue?", "Pilot company", briefing)).toContain("remain unmeasured");
+  });
+
+  it("explains a validated outcome without claiming causation", () => {
+    const ready = buildAiReachBriefing({ ...base, connections: accessRecords, verifiedResourceCount: 5, evidenceSnapshot }, now);
+    const answer = answerAiReachQuestion("What is the revenue?", "Pilot company", ready);
+    expect(answer).toContain("complete read-only outcome snapshot");
+    expect(answer).toContain("does not prove that a marketing change caused the outcome");
+    expect(answer).not.toContain("remain unmeasured");
   });
 
   it("still names missing Ads access when Analytics is connected", () => {

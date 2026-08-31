@@ -23,7 +23,9 @@ export function answerAiReachQuestion(question: string, organizationName: string
   }
 
   if (["measure", "result", "revenue", "meeting", "outcome", "business"].some((term) => normalized.includes(term))) {
-    return `Business results remain unmeasured in this view. ${briefing.limitation}`;
+    return briefing.status === "ready"
+      ? `${briefing.summary} ${briefing.limitation}`
+      : `Business results remain unmeasured in this view. ${briefing.limitation}`;
   }
 
   return `For ${organizationName}, start with “${briefing.recommendations[0].title}.” I will explain the evidence, limits, effort, risk, and approval needed before any change.`;
