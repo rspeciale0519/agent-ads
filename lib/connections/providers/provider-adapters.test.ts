@@ -133,6 +133,39 @@ describe("Google read-only adapter", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("googleads.googleapis.com");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("reads a bounded SearchStream campaign report without exposing the upstream payload", async () => {
+    process.env.GOOGLE_OAUTH_CLIENT_ID = "client";
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
+    process.env.GOOGLE_ADS_API_VERSION = "v25";
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
+    process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID = "9999999999";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("oauth2.googleapis.com/token")) return json({ access_token: "access" });
+      expect(url).toBe("https://googleads.googleapis.com/v25/customers/123/googleAds:searchStream");
+      const headers = new Headers(init?.headers);
+      expect(headers.get("Authorization")).toBe("Bearer access");
+      expect(headers.get("developer-token")).toBe("developer-token");
+      expect(headers.get("login-customer-id")).toBe("9999999999");
+      expect(JSON.parse(String(init?.body))).toEqual({ query: "SELECT customer.id, customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, segments.date FROM campaign WHERE segments.date BETWEEN '2026-08-01' AND '2026-08-31' ORDER BY segments.date, campaign.id" });
+      return json([{ results: [{ customer: { id: "123", currencyCode: "USD" }, campaign: { id: "42", resourceName: "customers/123/campaigns/42", name: "Leadership keynote", status: "ENABLED", advertisingChannelType: "SEARCH" }, metrics: { impressions: "10", clicks: "2", costMicros: "1000", conversions: "1" }, segments: { date: "2026-08-12" }, secret: "must-not-leave" }] }]);
+    });
+
+    const report = await new GoogleReadOnlyAdapter("google_ads").readCampaignReport("refresh", "oauth_refresh_token", { customerId: "123", startDate: "2026-08-01", endDate: "2026-08-31" });
+    expect(report).toMatchObject({ customerId: "123", currencyCode: "USD", rows: [{ campaignId: "42", date: "2026-08-12" }] });
+    expect(report).not.toHaveProperty("secret");
+    expect(report.rows[0]).not.toHaveProperty("secret");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects an invalid report window before making a provider request", async () => {
+    process.env.GOOGLE_ADS_API_VERSION = "v25";
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = "developer-token";
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(new GoogleReadOnlyAdapter("google_ads").readCampaignReport("access", "oauth_access_token", { customerId: "123", startDate: "2026-09-01", endDate: "2026-08-31" })).rejects.toThrow("GOOGLE_ADS_REPORT_REQUEST_INVALID");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("Meta read-only adapter", () => {

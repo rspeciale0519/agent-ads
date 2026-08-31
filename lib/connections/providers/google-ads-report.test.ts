@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GoogleAdsReportError, normalizeGoogleAdsReport, parseGoogleAdsReport } from "./google-ads-report";
+import { emptyGoogleAdsReport, GoogleAdsReportError, normalizeGoogleAdsReport, parseGoogleAdsReport } from "./google-ads-report";
 
 function fixture() {
   return {
@@ -43,6 +43,22 @@ describe("Google Ads read-only report contract", () => {
     expect(report.rows[0]).toMatchObject({ campaignId: "42", campaignName: "Leadership keynote", date: "2026-08-12", metrics: { impressions: 1000, clicks: 100, costMicros: 125000000 } });
     expect(report).not.toHaveProperty("privateResponseField");
     expect(report.rows[0]).not.toHaveProperty("secret");
+  });
+
+  it("accepts the official averageCpc field and preserves the derived metric contract", () => {
+    const input = fixture();
+    Object.assign(input.results[0].metrics, { averageCpc: "1250000" });
+    const report = parseGoogleAdsReport(input);
+    expect(report.rows[0]?.metrics.averageCpcMicros).toBe(1250000);
+  });
+
+  it("creates a bounded empty report for an authorized customer with no campaigns", () => {
+    expect(emptyGoogleAdsReport({ customerId: "1234567890", startDate: "2026-08-01", endDate: "2026-08-31" })).toMatchObject({
+      customerId: "1234567890",
+      currencyCode: null,
+      reportingWindow: { start: "2026-08-01", end: "2026-08-31" },
+      rows: [],
+    });
   });
 
   it("flattens the documented array of SearchStream response chunks", () => {

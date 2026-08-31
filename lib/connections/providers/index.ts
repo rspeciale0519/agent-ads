@@ -25,12 +25,15 @@ export type { OAuthCredentialKind, ProviderAdapter, ProviderCredentialKind, Prov
 export {
   GOOGLE_ADS_REPORT_CONTRACT_VERSION,
   GOOGLE_ADS_REPORT_MAX_CHUNKS,
+  GOOGLE_ADS_REPORT_MAX_DAYS,
   GOOGLE_ADS_REPORT_MAX_ROWS,
   GoogleAdsReportError,
   googleAdsReportResponseSchema,
+  googleAdsReportRequestSchema,
   googleAdsReportRowSchema,
   googleAdsReportSchema,
   normalizeGoogleAdsReport,
+  emptyGoogleAdsReport,
   parseGoogleAdsReport,
 } from "./google-ads-report";
-export type { GoogleAdsReport, GoogleAdsReportResponse, GoogleAdsReportRow, GoogleAdsReportSearchStreamResponse } from "./google-ads-report";
+export type { GoogleAdsReport, GoogleAdsReportRequest, GoogleAdsReportResponse, GoogleAdsReportRow, GoogleAdsReportSearchStreamResponse } from "./google-ads-report";

@@ -7,6 +7,7 @@ import { z } from "zod";
 export const GOOGLE_ADS_REPORT_CONTRACT_VERSION = "google-ads-report-1.0.0";
 export const GOOGLE_ADS_REPORT_MAX_ROWS = 500;
 export const GOOGLE_ADS_REPORT_MAX_CHUNKS = 100;
+export const GOOGLE_ADS_REPORT_MAX_DAYS = 366;
 
 const customerIdSchema = z.string().trim().regex(/^\d{1,20}$/, "Use a Google Ads customer ID.");
 const campaignIdSchema = z.string().trim().regex(/^\d{1,20}$/, "Use a Google Ads campaign ID.");
@@ -26,6 +27,17 @@ const rawWindowSchema = z.object({
   end: dateSchema,
 }).superRefine((window, context) => {
   if (window.end < window.start) context.addIssue({ code: "custom", path: ["end"], message: "The reporting window must end after it starts." });
+});
+
+export const googleAdsReportRequestSchema = z.object({
+  customerId: customerIdSchema,
+  startDate: dateSchema,
+  endDate: dateSchema,
+}).superRefine((request, context) => {
+  if (request.endDate < request.startDate) context.addIssue({ code: "custom", path: ["endDate"], message: "The reporting window must end after it starts." });
+  const start = Date.parse(`${request.startDate}T00:00:00.000Z`);
+  const end = Date.parse(`${request.endDate}T00:00:00.000Z`);
+  if (Number.isFinite(start) && Number.isFinite(end) && (end - start) / 86_400_000 >= GOOGLE_ADS_REPORT_MAX_DAYS) context.addIssue({ code: "custom", path: ["endDate"], message: "The reporting window is too large." });
 });
 
 const rawCustomerSchema = z.object({
@@ -50,6 +62,7 @@ const rawMetricsSchema = z.object({
   conversions: numericValueSchema,
   ctr: numericValueSchema.optional(),
   averageCpcMicros: numericValueSchema.optional(),
+  averageCpc: numericValueSchema.optional(),
 }).passthrough();
 
 const rawRowSchema = z.object({
@@ -107,6 +120,7 @@ export const googleAdsReportSchema = z.object({
 
 export type GoogleAdsReportResponse = z.infer<typeof googleAdsReportResponseSchema>;
 export type GoogleAdsReportSearchStreamResponse = z.infer<typeof googleAdsReportSearchStreamResponseSchema>;
+export type GoogleAdsReportRequest = z.infer<typeof googleAdsReportRequestSchema>;
 export type GoogleAdsReportRow = z.infer<typeof googleAdsReportRowSchema>;
 export type GoogleAdsReport = z.infer<typeof googleAdsReportSchema>;
 
@@ -117,6 +131,19 @@ export class GoogleAdsReportError extends Error {
     super("GOOGLE_ADS_REPORT_INVALID");
     this.name = "GoogleAdsReportError";
   }
+}
+
+export function emptyGoogleAdsReport(request: GoogleAdsReportRequest): GoogleAdsReport {
+  const parsed = googleAdsReportRequestSchema.safeParse(request);
+  if (!parsed.success) throw new GoogleAdsReportError();
+  return googleAdsReportSchema.parse({
+    contractVersion: GOOGLE_ADS_REPORT_CONTRACT_VERSION,
+    customerId: parsed.data.customerId,
+    currencyCode: null,
+    reportingWindow: { start: parsed.data.startDate, end: parsed.data.endDate },
+    rows: [],
+    totals: { impressions: 0, clicks: 0, costMicros: 0, conversions: 0, ctr: 0, averageCpcMicros: 0 },
+  });
 }
 
 function numericValue(value: number | string): number {
@@ -222,7 +249,8 @@ export function parseGoogleAdsReport(value: unknown): GoogleAdsReport {
       const costMicros = integerMetric(rawRow.metrics.costMicros);
       const conversions = numericValue(rawRow.metrics.conversions);
       const suppliedCtr = rawRow.metrics.ctr === undefined ? undefined : numericValue(rawRow.metrics.ctr);
-      const suppliedAverageCpc = rawRow.metrics.averageCpcMicros === undefined ? undefined : integerMetric(rawRow.metrics.averageCpcMicros);
+      const suppliedAverageCpcValue = rawRow.metrics.averageCpcMicros ?? rawRow.metrics.averageCpc;
+      const suppliedAverageCpc = suppliedAverageCpcValue === undefined ? undefined : integerMetric(suppliedAverageCpcValue);
       const ctr = suppliedCtr ?? (impressions === 0 ? 0 : clicks / impressions);
       const averageCpcMicros = suppliedAverageCpc ?? (clicks === 0 ? 0 : Math.round(costMicros / clicks));
       const normalized = googleAdsReportRowSchema.safeParse({
