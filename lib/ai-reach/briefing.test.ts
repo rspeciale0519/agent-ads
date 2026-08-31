@@ -27,6 +27,8 @@ describe("buildAiReachBriefing", () => {
     expect(briefing.recommendations).toHaveLength(3);
     expect(briefing.sources).toHaveLength(5);
     expect(briefing.sources.some((source) => source.state !== "connected")).toBe(true);
+    expect(briefing.recommendations.every((recommendation) => recommendation.uncertainty.length > 0)).toBe(true);
+    expect(briefing.recommendations.map((recommendation) => recommendation.uncertainty)).toEqual(["High", "High", "High"]);
   });
 
   it.each(["google_analytics", "google_search_console", "google_tag_manager", "google_ads_backup"])(
@@ -57,6 +59,7 @@ describe("buildAiReachBriefing", () => {
     const briefing = buildAiReachBriefing({ ...base, connections: reverse ? connections.reverse() : connections }, now);
     expect(briefing.sources.find((source) => source.name === "Google Ads")?.state).toBe("connected");
     expect(briefing.recommendations[1].title).toBe("Review Google Ads reporting evidence");
+    expect(briefing.recommendations[1].uncertainty).toBe("Medium");
   });
 
   it.each(["unknown", "read_write", "write", ""])("does not present %s access as read-only", (accessMode) => {

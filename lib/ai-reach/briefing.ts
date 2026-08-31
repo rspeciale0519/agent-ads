@@ -10,6 +10,7 @@ export type AiReachRecommendation = {
   expectedEffect: string;
   effort: "Low" | "Medium";
   risk: "Low" | "Medium";
+  uncertainty: "Low" | "Medium" | "High";
   approval: string;
 };
 
@@ -77,6 +78,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         expectedEffect: "A clear test makes later results easier to compare.",
         effort: "Low",
         risk: "Low",
+        uncertainty: "High",
         approval: "Customer approval required",
       },
       {
@@ -87,6 +89,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         expectedEffect: "It prepares a read-only route for campaign evidence.",
         effort: "Medium",
         risk: "Low",
+        uncertainty: google.state === "connected" ? "Medium" : "High",
         approval: "Advertising owner approval required",
       },
       {
@@ -97,6 +100,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",
         risk: "Medium",
+        uncertainty: dubsado.state === "connected" ? "Medium" : "High",
         approval: "Customer and measurement owner approval required",
       },
     ],
