@@ -1,4 +1,5 @@
-import type { DashboardData } from "../dashboard/dashboard-service";
+import type { ConnectionProvider } from "../connections/contracts";
+import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
 
 export type AiReachRecommendation = {
   id: string;
@@ -14,59 +15,56 @@ export type AiReachRecommendation = {
 export type AiReachBriefing = {
   status: "limited" | "ready";
   summary: string;
+  limitation: string;
   sources: Array<{ name: string; state: "connected" | "missing" | "needs_review"; detail: string }>;
   recommendations: [AiReachRecommendation, AiReachRecommendation, AiReachRecommendation];
 };
 
 type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount">;
+type Source = AiReachBriefing["sources"][number];
 
-export function buildAiReachBriefing(data: BriefingInput): AiReachBriefing {
-  const google = data.connections.find((connection) => connection.provider.toLowerCase().includes("google"));
-  const analytics = data.connections.find((connection) => connection.provider.toLowerCase() === "google_analytics");
-  const searchConsole = data.connections.find((connection) => connection.provider.toLowerCase() === "google_search_console");
-  const website = data.connections.find((connection) => connection.provider.toLowerCase() === "wordpress");
-  const dubsado = data.connections.find((connection) => connection.provider.toLowerCase().includes("dubsado"));
-  const sources = [
-    {
-      name: "Website and onboarding",
-      state: data.onboarding.status === "submitted" && website?.status === "active_read_only" ? "connected" as const : "needs_review" as const,
-      detail: data.onboarding.status === "submitted" && website?.status === "active_read_only" ? "Business context and a read-only site route are ready." : "Business context or a read-only site route needs review.",
-    },
-    {
-      name: "Google Ads",
-      state: google?.status === "active_read_only" ? "connected" as const : "missing" as const,
-      detail: google?.status === "active_read_only" ? "Read-only access is active." : "No verified read-only resource is available.",
-    },
-    {
-      name: "Google Analytics 4",
-      state: analytics?.status === "active_read_only" ? "connected" as const : "missing" as const,
-      detail: analytics?.status === "active_read_only" ? "Read-only property access is active." : "No verified read-only property is available.",
-    },
-    {
-      name: "Search Console",
-      state: searchConsole?.status === "active_read_only" ? "connected" as const : "missing" as const,
-      detail: searchConsole?.status === "active_read_only" ? "Read-only property access is active." : "Read-only property access is not connected.",
-    },
-    {
-      name: "Dubsado outcomes",
-      state: dubsado?.status === "active_read_only" ? "connected" as const : "missing" as const,
-      detail: dubsado?.status === "active_read_only" ? "Commercial source is connected for review." : "Outcome stages and revenue fields are not mapped.",
-    },
-  ];
+function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
+  const verifiedAt = connection.lastVerifiedAt === null ? NaN : Date.parse(connection.lastVerifiedAt);
+  const expiresAt = connection.expiresAt === null ? null : Date.parse(connection.expiresAt);
+  return connection.status === "active_read_only"
+    && connection.accessMode === "read_only"
+    && Number.isFinite(verifiedAt) && verifiedAt <= now
+    && (expiresAt === null || (Number.isFinite(expiresAt) && expiresAt > now));
+}
+
+function sourceRecord(connections: DashboardConnectionSummary[], provider: ConnectionProvider, name: string, now: number): Source {
+  const matches = connections.filter((connection) => connection.provider === provider);
+  // A verified manual route can have no discovered resource rows. Counts cannot establish source identity or outcome evidence.
+  if (matches.some((connection) => hasReadOnlyAccessRecord(connection, now))) {
+    return { name, state: "connected", detail: "Read-only access is recorded. Source data still needs review." };
+  }
+  return matches.length > 0
+    ? { name, state: "needs_review", detail: "A connection exists. Review its access, verification date, and expiry." }
+    : { name, state: "missing", detail: "No read-only connection is recorded." };
+}
+
+export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiReachBriefing {
+  const checkedAt = now.getTime();
+  const google = sourceRecord(data.connections, "google_ads", "Google Ads", checkedAt);
+  const analytics = sourceRecord(data.connections, "google_analytics", "Google Analytics 4", checkedAt);
+  const searchConsole = sourceRecord(data.connections, "google_search_console", "Search Console", checkedAt);
+  const website = sourceRecord(data.connections, "wordpress", "Website", checkedAt);
+  const dubsado = sourceRecord(data.connections, "dubsado", "Dubsado outcomes", checkedAt);
+  const submitted = data.onboarding.status === "submitted";
+  const sources = [website, google, analytics, searchConsole, dubsado];
   const connectedSources = sources.filter((source) => source.state === "connected").length;
-  const status = connectedSources === sources.length && data.verifiedResourceCount > 0 ? "ready" as const : "limited" as const;
   return {
-    status,
-    summary: status === "ready"
-      ? `AI Reach has evidence from ${connectedSources} core sources. Review the three actions below before making any change.`
-      : `AI Reach has partial evidence from ${connectedSources} of ${sources.length} core sources. Connect and approve data before measuring business results.`,
+    // DashboardData contains connection metadata, not the approved outcome snapshot required for evidence readiness.
+    status: "limited",
+    summary: `AI Reach shows read-only access records for ${connectedSources} of ${sources.length} core sources. Business results are not measured in this view.`,
+    limitation: "Approved business results are not available in this view. Data age and customer approval still need review.",
     sources,
     recommendations: [
       {
         id: "offer-focus",
-        title: "Choose one offer for the first test",
-        reason: "Several offer families are listed, so a single starting offer is not yet clear.",
-        evidence: ["Onboarding lists keynote speaking, sales training, leadership speaking, and leadership development.", "The first offer needs customer approval."],
+        title: submitted ? "Confirm the offer for the first test" : "Complete your business profile",
+        reason: "Confirm the offer and customer approval before comparing business results.",
+        evidence: [submitted ? "Onboarding is marked submitted." : "Onboarding is not marked submitted.", "This summary contains no approved offer decision."],
         expectedEffect: "A clear test makes later results easier to compare.",
         effort: "Low",
         risk: "Low",
@@ -74,20 +72,20 @@ export function buildAiReachBriefing(data: BriefingInput): AiReachBriefing {
       },
       {
         id: "google-read-only",
-        title: google?.status === "active_read_only" ? "Refresh Google Ads evidence" : "Connect Google Ads read-only",
-        reason: google?.status === "active_read_only" ? "Google Ads is connected, but a fresh review keeps the briefing current." : "Google Ads is the proposed first advertising source, but no verified resource is available.",
-        evidence: [google?.status === "active_read_only" ? "A read-only Google connection is recorded." : "No verified Google Ads resource is recorded.", "The pilot forbids ad, budget, bid, and targeting changes."],
-        expectedEffect: "It supplies campaign evidence without granting change access.",
+        title: google.state === "connected" ? "Review Google Ads reporting evidence" : google.state === "needs_review" ? "Verify Google Ads read-only access" : "Connect Google Ads read-only",
+        reason: google.state === "connected" ? "Access is recorded, but campaign results and their date range are not available in this view." : "Google Ads access needs verification before it can support reporting.",
+        evidence: [google.detail, "The pilot forbids ad, budget, bid, and targeting changes."],
+        expectedEffect: "It prepares a read-only route for campaign evidence.",
         effort: "Medium",
         risk: "Low",
         approval: "Advertising owner approval required",
       },
       {
         id: "dubsado-map",
-        title: dubsado?.status === "active_read_only" ? "Map Dubsado outcome stages" : "Add a Dubsado read route",
-        reason: dubsado?.status === "active_read_only" ? "Commercial stages still need an approved mapping before efficiency metrics are used." : "The proposed commercial source is not connected, so revenue outcomes cannot be reconciled.",
-        evidence: [dubsado?.status === "active_read_only" ? "Dubsado access is recorded without an approved stage map." : "No Dubsado read-only connection is recorded.", "Revenue, proposal, and signed-engagement definitions remain unapproved."],
-        expectedEffect: "It links advertising evidence to qualified business outcomes safely.",
+        title: dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
+        reason: "Commercial results need approved stage definitions and source data before they can support a decision.",
+        evidence: [dubsado.detail, "An approved stage map is not available in this view."],
+        expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",
         risk: "Medium",
         approval: "Customer and measurement owner approval required",
