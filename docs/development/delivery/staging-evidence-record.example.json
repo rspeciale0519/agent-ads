@@ -7,7 +7,7 @@
   "validUntil": "2026-09-04T12:00:00Z",
   "source": {
     "gitRevision": "bff8b60f69ae3e0c58279ebb87f8be3f58457b7f",
-    "artifactIdentifier": "synthetic-artifact"
+    "artifactIdentifier": "synthetic-template-do-not-use-as-proof"
   },
   "target": {
     "deploymentOrigin": "https://synthetic-staging-abc123.vercel.app",

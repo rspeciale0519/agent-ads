@@ -33,6 +33,13 @@ describe("security scan credential patterns", () => {
     expect(findCredentialPatternLabels(databaseUrl)).toContain("database URL credential");
   });
 
+  it("detects GitHub fine-grained personal access tokens", async () => {
+    const { findCredentialPatternLabels } = await scanModule;
+    const token = ["github", "pat", "g".repeat(40)].join("_");
+
+    expect(findCredentialPatternLabels(token)).toContain("GitHub fine-grained token");
+  });
+
   it("allows explicit synthetic database credentials used by tests and templates", async () => {
     const { findCredentialPatternLabels } = await scanModule;
 
