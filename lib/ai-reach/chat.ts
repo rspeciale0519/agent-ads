@@ -28,5 +28,5 @@ export function answerAiReachQuestion(question: string, organizationName: string
       : `Business results remain unmeasured in this view. ${briefing.limitation}`;
   }
 
-  return `For ${organizationName}, start with “${briefing.recommendations[0].title}.” I will explain the evidence, limits, effort, risk, and approval needed before any change.`;
+  return `For ${organizationName}, start with “${briefing.recommendations[0].title}.” I will explain the evidence, limits, effort, risk, uncertainty (${briefing.recommendations[0].uncertainty}), and approval needed before any change.`;
 }

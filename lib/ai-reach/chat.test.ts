@@ -44,6 +44,11 @@ describe("answerAiReachQuestion", () => {
     expect(answerAiReachQuestion("Will this make more revenue?", "Pilot company", briefing)).toContain("remain unmeasured");
   });
 
+  it("includes recommendation uncertainty in the default response", () => {
+    const answer = answerAiReachQuestion("What should I look at first?", "Pilot company", briefing);
+    expect(answer).toContain(`uncertainty (${briefing.recommendations[0].uncertainty})`);
+  });
+
   it("explains a validated outcome without claiming causation", () => {
     const ready = buildAiReachBriefing({ ...base, connections: accessRecords, verifiedResourceCount: 5, evidenceSnapshot }, now);
     const answer = answerAiReachQuestion("What is the revenue?", "Pilot company", ready);
