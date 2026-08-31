@@ -25,6 +25,22 @@ export type AiReachBriefing = {
 type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount"> & { evidenceSnapshot?: ReadOnlyEvidenceSnapshot | null };
 type Source = AiReachBriefing["sources"][number];
 
+const googleAdsMetricKeys = new Set([
+  "google_ads.spend",
+  "google_ads.impressions",
+  "google_ads.clicks",
+  "google_ads.conversions",
+  "google_ads.click_rate",
+]);
+
+function hasGoogleAdsPerformanceEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return false;
+  const officialGoogleAdsEvidenceIds = new Set(snapshot.evidence
+    .filter((evidence) => evidence.provider === "google_ads" && evidence.sourceClass === "official_platform_observation" && evidence.method === "official_api")
+    .map((evidence) => evidence.id));
+  return snapshot.metrics.some((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)));
+}
+
 function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
   const verifiedAt = connection.lastVerifiedAt === null ? NaN : Date.parse(connection.lastVerifiedAt);
   const expiresAt = connection.expiresAt === null ? null : Date.parse(connection.expiresAt);
@@ -53,7 +69,16 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const website = sourceRecord(data.connections, "wordpress", "Website", checkedAt);
   const dubsado = sourceRecord(data.connections, "dubsado", "Dubsado outcomes", checkedAt);
   const submitted = data.onboarding.status === "submitted";
-  const sources = [website, google, analytics, searchConsole, dubsado];
+  const googleAdsPerformanceEvidence = hasGoogleAdsPerformanceEvidence(data.evidenceSnapshot);
+  const sources = [
+    website,
+    googleAdsPerformanceEvidence
+      ? { ...google, detail: `${google.detail} Campaign performance metrics are included in the evidence snapshot.` }
+      : google,
+    analytics,
+    searchConsole,
+    dubsado,
+  ];
   const connectedSources = sources.filter((source) => source.state === "connected").length;
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
@@ -83,9 +108,11 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       },
       {
         id: "google-read-only",
-        title: google.state === "connected" ? "Review Google Ads reporting evidence" : google.state === "needs_review" ? "Verify Google Ads read-only access" : "Connect Google Ads read-only",
-        reason: google.state === "connected" ? "Access is recorded, but campaign results and their date range are not available in this view." : "Google Ads access needs verification before it can support reporting.",
-        evidence: [google.detail, "The pilot forbids ad, budget, bid, and targeting changes."],
+        title: googleAdsPerformanceEvidence || google.state === "connected" ? "Review Google Ads reporting evidence" : google.state === "needs_review" ? "Verify Google Ads read-only access" : "Connect Google Ads read-only",
+        reason: googleAdsPerformanceEvidence
+          ? "Campaign metrics are present in the evidence snapshot. Review the reporting window and platform limitations before making a decision."
+          : google.state === "connected" ? "Access is recorded, but campaign results and their date range are not available in this view." : "Google Ads access needs verification before it can support reporting.",
+        evidence: [googleAdsPerformanceEvidence ? "Official Google Ads campaign metrics are included in the evidence snapshot." : google.detail, "The pilot forbids ad, budget, bid, and targeting changes."],
         expectedEffect: "It prepares a read-only route for campaign evidence.",
         effort: "Medium",
         risk: "Low",

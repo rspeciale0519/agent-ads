@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardConnectionSummary } from "../dashboard/dashboard-service";
 import { buildAiReachBriefing } from "./briefing";
+import { parseReadOnlyEvidenceSnapshot } from "./evidence-contract";
 
 const now = new Date("2026-08-30T12:00:00.000Z");
 const base = {
@@ -150,6 +151,30 @@ describe("buildAiReachBriefing", () => {
     expect(briefing.recommendations[0].title).toBe("Confirm the offer for the first test");
     expect(briefing.recommendations[0].evidence.join(" ")).toContain("no approved offer decision");
     expect(JSON.stringify(briefing)).not.toMatch(/Onboarding lists|Several offer families are listed/);
+  });
+
+  it("surfaces official Google Ads metrics included in an evidence snapshot", () => {
+    const evidenceSnapshot = parseReadOnlyEvidenceSnapshot({
+      snapshotId: "snapshot-google-ads",
+      organizationId: "org-1",
+      primaryOutcomeKey: "qualified_leads",
+      reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" },
+      capturedAt: "2026-08-30T10:00:00.000Z",
+      collectorVersion: "google-ads-reader-1.0.0",
+      status: "partial",
+      freshness: { state: "fresh", checkedAt: "2026-08-30T10:00:00.000Z", maxAgeHours: 48 },
+      reconciliation: { state: "warning", limitation: "Business outcome sources are still pending." },
+      evidence: [{ id: "evidence-google-ads", sourceClass: "official_platform_observation", provider: "google_ads", method: "official_api", collectedAt: "2026-08-30T10:00:00.000Z", collectorVersion: "google-ads-reader-1.0.0", limitations: ["Platform metrics do not prove revenue."] }],
+      metrics: [
+        { key: "google_ads.impressions", value: 1000, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "platform_reported", evidenceIds: ["evidence-google-ads"], limitations: ["Platform metrics do not prove revenue."] },
+        { key: "qualified_leads", value: 0, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "unknown", evidenceIds: ["evidence-google-ads"], limitations: ["Business outcome sources are still pending."] },
+      ],
+      limitations: ["Business outcome sources are still pending."],
+    });
+    const briefing = buildAiReachBriefing({ ...base, evidenceSnapshot }, now);
+    expect(briefing.sources.find((source) => source.name === "Google Ads")?.detail).toContain("Campaign performance metrics are included");
+    expect(briefing.recommendations[1].title).toBe("Review Google Ads reporting evidence");
+    expect(briefing.recommendations[1].reason).toContain("Campaign metrics are present");
   });
 
   it.each(["not_started", "in_progress"] as const)("does not claim a submitted profile when onboarding is %s", (status) => {

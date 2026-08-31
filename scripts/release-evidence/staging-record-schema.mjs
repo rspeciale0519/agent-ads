@@ -241,6 +241,16 @@ function isSafeHttpsUrl(value, originOnly = false) {
   }
 }
 
+function isVercelDeploymentOrigin(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname.endsWith(".vercel.app")
+      && parsed.hostname !== "vercel.app";
+  } catch {
+    return false;
+  }
+}
+
 const safeReference = z.string().min(1).max(512).refine((value) => {
   if (value.startsWith("https://")) return isSafeHttpsUrl(value);
   if (value.startsWith("restricted:")) {
@@ -321,7 +331,10 @@ export const stagingEvidenceRecordSchema = z.object({
     artifactIdentifier: safeIdentifier,
   }).strict(),
   target: z.object({
-    deploymentOrigin: z.string().max(2048).refine((value) => isSafeHttpsUrl(value, true)),
+    deploymentOrigin: z.string()
+      .max(2048)
+      .refine((value) => isSafeHttpsUrl(value, true))
+      .refine(isVercelDeploymentOrigin),
     vercelProjectIdentifier,
     vercelDeploymentIdentifier,
     vercelProjectLinkSha256: sha256Digest,

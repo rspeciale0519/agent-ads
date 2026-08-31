@@ -10,7 +10,7 @@
     "artifactIdentifier": "synthetic-artifact"
   },
   "target": {
-    "deploymentOrigin": "https://staging.example.invalid",
+    "deploymentOrigin": "https://synthetic-staging-abc123.vercel.app",
     "vercelProjectIdentifier": "prj_syntheticproject",
     "vercelDeploymentIdentifier": "dpl_syntheticdeployment",
     "vercelProjectLinkSha256": "1111111111111111111111111111111111111111111111111111111111111111",
