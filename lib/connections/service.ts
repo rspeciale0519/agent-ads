@@ -144,6 +144,7 @@ export async function readGoogleAdsCampaignReport(context: OrganizationContext, 
   }));
   if (!connection) throw new ConnectionServiceError("CONNECTION_NOT_FOUND", 404);
   if (connection.provider !== "google_ads") throw new ConnectionServiceError("PROVIDER_NOT_SUPPORTED", 409);
+  if (!providerAuthorizationEnabled("google_ads", context.organizationId)) throw new ConnectionServiceError("CONNECTIONS_DISABLED", 503);
   if (connection.status !== "active_read_only" || connection.accessMode !== "read_only" || !["read_only", "read_only_evidence_recorded"].includes(connection.effectiveRole ?? "")) throw new ConnectionServiceError("CONNECTION_NOT_READY", 409);
   if (!connection.resources.some((resource) => resource.externalId === request.customerId)) throw new ConnectionServiceError("RESOURCE_NOT_SELECTED", 409);
   if (!connection.credentialReferenceId) throw new ConnectionServiceError("SECRET_UNAVAILABLE", 503);
