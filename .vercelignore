@@ -1,14 +1,20 @@
-# Keep local credentials and private evidence out of Vercel uploads.
-.env*
-docs/temp/
-archive/
-
-# Exclude local tooling and generated files.
-.agents/
-.Codex/
-.git/
-.next/
-.pnpm-store/
-.vercel/
-node_modules/
-scripts/gate0/
+# Upload only the application source and build inputs.
+/*
+!app/
+!app/**
+!lib/
+!lib/**
+!prisma/
+!prisma/**
+!public/
+!public/**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!eslint.config.mjs
+!middleware.ts
+!next-env.d.ts
+!next.config.ts
+!tsconfig.json
+!vercel.json
+!.vercelignore
