@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 export const GOOGLE_ADS_REPORT_CONTRACT_VERSION = "google-ads-report-1.0.0";
 export const GOOGLE_ADS_REPORT_MAX_ROWS = 500;
+export const GOOGLE_ADS_REPORT_MAX_CHUNKS = 100;
 
 const customerIdSchema = z.string().trim().regex(/^\d{1,20}$/, "Use a Google Ads customer ID.");
 const campaignIdSchema = z.string().trim().regex(/^\d{1,20}$/, "Use a Google Ads campaign ID.");
@@ -58,13 +59,19 @@ const rawRowSchema = z.object({
   segments: z.object({ date: dateSchema.optional() }).passthrough().optional(),
 }).passthrough();
 
-/** The supported, bounded subset of a Google Ads Search/SearchStream response. */
-export const googleAdsReportResponseSchema = z.object({
+/** The supported, bounded subset of one Google Ads Search/SearchStream response chunk. */
+const googleAdsReportResponseChunkSchema = z.object({
   customerId: customerIdSchema.optional(),
   currencyCode: currencyCodeSchema.optional(),
   reportingWindow: rawWindowSchema.optional(),
   results: z.array(rawRowSchema).max(GOOGLE_ADS_REPORT_MAX_ROWS),
 }).passthrough();
+
+/** The documented SearchStream shape is an array of bounded response chunks. */
+export const googleAdsReportResponseSchema = googleAdsReportResponseChunkSchema;
+const googleAdsReportSearchStreamResponseSchema = z.array(googleAdsReportResponseChunkSchema)
+  .min(1)
+  .max(GOOGLE_ADS_REPORT_MAX_CHUNKS);
 
 const normalizedMetricSchema = z.object({
   impressions: z.number().int().nonnegative(),
@@ -99,6 +106,7 @@ export const googleAdsReportSchema = z.object({
 });
 
 export type GoogleAdsReportResponse = z.infer<typeof googleAdsReportResponseSchema>;
+export type GoogleAdsReportSearchStreamResponse = z.infer<typeof googleAdsReportSearchStreamResponseSchema>;
 export type GoogleAdsReportRow = z.infer<typeof googleAdsReportRowSchema>;
 export type GoogleAdsReport = z.infer<typeof googleAdsReportSchema>;
 
@@ -132,6 +140,42 @@ function customerIdFromCampaignResourceName(resourceName: string | undefined): s
   return resourceName?.match(/^customers\/(\d{1,20})\/campaigns\/\d{1,20}$/)?.[1];
 }
 
+function resolveConsistentChunkMetadata<T>(values: readonly (T | undefined)[], equal: (left: T, right: T) => boolean = Object.is): T | undefined {
+  const defined = values.filter((value): value is T => value !== undefined);
+  const first = defined[0];
+  if (first !== undefined && defined.some((value) => !equal(value, first))) throw new GoogleAdsReportError();
+  return first;
+}
+
+function normalizeResponseChunks(value: unknown): GoogleAdsReportResponse {
+  if (!Array.isArray(value)) {
+    const parsed = googleAdsReportResponseSchema.safeParse(value);
+    if (!parsed.success) throw new GoogleAdsReportError();
+    return parsed.data;
+  }
+
+  const parsed = googleAdsReportSearchStreamResponseSchema.safeParse(value);
+  if (!parsed.success) throw new GoogleAdsReportError();
+
+  const chunks = parsed.data;
+  const results = chunks.flatMap((chunk) => chunk.results);
+  if (results.length > GOOGLE_ADS_REPORT_MAX_ROWS) throw new GoogleAdsReportError();
+
+  const reportingWindow = resolveConsistentChunkMetadata(
+    chunks.map((chunk) => chunk.reportingWindow),
+    (left, right) => left.start === right.start && left.end === right.end,
+  );
+  const customerId = resolveConsistentChunkMetadata(chunks.map((chunk) => chunk.customerId));
+  const currencyCode = resolveConsistentChunkMetadata(chunks.map((chunk) => chunk.currencyCode));
+  const response: GoogleAdsReportResponse = {
+    results,
+    ...(customerId ? { customerId } : {}),
+    ...(currencyCode ? { currencyCode } : {}),
+    ...(reportingWindow ? { reportingWindow } : {}),
+  };
+  return response;
+}
+
 function resolveCustomerId(response: GoogleAdsReportResponse, row: z.infer<typeof rawRowSchema>): string | undefined {
   const candidates = [
     response.customerId,
@@ -162,11 +206,8 @@ function resolveReportingWindow(response: GoogleAdsReportResponse, rows: readonl
  * Only campaign identifiers, labels, dates, and read-only metrics leave this function.
  */
 export function parseGoogleAdsReport(value: unknown): GoogleAdsReport {
-  const parsed = googleAdsReportResponseSchema.safeParse(value);
-  if (!parsed.success) throw new GoogleAdsReportError();
-
   try {
-    const response = parsed.data;
+    const response = normalizeResponseChunks(value);
     const rows: GoogleAdsReportRow[] = response.results.map((rawRow) => {
       const customerId = resolveCustomerId(response, rawRow);
       if (!customerId) throw new GoogleAdsReportError();

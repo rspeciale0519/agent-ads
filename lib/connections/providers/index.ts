@@ -24,6 +24,7 @@ export { parseProviderCredentialKind } from "./provider-adapter";
 export type { OAuthCredentialKind, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
 export {
   GOOGLE_ADS_REPORT_CONTRACT_VERSION,
+  GOOGLE_ADS_REPORT_MAX_CHUNKS,
   GOOGLE_ADS_REPORT_MAX_ROWS,
   GoogleAdsReportError,
   googleAdsReportResponseSchema,
@@ -32,4 +33,4 @@ export {
   normalizeGoogleAdsReport,
   parseGoogleAdsReport,
 } from "./google-ads-report";
-export type { GoogleAdsReport, GoogleAdsReportResponse, GoogleAdsReportRow } from "./google-ads-report";
+export type { GoogleAdsReport, GoogleAdsReportResponse, GoogleAdsReportRow, GoogleAdsReportSearchStreamResponse } from "./google-ads-report";
