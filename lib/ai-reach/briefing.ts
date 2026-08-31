@@ -1,5 +1,6 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
+import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 
 export type AiReachRecommendation = {
   id: string;
@@ -20,7 +21,7 @@ export type AiReachBriefing = {
   recommendations: [AiReachRecommendation, AiReachRecommendation, AiReachRecommendation];
 };
 
-type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount">;
+type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount"> & { evidenceSnapshot?: ReadOnlyEvidenceSnapshot | null };
 type Source = AiReachBriefing["sources"][number];
 
 function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
@@ -53,11 +54,19 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const submitted = data.onboarding.status === "submitted";
   const sources = [website, google, analytics, searchConsole, dubsado];
   const connectedSources = sources.filter((source) => source.state === "connected").length;
+  const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
+  const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
+  const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {
-    // DashboardData contains connection metadata, not the approved outcome snapshot required for evidence readiness.
-    status: "limited",
-    summary: `AI Reach shows read-only access records for ${connectedSources} of ${sources.length} core sources. Business results are not measured in this view.`,
-    limitation: "Approved business results are not available in this view. Data age and customer approval still need review.",
+    status: snapshotReady ? "ready" : "limited",
+    summary: snapshotReady && primaryMetric
+      ? `AI Reach has a complete read-only outcome snapshot. ${primaryMetric.key.replaceAll("_", " ")} is ${primaryMetric.value}${primaryMetric.unit === "currency" ? ` ${primaryMetric.currency}` : ""}.`
+      : `AI Reach shows read-only access records for ${connectedSources} of ${sources.length} core sources. Business results are not measured in this view.`,
+    limitation: snapshotReady
+      ? "This snapshot uses approved read-only evidence. It does not prove that a marketing change caused the outcome."
+      : data.evidenceSnapshot && snapshotAssessment
+        ? `Approved business results are not ready for decisions. ${snapshotAssessment.blockers.join(" ")}`
+        : "Approved business results are not available in this view. Data age and customer approval still need review.",
     sources,
     recommendations: [
       {
