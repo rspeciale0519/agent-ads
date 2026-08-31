@@ -5,6 +5,10 @@ import { requireAal2, getAssuranceStatus } from "../auth/assurance";
 import { hasPermission, type ConnectionPermission } from "../auth/permissions";
 import { withTenantContext, type OrganizationContext } from "../auth/organization-context";
 import { getProviderAdapter, parseProviderCredentialKind } from "./providers";
+import { GoogleReadOnlyAdapter } from "./providers/google";
+import { googleAdsReportRequestSchema } from "./providers/google-ads-report";
+import type { GoogleAdsReport, GoogleAdsReportRequest } from "./providers/google-ads-report";
+import { ProviderAdapterError } from "./providers/provider-adapter";
 import type { ProviderResource } from "./providers";
 import { redactSensitive } from "./redaction";
 import { getSecretBroker } from "./secrets/supabase-vault";
@@ -122,6 +126,39 @@ export async function getConnectionDetail(context: OrganizationContext, id: stri
       request: connection.request,
     };
   });
+}
+
+export async function readGoogleAdsCampaignReport(context: OrganizationContext, id: string, input: GoogleAdsReportRequest, broker: SecretBroker = getSecretBroker()): Promise<GoogleAdsReport> {
+  requireConnectionPermission(context, "connections.view");
+  const request = googleAdsReportRequestSchema.parse(input);
+  const connection = await withTenantContext(context, (tx) => tx.connection.findFirst({
+    where: { id, organizationId: context.organizationId, archivedAt: null },
+    select: {
+      provider: true,
+      status: true,
+      accessMode: true,
+      effectiveRole: true,
+      credentialReferenceId: true,
+      resources: { where: { archivedAt: null, selected: true, eligibility: "eligible", resourceType: "ads_customer" }, select: { externalId: true } },
+    },
+  }));
+  if (!connection) throw new ConnectionServiceError("CONNECTION_NOT_FOUND", 404);
+  if (connection.provider !== "google_ads") throw new ConnectionServiceError("PROVIDER_NOT_SUPPORTED", 409);
+  if (connection.status !== "active_read_only" || connection.accessMode !== "read_only" || !["read_only", "read_only_evidence_recorded"].includes(connection.effectiveRole ?? "")) throw new ConnectionServiceError("CONNECTION_NOT_READY", 409);
+  if (!connection.resources.some((resource) => resource.externalId === request.customerId)) throw new ConnectionServiceError("RESOURCE_NOT_SELECTED", 409);
+  if (!connection.credentialReferenceId) throw new ConnectionServiceError("SECRET_UNAVAILABLE", 503);
+  const reference = await withTenantContext(context, (tx) => tx.credentialReference.findFirst({ where: activeCredentialReferenceWhere(context.organizationId, id, connection.credentialReferenceId as string), select: { brokerHandle: true, credentialKind: true } }));
+  const secret = await readScopedCredentialSecret(connection.credentialReferenceId, reference, broker);
+  if (!secret) throw new ConnectionServiceError("SECRET_UNAVAILABLE", 503);
+  const adapter = getProviderAdapter("google_ads");
+  if (!(adapter instanceof GoogleReadOnlyAdapter)) throw new ConnectionServiceError("GOOGLE_ADS_REPORT_UNAVAILABLE", 503);
+  try {
+    return await adapter.readCampaignReport(secret, parseProviderCredentialKind(reference?.credentialKind), request);
+  } catch (error) {
+    if (error instanceof ConnectionServiceError) throw error;
+    if (error instanceof ProviderAdapterError && error.code === "GOOGLE_ADS_REPORT_INVALID") throw new ConnectionServiceError("GOOGLE_ADS_REPORT_INVALID", 502);
+    throw new ConnectionServiceError("GOOGLE_ADS_REPORT_UNAVAILABLE", 503);
+  }
 }
 
 export async function selectConnectionResources(context: OrganizationContext, id: string, resourceIds: string[], correlationId: string) {

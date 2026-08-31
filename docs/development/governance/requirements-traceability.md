@@ -46,7 +46,7 @@ Every implementation item must provide:
 | FND-CI-001 | required validation and disposable schema workflow | configured; successful remote run unverified | F0 |
 | REC-BKP-001 | complete recovery set and restore drill | unverified | F1 |
 | REC-FWD-001 | forward recovery and compatible application rollback plan | documented; not executed | F1 |
-| PIL-CONN-001 | read-only proof for approved pilot sources | local provider contracts and Google Ads SearchStream read method; tenant service, persistence, and live source proof missing | P1 |
+| PIL-CONN-001 | read-only proof for approved pilot sources | local provider contracts, tenant authorization service, and Google Ads report API; persistence, reconciliation, and live source proof missing | P1 |
 | AIR-EVD-001 | AI Reach metric definitions, source classes, and limits | local evidence contract and read-only UI implemented; source-backed evidence workflow missing | P2 |
 | AIR-SMP-001 | question-set, sample provenance, citation, and referral lineage | documented with synthetic tests; approved observation collection and lineage persistence missing | P2 |
 | APR-PIL-001 | AAL2, active session, action-bound approval, expiry, and destination | local historical evidence only | P3 |
