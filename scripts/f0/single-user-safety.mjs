@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { matchesPrimaryPostgresError } from "./postgres-error.mjs";
 
 const markerPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const markerPrefix = "agent_ads_f0_single_user_disposable:";
@@ -228,7 +229,7 @@ export function runSingleUserSqlExpectFailure(
   if (!result.error && result.status === 0 && !postgresOutputHasError(output)) {
     throw new Error(`${label} unexpectedly succeeded.`);
   }
-  if (!output.includes(expectedMessage)) {
+  if (!matchesPrimaryPostgresError(result, expectedMessage)) {
     process.stderr.write(output);
     throw new Error(`${label} did not fail with the expected guard.`);
   }

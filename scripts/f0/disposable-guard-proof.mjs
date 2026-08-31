@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { matchesPrimaryPostgresError } from "./postgres-error.mjs";
 import {
   assertNetworkProofMutex,
   networkDatabaseEnvironment,
@@ -76,7 +77,7 @@ function verifyGuardFailure(label, expectedMessage, selectedMarker = marker) {
   });
   const output = safeOutput(result);
   if (!result.error && result.status === 0) throw new Error(`${label} unexpectedly passed.`);
-  if (!output.includes(expectedMessage)) {
+  if (!matchesPrimaryPostgresError(result, expectedMessage)) {
     process.stderr.write(output);
     throw new Error(`${label} failed without the expected guard message.`);
   }
@@ -96,7 +97,7 @@ ${clusterGuard}
   });
   const output = safeOutput(result);
   if (!result.error && result.status === 0) throw new Error(`${label} unexpectedly passed.`);
-  if (!output.includes(expectedMessage)) {
+  if (!matchesPrimaryPostgresError(result, expectedMessage)) {
     process.stderr.write(output);
     throw new Error(`${label} failed without the expected guard message.`);
   }

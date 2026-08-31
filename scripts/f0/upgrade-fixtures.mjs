@@ -109,25 +109,25 @@ export const upgradeScenarios = [
   {
     name: "malformed",
     fixture: fixture({ pointerA: "not-a-uuid" }),
-    expectedFailure: "non-canonical UUID",
+    expectedFailure: "connections.credential_reference_id contains a non-canonical UUID; reconcile the row before retrying",
     assertion: textRollbackAssertion("not-a-uuid"),
   },
   {
     name: "orphan",
     fixture: fixture({ pointerA: orphan }),
-    expectedFailure: "orphaned or cross-tenant reference",
+    expectedFailure: "connections.credential_reference_id contains an orphaned or cross-tenant reference; reconcile the row before retrying",
     assertion: textRollbackAssertion(orphan),
   },
   {
     name: "cross_tenant",
     fixture: fixture({ pointerA: reference, referenceOrganization: organizationB }),
-    expectedFailure: "orphaned or cross-tenant reference",
+    expectedFailure: "connections.credential_reference_id contains an orphaned or cross-tenant reference; reconcile the row before retrying",
     assertion: textRollbackAssertion(reference),
   },
   {
     name: "collision",
     fixture: fixture({ pointerA: reference, pointerB: reference.toUpperCase(), referenceOrganization: organizationA }),
-    expectedFailure: "collide after UUID normalization",
+    expectedFailure: "connections.credential_reference_id contains references that collide after UUID normalization",
     assertion: textRollbackAssertion(reference, reference.toUpperCase()),
   },
   {
@@ -140,7 +140,7 @@ ${fixture({ pointerA: reference }).replace(
 VALUES ('${reference}', 'f0-missing-tenant-handle', 'proof', 'oauth_refresh_token', 'proof-v1', now());
 INSERT INTO public.connections`,
 )}`,
-    expectedFailure: "organization_id is missing while credential pointers exist",
+    expectedFailure: "credential_references.organization_id is missing while credential pointers exist; complete the approved tenant backfill before retrying",
     assertion: textRollbackAssertion(reference),
   },
   {

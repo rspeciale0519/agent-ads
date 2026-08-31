@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -10,6 +10,8 @@ import {
   resolveNetworkProofContext,
 } from "./network-safety.mjs";
 import { upgradeScenarios } from "./upgrade-fixtures.mjs";
+import { runSecurityRepairProof } from "./security-repair-fixtures.mjs";
+import { matchesPrimaryPostgresError } from "./postgres-error.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveNetworkProofContext();
@@ -44,7 +46,7 @@ function requireFailure(label, database, sql, expectedMessage) {
   const result = psqlResult(database, { sql });
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   if (!result.error && result.status === 0) throw new Error(`${label} unexpectedly succeeded.`);
-  if (!output.includes(expectedMessage)) {
+  if (!matchesPrimaryPostgresError(result, expectedMessage)) {
     process.stderr.write(output);
     throw new Error(`${label} did not fail with the expected guard.`);
   }
@@ -134,6 +136,30 @@ try {
     }
     requireSuccess(`Upgrade assertion ${scenario.name}`, scenarioDatabase, { sql: scenario.assertion });
   }
+
+  // The mutex keeps agent_ads_f0 connected. Build a separate migrated template
+  // rather than releasing the mutex to make that database available for cloning.
+  const securityTemplate = "agent_ads_f0_security_template";
+  createDatabase(securityTemplate);
+  requireSuccess("Security repair template bootstrap", securityTemplate, { file: bootstrapFile });
+  const migrationRoot = path.join(root, "prisma", "migrations");
+  const migrationNames = readdirSync(migrationRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  for (const migrationName of migrationNames) {
+    requireSuccess(`Security repair template migration ${migrationName}`, securityTemplate,
+      { file: path.join(migrationRoot, migrationName, "migration.sql") });
+  }
+  requireSuccess("Security repair template assertions", securityTemplate,
+    { file: path.join(root, "scripts", "f0", "assertions.sql") });
+  runSecurityRepairProof({
+    cloneDatabase: (database) => createDatabase(database, securityTemplate),
+    runSql: (label, database, sql) => requireSuccess(label, database, { sql }),
+    runSqlExpectFailure: requireFailure,
+    repairMigration: readFileSync(
+      path.join(root, "prisma", "migrations", "20260830120000_restore_security_contract", "migration.sql"),
+      "utf8",
+    ),
+  });
 } finally {
   let cleanupFailed = false;
   for (const name of createdDatabases.reverse()) {
@@ -146,4 +172,4 @@ try {
   if (cleanupFailed) throw new Error("F0 upgrade proof could not remove every run-owned database.");
 }
 
-console.log("F0 upgrade proof passed: permission-role login guards, valid, null, malformed, orphan, cross-tenant, collision, rollback, and historical tenant-column paths are safe.");
+console.log("F0 upgrade proof passed: permission-role login guards, UUID upgrades, and security repair catalog fixtures, idempotence, and rollback passed.");
