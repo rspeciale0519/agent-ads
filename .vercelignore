@@ -1,13 +1,9 @@
 # Upload only the application source and build inputs.
 /*
-!app/
-!app/**
-!lib/
-!lib/**
-!prisma/
-!prisma/**
-!public/
-!public/**
+!app
+!lib
+!prisma
+!public
 !package.json
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
