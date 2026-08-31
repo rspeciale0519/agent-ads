@@ -45,13 +45,13 @@ function requireProbe(sql, expected, message) {
   }
 }
 
-function holderFailureWithin(timeoutMs) {
+function holderHealthFailureWithin(timeoutMs) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error("F0 holder-death proof timed out.")),
       timeoutMs,
     );
-    mutex.failure.then((error) => {
+    mutex.healthMonitorFailure.then((error) => {
       clearTimeout(timer);
       resolve(error);
     });
@@ -123,7 +123,7 @@ try {
   let holderError;
   try {
     context.psql = `f0_missing_psql_${metadata.token}`;
-    holderError = await holderFailureWithin(5_000);
+    holderError = await holderHealthFailureWithin(5_000);
   } finally {
     context.psql = psql;
   }

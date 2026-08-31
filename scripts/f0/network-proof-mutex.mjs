@@ -389,8 +389,12 @@ export async function acquireNetworkProofMutex(context) {
   let holderHealthError = null;
   let startError = null;
   let settleFailure;
+  let settleHealthMonitorFailure;
   const failure = new Promise((resolve) => {
     settleFailure = resolve;
+  });
+  const healthMonitorFailure = new Promise((resolve) => {
+    settleHealthMonitorFailure = resolve;
   });
   child.on("error", (error) => {
     startError ??= error;
@@ -548,6 +552,7 @@ export async function acquireNetworkProofMutex(context) {
         || acquired[2] !== mutex.systemIdentifier
       ) {
         holderHealthError = new Error("F0 network proof mutex holder lost its database lock.");
+        settleHealthMonitorFailure(holderHealthError);
         settleFailure(holderHealthError);
         return;
       }
@@ -573,6 +578,7 @@ export async function acquireNetworkProofMutex(context) {
       await transitionTargetMarker(runningMarker, completeMarker);
     },
     failure,
+    healthMonitorFailure,
     assertAlive() {
       if (holderHealthError) throw holderHealthError;
       if (child.exitCode !== null || child.signalCode !== null || child.killed) {
