@@ -14,3 +14,8 @@
 !tsconfig.json
 !vercel.json
 !.vercelignore
+!scripts
+scripts/*
+!scripts/release-evidence
+scripts/release-evidence/*
+!scripts/release-evidence/staging-runtime-targets.mjs
