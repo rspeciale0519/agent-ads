@@ -1,0 +1,14 @@
+# Keep local credentials and private evidence out of Vercel uploads.
+.env*
+docs/temp/
+archive/
+
+# Exclude local tooling and generated files.
+.agents/
+.Codex/
+.git/
+.next/
+.pnpm-store/
+.vercel/
+node_modules/
+scripts/gate0/
