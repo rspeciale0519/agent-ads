@@ -1,0 +1,23 @@
+# Upload only the application source and build inputs.
+/*
+!app
+!lib
+!prisma
+!public
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!eslint.config.mjs
+!middleware.ts
+!next-env.d.ts
+!next.config.ts
+!tsconfig.json
+!vercel.json
+!.vercelignore
+!scripts
+scripts/*
+!scripts/release-evidence
+scripts/release-evidence/*
+!scripts/release-evidence/staging-runtime-targets.mjs
+!scripts/release-evidence/staging-runtime-targets.d.mts
+!scripts/release-evidence/staging-runtime-environment-policy.mjs

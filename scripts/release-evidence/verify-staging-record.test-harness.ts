@@ -33,6 +33,7 @@ export type FixtureRecord = {
     artifactIdentifier: string;
   };
   target: {
+    deploymentOrigin: string;
     vercelProjectIdentifier: string;
     vercelDeploymentIdentifier: string;
     vercelProjectLinkSha256: string;

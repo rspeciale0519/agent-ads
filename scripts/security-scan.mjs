@@ -10,6 +10,7 @@ const patterns = [
   ["JWT", /\beyJ[a-zA-Z0-9_-]{12,}\.[a-zA-Z0-9_-]{12,}\.[a-zA-Z0-9_-]{12,}\b/],
   ["AWS access key", /\bAKIA[0-9A-Z]{16}\b/],
   ["GitHub token", /\bgh[pousr]_[A-Za-z0-9_]{30,}\b/],
+  ["GitHub fine-grained token", /\bgithub_pat_[A-Za-z0-9_]{20,}\b/],
   ["Stripe live key", /\bsk_live_[A-Za-z0-9]{20,}\b/],
   ["Slack token", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/],
   ["Supabase secret key", /\bsb_secret_[A-Za-z0-9._-]{24,}\b/],

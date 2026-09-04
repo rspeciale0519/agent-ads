@@ -102,6 +102,7 @@ export function requireTrustAnchorsMatchHead() {
     "diff",
     "--quiet",
     "--no-ext-diff",
+    "--no-textconv",
     "HEAD",
     "--",
     ...TRUST_ANCHOR_PATHS,

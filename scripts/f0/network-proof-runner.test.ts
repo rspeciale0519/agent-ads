@@ -418,6 +418,8 @@ describe("F0 network proof cooperative session mutex", () => {
     expect(mutexSource).toContain("holderMarkerTransitionSql");
     expect(mutexSource).toContain("HOLDER_HEALTH_INTERVAL_MS");
     expect(mutexSource).toContain("mutex holder lost its database lock");
+    expect(mutexSource).toContain("healthMonitorFailure");
+    expect(mutexSource).toContain("settleHealthMonitorFailure(holderHealthError)");
     expect(mutexSource).toContain("settleFailure(holderHealthError)");
     expect(mutexSource).toContain("pg_catalog.pg_backend_pid() <> ${mutex.backendPid}");
     expect(mutexSource).toContain("await writeHolderSql(");
@@ -603,6 +605,8 @@ describe("F0 network proof cooperative session mutex", () => {
     expect(holderDeathProofSource).toContain("pg_catalog.pg_terminate_backend");
     expect(holderDeathProofSource).toContain("F0_HOLDER_DEATH_CONTAINED");
     expect(holderDeathProofSource).toContain("mutex holder lost its database lock");
+    expect(holderDeathProofSource).toContain("mutex.healthMonitorFailure");
+    expect(holderDeathProofSource).not.toContain("mutex.failure.then");
     expect(holderDeathProofSource).toContain("fresh wrapped reuse attempt");
     expect(holderDeathProofSource).toContain("await mutex.quarantineAndRelease()");
     expect(workflow).not.toContain("node scripts/f0/disposable-mark-guard-proof.mjs");

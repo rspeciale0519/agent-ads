@@ -137,6 +137,37 @@ If provisioning fails, keep all provider flags disabled. Revoke the affected log
 
 The Vault boundary migration removes write-function access from public and non-broker roles. Its transaction rolls back after a migration failure. If broker calls fail after deployment, keep provider flags disabled and inspect the live function signatures and grants. Restore only the approved broker grant through a reviewed forward migration. Never restore public access.
 
+### Forward protection repair
+
+`20260830120000_restore_security_contract` restores two existing migration contracts.
+It forces RLS on `private.rate_limit_buckets` and removes two `service_role` Vault function grants.
+It preserves data, function bodies, owners, policies, login principals, and Vault relation grants.
+It does not complete the staging release gate.
+
+Before application:
+
+1. Obtain explicit approval for the target database and permission changes.
+2. Record the operator, approver, build, target fingerprint, UTC time, and approved recovery evidence.
+3. Keep all provider actions, schedulers, and email delivery disabled.
+4. Compare the limiter body and configuration with the reviewed migration source without recording its live body.
+5. Record exact-byte and line-ending comparisons separately.
+6. Verify the trusted definer owner, its table privileges, and the zero-policy table contract.
+7. Run the guarded disposable migration and repair-fixture checks.
+8. Apply through the approved Prisma procedure with `DIRECT_URL`.
+9. Verify the migration result and repeat target catalog and runtime tests.
+
+FORCE can briefly block table access. The repair uses a one-second lock timeout and a fifteen-second statement timeout.
+Its transaction fails if a precondition, effective denial, or retained broker permission check fails.
+Verify rollback before another attempt. Do not repair successful migration history.
+After a committed repair, keep features disabled if runtime checks fail.
+Use a reviewed forward repair. Do not restore public Vault access or disable required RLS protection.
+
+Login membership settings, direct login grants, and any service-role Vault relation access require separate review.
+This migration does not infer deployment login identity or change those permissions.
+Single-user F0 proves SQL and catalog behavior only. Its loader changes body whitespace.
+It does not prove runtime RLS, Supavisor behavior, hosted Vault encryption, or recovery.
+An uncertain fixture commit fails the proof. Isolate that disposable cluster. Do not reuse it.
+
 ## Restore / clone drill
 
 The Supabase Vault ciphertext is portable only when the documented Vault root-key path is preserved. A database dump without the corresponding root key is not a valid recovery set.

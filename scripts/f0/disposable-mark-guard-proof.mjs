@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { matchesPrimaryPostgresError } from "./postgres-error.mjs";
 import {
   assertNetworkProofMutex,
   networkDatabaseEnvironment,
@@ -100,7 +101,7 @@ function expectScriptFailure(label, script, expectedMessage) {
   });
   const output = safeOutput(result);
   if (!result.error && result.status === 0) throw new Error(`${label} unexpectedly succeeded.`);
-  if (!output.includes(expectedMessage)) {
+  if (!matchesPrimaryPostgresError(result, expectedMessage)) {
     process.stderr.write(output);
     throw new Error(`${label} failed without the expected guard message.`);
   }

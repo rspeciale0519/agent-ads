@@ -375,6 +375,16 @@ describe("staging runtime configuration checker", () => {
     expect(checkStagingRuntimeConfig(environment).codes).toEqual(["STAGING_RUNTIME_CONFIG_VALID"]);
   });
 
+  it("rejects NODE_OPTIONS because it can preload code before the checker runs", async () => {
+    const { checkStagingRuntimeConfig } = await checkerModule;
+    const environment = validEnvironment();
+    environment.NODE_OPTIONS = "--require=untrusted-module";
+
+    expect(checkStagingRuntimeConfig(environment).codes).toContain(
+      "STAGING_RUNTIME_CONFIG_UNAPPROVED_VARIABLE",
+    );
+  });
+
   it("writes only one safe JSON result and no diagnostic stream", () => {
     const environment: NodeJS.ProcessEnv = { NODE_ENV: "production" };
     for (const name of ["PATH", "PATHEXT", "SystemRoot", "TEMP", "TMP", "WINDIR"] as const) {

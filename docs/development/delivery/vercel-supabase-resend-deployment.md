@@ -85,15 +85,16 @@ The core Vercel runtime allowlist is:
 
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
 - `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `SUPABASE_STORAGE_BUCKET`;
-- `SUPABASE_SERVICE_ROLE_KEY` only as a temporary server-only migration fallback;
 - `DATABASE_URL` with the low-privilege runtime principal and strict TLS parameters;
 - `SECRET_BROKER_BACKEND`, `SECRET_BROKER_KEY_VERSION`, and a strict-TLS `SECRET_BROKER_DATABASE_URL`;
 - `SECRET_FINGERPRINT_KEY`, `OAUTH_STATE_HMAC_KEY`, `RATE_LIMIT_HMAC_KEY`, and `IDEMPOTENCY_HMAC_KEY`;
-- approved `ACCOUNT_CONNECTIONS_*_ENABLED` flags, `ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH`, and `ACCOUNT_CONNECTIONS_ALLOWED_ORGANIZATION_IDS`;
+- `ACCOUNT_CONNECTIONS_ENABLED=false`, `ACCOUNT_CONNECTIONS_GLOBAL_KILL_SWITCH=true`, and an absent or empty `ACCOUNT_CONNECTIONS_ALLOWED_ORGANIZATION_IDS`;
 - `STAGING_RUNTIME_TARGET_FINGERPRINT` after the configuration-only check;
 - `EMAIL_DELIVERY_MODE=disabled` until the approved email test starts.
 
 Add `SUPABASE_SECRET_KEY` and verify the deployment. Then remove `SUPABASE_SERVICE_ROLE_KEY` from the environment.
+
+The staging runtime checker rejects `SUPABASE_SERVICE_ROLE_KEY` and every provider-specific `ACCOUNT_CONNECTIONS_*_ENABLED` variable. Use those variables only in an approved local migration or provider environment.
 
 After every consumer uses the secret key, disable the legacy JWT keys in Supabase.
 
@@ -108,6 +109,8 @@ Add one provider's credentials only after that provider's separate read-only acc
 Never add `DIRECT_URL`, `APP_BOOTSTRAP_*`, database-owner credentials, migration credentials, or `ACCOUNT_CONNECTIONS_MOCK_PROVIDER` to Vercel.
 
 Do not copy all `.env.example` entries into Vercel. Omit unused and unapproved variables.
+
+The example record is a schema template, not release proof. Before verification, replace every synthetic target, timestamp, digest, and reference, select an approved recovery mode, and set every required check to `pass` with an observation and evidence reference.
 
 Run the core staging preflight before you add migration, provider, maintenance, or Resend variables.
 

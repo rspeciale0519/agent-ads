@@ -134,6 +134,15 @@ describe("staging evidence verifier record content", () => {
     );
   }, 60_000);
 
+  it("requires the staging origin to be a Vercel deployment origin", () => {
+    const record = completeFixture();
+    record.target.deploymentOrigin = "https://staging.example.invalid";
+    expectCode(
+      runVerifier(writeFixture("non-vercel-deployment-origin.json", record)),
+      "STAGING_EVIDENCE_SCHEMA_INVALID",
+    );
+  });
+
   it("does not let limitation codes approve checks", () => {
     const passing = completeFixture();
     passing.checks[0].limitationCodes = ["KNOWN_LIMITATION"];

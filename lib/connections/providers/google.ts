@@ -3,6 +3,7 @@ import type { AuthorizationContext, ProviderAdapter, ProviderCredentialKind, Pro
 import { ProviderAdapterError } from "./provider-adapter";
 import { configuredRedirectUri, isJsonObject, parseLatency, requestJson, stringArray, stringValue } from "./http";
 import { withRefreshLock } from "../refresh-lock";
+import { emptyGoogleAdsReport, googleAdsReportRequestSchema, parseGoogleAdsReport, GoogleAdsReportError, type GoogleAdsReport, type GoogleAdsReportRequest } from "./google-ads-report";
 
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -110,6 +111,35 @@ export class GoogleReadOnlyAdapter implements ProviderAdapter {
     if (this.provider === "google_analytics") return this.discoverAnalytics(token);
     if (this.provider === "google_search_console") return this.discoverSearchConsole(token);
     return this.discoverTagManager(token);
+  }
+
+  /** Read a bounded campaign report. This method never exposes the upstream response or enables writes. */
+  async readCampaignReport(secret: string, credentialKind: ProviderCredentialKind, request: GoogleAdsReportRequest): Promise<GoogleAdsReport> {
+    if (this.provider !== "google_ads") throw new ProviderAdapterError("GOOGLE_ADS_REPORT_NOT_SUPPORTED");
+    const parsedRequest = googleAdsReportRequestSchema.safeParse(request);
+    if (!parsedRequest.success) throw new ProviderAdapterError("GOOGLE_ADS_REPORT_REQUEST_INVALID");
+    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    if (!developerToken) throw new ProviderAdapterError("GOOGLE_ADS_ACCESS_NOT_CONFIGURED");
+    const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
+    if (loginCustomerId && !/^\d{1,20}$/.test(loginCustomerId)) throw new ProviderAdapterError("GOOGLE_ADS_LOGIN_CUSTOMER_ID_INVALID");
+    const version = googleAdsApiVersion();
+    const token = await this.accessToken(secret, credentialKind);
+    const { customerId, startDate, endDate } = parsedRequest.data;
+    const query = [
+      "SELECT customer.id, customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type,",
+      "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, segments.date",
+      `FROM campaign WHERE segments.date BETWEEN '${startDate}' AND '${endDate}' ORDER BY segments.date, campaign.id`,
+    ].join(" ");
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "developer-token": developerToken };
+    if (loginCustomerId) headers["login-customer-id"] = loginCustomerId;
+    const payload = await requestJson(`https://googleads.googleapis.com/${version}/customers/${customerId}/googleAds:searchStream`, { method: "POST", headers, body: JSON.stringify({ query }) }, "GOOGLE_ADS_REPORT", GOOGLE_HOSTS);
+    if (Array.isArray(payload) && payload.length > 0 && payload.every((chunk) => isJsonObject(chunk) && Array.isArray(chunk.results) && chunk.results.length === 0)) return emptyGoogleAdsReport(parsedRequest.data);
+    try {
+      return parseGoogleAdsReport(payload);
+    } catch (error) {
+      if (error instanceof GoogleAdsReportError) throw new ProviderAdapterError("GOOGLE_ADS_REPORT_INVALID");
+      throw error;
+    }
   }
 
   private async discoverAds(token: string) {

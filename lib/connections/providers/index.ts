@@ -22,3 +22,18 @@ export function getProviderAdapter(provider: ConnectionProvider): ProviderAdapte
 
 export { parseProviderCredentialKind } from "./provider-adapter";
 export type { OAuthCredentialKind, ProviderAdapter, ProviderCredentialKind, ProviderResource, ProviderVerification, TokenExchangeResult } from "./provider-adapter";
+export {
+  GOOGLE_ADS_REPORT_CONTRACT_VERSION,
+  GOOGLE_ADS_REPORT_MAX_CHUNKS,
+  GOOGLE_ADS_REPORT_MAX_DAYS,
+  GOOGLE_ADS_REPORT_MAX_ROWS,
+  GoogleAdsReportError,
+  googleAdsReportResponseSchema,
+  googleAdsReportRequestSchema,
+  googleAdsReportRowSchema,
+  googleAdsReportSchema,
+  normalizeGoogleAdsReport,
+  emptyGoogleAdsReport,
+  parseGoogleAdsReport,
+} from "./google-ads-report";
+export type { GoogleAdsReport, GoogleAdsReportRequest, GoogleAdsReportResponse, GoogleAdsReportRow, GoogleAdsReportSearchStreamResponse } from "./google-ads-report";

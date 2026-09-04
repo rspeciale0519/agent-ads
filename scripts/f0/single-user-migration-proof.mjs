@@ -9,6 +9,7 @@ import {
   runSingleUserSqlExpectFailure,
 } from "./single-user-safety.mjs";
 import { upgradeScenarios } from "./upgrade-fixtures.mjs";
+import { runSecurityRepairProof } from "./security-repair-fixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const context = resolveSingleUserContext(root);
@@ -90,4 +91,16 @@ for (const scenario of upgradeScenarios) {
   runSql(`Upgrade assertion ${scenario.name}`, scenarioDatabase, scenario.assertion);
 }
 
-console.log("F0 single-user migration proof passed: the full SQL chain and all UUID upgrade branches passed without a network socket. RLS behavior requires the networked CI proof.");
+runSecurityRepairProof({
+  cloneDatabase(database) {
+    if (!/^agent_ads_f0_security_[a-z_]+$/u.test(database)) {
+      throw new Error("Unsafe single-user security repair clone.");
+    }
+    runSql("Security repair clone creation", "postgres", `CREATE DATABASE "${database}" TEMPLATE agent_ads_f0;\n`);
+  },
+  runSql,
+  runSqlExpectFailure,
+  repairMigration: readFileSync(path.join(migrationRoot, "20260830120000_restore_security_contract", "migration.sql"), "utf8"),
+});
+
+console.log("F0 single-user migration proof passed: the full SQL chain, UUID upgrades, and security repair catalog fixtures passed without a network socket. RLS behavior requires the networked CI proof.");

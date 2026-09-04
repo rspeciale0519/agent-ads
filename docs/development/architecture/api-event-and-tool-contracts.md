@@ -63,6 +63,7 @@
 - `GET /platform-accounts`
 - `GET /platform-accounts/{id}/capabilities`
 - `POST /platform-accounts/{id}/verify`
+- `GET /connections/{id}/reports/google-ads?customerId={id}&startDate={YYYY-MM-DD}&endDate={YYYY-MM-DD}` (read-only, selected resource only)
 - `POST /connections/{id}/revoke`
 
 ### Campaigns
