@@ -237,7 +237,7 @@ Only after a separate legal/platform/data review. Begin with first-party opted-i
 - Google search-term prospecting and negative proposals
 - React/HTML creative templates
 - Higgsfield creative generation
-- Hermes for research/digest orchestration
+- Hermes behind the application-owned gateway for research/digest orchestration; Hyperagent only as a reviewed non-production prototype
 - Postiz for approved social publishing and analytics
 - `last30days`-style trend research with policy-compliant source access
 

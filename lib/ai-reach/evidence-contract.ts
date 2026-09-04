@@ -96,6 +96,59 @@ export function parseReadOnlyEvidenceSnapshot(value: unknown): ReadOnlyEvidenceS
   return readOnlyEvidenceSnapshotSchema.parse(value);
 }
 
+export function combineReadOnlyEvidenceSnapshots(input: {
+  snapshotId: string;
+  organizationId: string;
+  primaryOutcomeKey: ReadOnlyEvidenceSnapshot["primaryOutcomeKey"];
+  reportingWindow: ReadOnlyEvidenceSnapshot["reportingWindow"];
+  capturedAt: string;
+  collectorVersion: string;
+  snapshots: ReadOnlyEvidenceSnapshot[];
+}): ReadOnlyEvidenceSnapshot {
+  if (input.snapshots.length === 0) throw new Error("EVIDENCE_SNAPSHOT_SOURCE_REQUIRED");
+  const evidenceIds = new Set<string>();
+  const metricKeys = new Set<string>();
+  const evidence = [] as ReadOnlyEvidenceSnapshot["evidence"];
+  const metrics = [] as ReadOnlyEvidenceSnapshot["metrics"];
+  const limitations = new Set<string>();
+  let allFresh = true;
+  let hasStale = false;
+  for (const snapshot of input.snapshots) {
+    if (snapshot.organizationId !== input.organizationId) throw new Error("EVIDENCE_SNAPSHOT_ORGANIZATION_MISMATCH");
+    if (Date.parse(snapshot.reportingWindow.start) !== Date.parse(input.reportingWindow.start) || Date.parse(snapshot.reportingWindow.end) !== Date.parse(input.reportingWindow.end)) {
+      throw new Error("EVIDENCE_SNAPSHOT_WINDOW_MISMATCH");
+    }
+    for (const reference of snapshot.evidence) {
+      if (evidenceIds.has(reference.id)) throw new Error("EVIDENCE_SNAPSHOT_EVIDENCE_DUPLICATE");
+      evidenceIds.add(reference.id);
+      evidence.push(reference);
+    }
+    for (const metric of snapshot.metrics) {
+      if (metricKeys.has(metric.key)) throw new Error(`EVIDENCE_SNAPSHOT_METRIC_DUPLICATE_${metric.key}`);
+      metricKeys.add(metric.key);
+      metrics.push(metric);
+    }
+    allFresh = allFresh && snapshot.freshness.state === "fresh";
+    hasStale = hasStale || snapshot.freshness.state === "stale";
+    snapshot.limitations.forEach((limitation) => limitations.add(limitation));
+  }
+  limitations.add("Cross-source reconciliation and advertising attribution are not established.");
+  return parseReadOnlyEvidenceSnapshot({
+    snapshotId: input.snapshotId,
+    organizationId: input.organizationId,
+    primaryOutcomeKey: input.primaryOutcomeKey,
+    reportingWindow: input.reportingWindow,
+    capturedAt: input.capturedAt,
+    collectorVersion: input.collectorVersion,
+    status: "partial",
+    freshness: { state: allFresh ? "fresh" : hasStale ? "stale" : "unknown", checkedAt: input.capturedAt, maxAgeHours: 48 },
+    reconciliation: { state: "warning", limitation: "Cross-source reconciliation and advertising attribution are not established." },
+    evidence,
+    metrics,
+    limitations: [...limitations].slice(0, 20),
+  });
+}
+
 export function assessReadOnlyEvidenceSnapshot(snapshot: ReadOnlyEvidenceSnapshot, now = new Date()) {
   const blockers: string[] = [];
   const checkedAt = Date.parse(snapshot.freshness.checkedAt);

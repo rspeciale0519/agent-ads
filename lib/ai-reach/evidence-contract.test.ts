@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessReadOnlyEvidenceSnapshot, parseReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { assessReadOnlyEvidenceSnapshot, combineReadOnlyEvidenceSnapshots, parseReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { buildAiReachBriefing } from "./briefing";
 
 const now = new Date("2026-08-30T12:00:00.000Z");
@@ -58,5 +58,29 @@ describe("read-only evidence contract", () => {
     expect(briefing.summary).toContain("qualified leads is 12");
     expect(briefing.limitation).toContain("does not prove");
     expect(briefing.recommendations).toHaveLength(3);
+  });
+
+  it("combines source snapshots without claiming cross-source reconciliation", () => {
+    const advertising = fixture({
+      snapshotId: "snapshot-advertising",
+      primaryOutcomeKey: "closed_won_deals",
+      evidence: [{ id: "evidence-advertising", sourceClass: "official_platform_observation", provider: "google_ads", method: "official_api", collectedAt: "2026-08-30T10:00:00.000Z", collectorVersion: "google-ads-1.0.0", limitations: ["Platform metrics do not prove revenue."] }],
+      metrics: [{ key: "google_ads.clicks", value: 42, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "platform_reported", evidenceIds: ["evidence-advertising"], limitations: ["Platform metrics do not prove revenue."] }, { key: "closed_won_deals", value: 0, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "unknown", evidenceIds: ["evidence-advertising"], limitations: ["Business outcome evidence is not present."] }],
+    });
+    const combined = combineReadOnlyEvidenceSnapshots({ snapshotId: "snapshot-combined", organizationId: "org-synthetic-1", primaryOutcomeKey: "qualified_leads", reportingWindow: fixture().reportingWindow, capturedAt: "2026-08-30T12:00:00.000Z", collectorVersion: "combined-1.0.0", snapshots: [fixture(), advertising] });
+    expect(combined.status).toBe("partial");
+    expect(combined.reconciliation.state).toBe("warning");
+    expect(combined.metrics.map((metric) => metric.key)).toEqual(["qualified_leads", "google_ads.clicks", "closed_won_deals"]);
+    expect(combined.limitations).toContain("Cross-source reconciliation and advertising attribution are not established.");
+  });
+
+  it("rejects duplicate metric keys when combining sources", () => {
+    const duplicate = fixture({ snapshotId: "snapshot-duplicate", evidence: [{ ...fixture().evidence[0], id: "evidence-duplicate" }], metrics: [{ ...fixture().metrics[0], evidenceIds: ["evidence-duplicate"] }] });
+    expect(() => combineReadOnlyEvidenceSnapshots({ snapshotId: "snapshot-combined", organizationId: "org-synthetic-1", primaryOutcomeKey: "qualified_leads", reportingWindow: fixture().reportingWindow, capturedAt: "2026-08-30T12:00:00.000Z", collectorVersion: "combined-1.0.0", snapshots: [fixture(), duplicate] })).toThrow("EVIDENCE_SNAPSHOT_METRIC_DUPLICATE_qualified_leads");
+  });
+
+  it("rejects cross-tenant and cross-window inputs", () => {
+    expect(() => combineReadOnlyEvidenceSnapshots({ snapshotId: "snapshot-combined", organizationId: "org-synthetic-1", primaryOutcomeKey: "qualified_leads", reportingWindow: fixture().reportingWindow, capturedAt: "2026-08-30T12:00:00.000Z", collectorVersion: "combined-1.0.0", snapshots: [fixture(), fixture({ snapshotId: "snapshot-other-org", organizationId: "org-other" })] })).toThrow("EVIDENCE_SNAPSHOT_ORGANIZATION_MISMATCH");
+    expect(() => combineReadOnlyEvidenceSnapshots({ snapshotId: "snapshot-combined", organizationId: "org-synthetic-1", primaryOutcomeKey: "qualified_leads", reportingWindow: fixture().reportingWindow, capturedAt: "2026-08-30T12:00:00.000Z", collectorVersion: "combined-1.0.0", snapshots: [fixture(), fixture({ snapshotId: "snapshot-other-window", reportingWindow: { start: "2026-07-01T00:00:00.000Z", end: "2026-07-31T00:00:00.000Z" }, capturedAt: "2026-08-01T00:00:00.000Z" })] })).toThrow("EVIDENCE_SNAPSHOT_WINDOW_MISMATCH");
   });
 });

@@ -37,3 +37,6 @@ export {
   parseGoogleAdsReport,
 } from "./google-ads-report";
 export type { GoogleAdsReport, GoogleAdsReportRequest, GoogleAdsReportResponse, GoogleAdsReportRow, GoogleAdsReportSearchStreamResponse } from "./google-ads-report";
+export { mapDubsadoOutcomeStages, parseDubsadoExport } from "./dubsado-export";
+export { dubsadoOutcomeStageSchema } from "./dubsado-export";
+export type { DubsadoExportField, DubsadoExportMapping, DubsadoExportParseResult, DubsadoOutcomeRecord, DubsadoOutcomeStage, DubsadoStatusMap, MappedDubsadoOutcomeRecord } from "./dubsado-export";
