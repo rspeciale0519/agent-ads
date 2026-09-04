@@ -177,6 +177,29 @@ describe("buildAiReachBriefing", () => {
     expect(briefing.recommendations[1].reason).toContain("Campaign metrics are present");
   });
 
+  it("surfaces authorized Dubsado outcome metrics without claiming complete reconciliation", () => {
+    const evidenceSnapshot = parseReadOnlyEvidenceSnapshot({
+      snapshotId: "snapshot-dubsado",
+      organizationId: "org-1",
+      primaryOutcomeKey: "closed_won_deals",
+      reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" },
+      capturedAt: "2026-08-30T10:00:00.000Z",
+      collectorVersion: "dubsado-export-1.0.0",
+      status: "partial",
+      freshness: { state: "fresh", checkedAt: "2026-08-30T10:00:00.000Z", maxAgeHours: 48 },
+      reconciliation: { state: "warning", limitation: "Advertising reconciliation is still pending." },
+      evidence: [{ id: "evidence-dubsado", sourceClass: "business_outcome_observation", provider: "dubsado", method: "authorized_export", collectedAt: "2026-08-30T10:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", limitations: ["The export does not prove advertising causality."] }],
+      metrics: [{ key: "closed_won_deals", value: 1, unit: "count", reportingWindow: { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" }, attribution: "direct_first_party", evidenceIds: ["evidence-dubsado"], limitations: ["The export does not prove advertising causality."] }],
+      limitations: ["Advertising reconciliation is still pending."],
+    });
+    const briefing = buildAiReachBriefing({ ...base, connections: [connection("dubsado", { resourceCount: 0, selectedResourceCount: 0 })], evidenceSnapshot }, now);
+    expect(briefing.sources.find((source) => source.name === "Dubsado outcomes")?.detail).toContain("Commercial outcome metrics are included");
+    expect(briefing.recommendations[2].title).toBe("Review Dubsado outcome evidence");
+    expect(briefing.recommendations[2].reason).toContain("reporting window");
+    expect(briefing.recommendations).toHaveLength(3);
+    expect(JSON.stringify(briefing)).not.toMatch(/complete reconciliation|caused the outcome/i);
+  });
+
   it.each(["not_started", "in_progress"] as const)("does not claim a submitted profile when onboarding is %s", (status) => {
     const briefing = buildAiReachBriefing({
       ...base,

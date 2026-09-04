@@ -12,16 +12,19 @@ The MVP should minimize operational surface area. A tool belongs in the first re
 
 | Option | Strengths | Constraints | Recommended role |
 |---|---|---|---|
-| Hermes Agent | Provider-neutral; skills, memory, cron, MCP, messaging gateway; VPS-friendly | Broad capabilities require careful profiles, allowlists, and secret isolation | Internal research, diagnostics, and approval-digest harness |
+| Hermes Agent | Provider-neutral model support; skills, memory, cron, MCP, messaging gateway; VPS-friendly | Broad capabilities require careful profiles, allowlists, gateway mediation, and secret isolation | Selected production chief orchestrator/runtime behind the application-owned gateway |
+| Hyperagent | Hosted agents, packaged tools/integrations, custom MCP, and hosted MCP exposure may accelerate prototypes | Does not replace the product's tenant identity, database, durable workflows, approval/policy, billing, secrets, audit, or deterministic execution; security, export, reliability, data, and resale terms require review | Non-production prototype or internal workflow only; not the hosted product runtime |
 | OpenClaw | Strong personal operator experience; skills, messaging, cron, local control | One-user trust model; installed plugins/skills are trusted code; not a multi-tenant authorization boundary | Optional personal operator console |
 | Custom application worker | Typed contracts, exact authorization, predictable deployment, easiest to test | More engineering work; less ad-hoc flexibility | Required policy, execution, approval, and audit services |
 | Claude Code/Codex-style coding agent | Excellent for building connectors, skills, tests, and analysis code | Interactive development surface, not production authorization | Development and controlled analyst workflows |
 
-Recommendation: a custom application owns production state and permissions; Hermes may operate as a bounded internal harness over its read and proposal APIs.
+Current decision: Hermes is the production chief marketing orchestrator and agent runtime behind an application-owned gateway. The custom application owns production state, permissions, durable workflows, policy, approvals, billing, credentials, execution, audit, and rollback. Hyperagent is not selected. Hermes remains replaceable through the gateway contract, versioned/exportable artifacts, and independent evaluations.
 
 Hermes officially documents more than 60 built-in tools, skills, memory, MCP, security controls, messaging, and cron. See [Hermes docs](https://hermes-agent.nousresearch.com/docs/) and [features](https://hermes-agent.nousresearch.com/docs/user-guide/features/overview/).
 
 OpenClaw's own documentation says plugins are part of the trusted computing base and separate gateways/hosts are recommended across trust boundaries. See [OpenClaw security model](https://github.com/openclaw/openclaw/security).
+
+Hyperagent documents packaged tools, custom MCP connections, and an MCP server for exposing agents. These are useful integration capabilities but not evidence of the required multi-tenant control plane. See [available tools](https://www.hyperagent.com/docs/concepts/tools-and-integrations/available-tools), [custom MCP](https://www.hyperagent.com/docs/integrations/custom-mcp), [hosted MCP server](https://www.hyperagent.com/docs/concepts/agents/mcp-server), and [terms](https://hyperagent.com/terms?standalone=1).
 
 ## Model provider
 
@@ -177,8 +180,8 @@ Technology-agnostic baseline:
 - versioned SQL/typed metric service
 - typed proposal/policy/approval/audit services
 - frontier model through a provider-neutral adapter
-- optional Hermes profile for research and digest generation
+- Hermes behind an application-owned gateway with versioned profiles and proposal-only tools
 - object storage for assets and raw payload archives
 - standard logs, metrics, and traces
 
-Add ClickHouse, Airbyte, Postiz, Higgsfield, OpenClaw, or a model router only when a measured requirement justifies each operational dependency.
+Add ClickHouse, Airbyte, Postiz, Higgsfield, Hyperagent, OpenClaw, or a model router only when a measured requirement justifies each additional operational dependency and it passes the applicable security, data, reliability, export, and commercial review. Replacing Hermes requires a new recorded architecture decision and migration review.

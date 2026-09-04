@@ -1,6 +1,6 @@
 # Recommended System Architecture
 
-> **Research architecture:** Retained as evidence and design input. The authoritative Hermes-centered, multiplatform build architecture is in [`docs/development/architecture/system-architecture.md`](../development/architecture/system-architecture.md).
+> **Research architecture:** Retained as evidence and design input. The authoritative Hermes-centered, application-governed, cloud-hosted, multiplatform build architecture is in [`docs/development/architecture/system-architecture.md`](../development/architecture/system-architecture.md).
 
 ## Architecture goals
 

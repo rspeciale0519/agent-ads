@@ -1,6 +1,6 @@
 # Agentic Marketing Research Context
 
-> **Implementation authority:** The research remains the evidence base. Product decisions made after the audit—including Hermes-centered multi-agent orchestration, seven paid-advertising connectors, and seven organic-publishing connectors in the MVP—are specified in [`docs/development`](../development/README.md) and supersede narrower research-era MVP recommendations.
+> **Implementation authority:** The research remains the evidence base. Product decisions made after the audit—including Hermes-centered orchestration behind an application-owned gateway, AWS cloud service delivery, seven paid-advertising connectors, and seven organic-publishing connectors in the MVP—are specified in [`docs/development`](../development/README.md) and supersede narrower research-era recommendations.
 
 This directory is the permanent project context produced from the exhaustive review of the `Marketing` X bookmark category completed on 2026-08-06.
 

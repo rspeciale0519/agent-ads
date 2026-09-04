@@ -33,12 +33,33 @@ const googleAdsMetricKeys = new Set([
   "google_ads.click_rate",
 ]);
 
+const dubsadoMetricKeys = new Set([
+  "inquiries",
+  "qualified_leads",
+  "booked_calls",
+  "completed_qualified_meetings",
+  "proposals_issued",
+  "signed_engagements",
+  "closed_won_deals",
+  "booked_revenue",
+  "cancelled_engagements",
+  "refunded_engagements",
+]);
+
 function hasGoogleAdsPerformanceEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
   if (!snapshot) return false;
   const officialGoogleAdsEvidenceIds = new Set(snapshot.evidence
     .filter((evidence) => evidence.provider === "google_ads" && evidence.sourceClass === "official_platform_observation" && evidence.method === "official_api")
     .map((evidence) => evidence.id));
   return snapshot.metrics.some((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)));
+}
+
+function hasDubsadoOutcomeEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return false;
+  const approvedDubsadoEvidenceIds = new Set(snapshot.evidence
+    .filter((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export")
+    .map((evidence) => evidence.id));
+  return snapshot.metrics.some((metric) => dubsadoMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => approvedDubsadoEvidenceIds.has(evidenceId)));
 }
 
 function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
@@ -70,6 +91,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const dubsado = sourceRecord(data.connections, "dubsado", "Dubsado outcomes", checkedAt);
   const submitted = data.onboarding.status === "submitted";
   const googleAdsPerformanceEvidence = hasGoogleAdsPerformanceEvidence(data.evidenceSnapshot);
+  const dubsadoOutcomeEvidence = hasDubsadoOutcomeEvidence(data.evidenceSnapshot);
   const sources = [
     website,
     googleAdsPerformanceEvidence
@@ -77,7 +99,9 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       : google,
     analytics,
     searchConsole,
-    dubsado,
+    dubsadoOutcomeEvidence
+      ? { ...dubsado, detail: `${dubsado.detail} Commercial outcome metrics are included in the evidence snapshot.` }
+      : dubsado,
   ];
   const connectedSources = sources.filter((source) => source.state === "connected").length;
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
@@ -121,9 +145,11 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       },
       {
         id: "dubsado-map",
-        title: dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
-        reason: "Commercial results need approved stage definitions and source data before they can support a decision.",
-        evidence: [dubsado.detail, "An approved stage map is not available in this view."],
+        title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
+        reason: dubsadoOutcomeEvidence
+          ? "Commercial outcome metrics are present. Review their reporting window, stage map, and reconciliation limits before using them for a decision."
+          : "Commercial results need approved stage definitions and source data before they can support a decision.",
+        evidence: [dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail, "An approved stage map is not available in this view."],
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",
         risk: "Medium",

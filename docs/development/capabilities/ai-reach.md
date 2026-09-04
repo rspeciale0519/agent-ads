@@ -167,6 +167,8 @@ Every rate shows its numerator, denominator, window, method, and limitations.
 
 `Booked revenue` means the approved amount recorded when the selected CRM reaches the configured closed-won stage. It is not cash received.
 
+For the pilot, Dubsado outcome observations use an approved export or client-owned read route. The export requires an explicit status map and produces qualified leads, booked calls, signed engagements, booked revenue, cancellations, and refunds as separate stages. The snapshot remains partial until persistence, reconciliation, and live source checks pass.
+
 The organization approves the stage map, currency handling, event date, backfill window, corrections, duplicates, cancellations, and missing-value rules.
 
 Attribution labels must separate direct first-party evidence, platform-reported attribution, modeled attribution, and unknown source.
