@@ -17,8 +17,8 @@ const projectReference = "abcdefghijklmnopqrst";
 const targetEnvironment = {
   NEXT_PUBLIC_SUPABASE_URL: `https://${projectReference}.supabase.co`,
   SUPABASE_URL: `https://${projectReference}.supabase.co`,
-  DATABASE_URL: `postgresql://app_runtime_login.${projectReference}:synthetic-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict`,
-  SECRET_BROKER_DATABASE_URL: `postgresql://app_secret_broker_login.${projectReference}:synthetic-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict`,
+  DATABASE_URL: `postgresql://app_runtime_login.${projectReference}:synthetic-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt`,
+  SECRET_BROKER_DATABASE_URL: `postgresql://app_secret_broker_login.${projectReference}:synthetic-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt`,
 };
 const originalEnvironment = Object.fromEntries(
   managedNames.map((name) => [name, process.env[name]]),

@@ -14,6 +14,7 @@ const REQUIRED_DATABASE_QUERY_NAMES = Object.freeze([
   "pool_timeout",
   "sslmode",
   "sslaccept",
+  "sslcert",
 ]);
 
 function sha256(value) {
@@ -137,7 +138,9 @@ export function parseDatabaseUrl(rawValue) {
       tls: parsed.searchParams.getAll("sslmode").length === 1
         && parsed.searchParams.get("sslmode") === "require"
         && parsed.searchParams.getAll("sslaccept").length === 1
-        && parsed.searchParams.get("sslaccept") === "strict",
+        && parsed.searchParams.get("sslaccept") === "strict"
+        && parsed.searchParams.getAll("sslcert").length === 1
+        && parsed.searchParams.get("sslcert") === "prod-ca-2021.crt",
     });
   } catch {
     return null;

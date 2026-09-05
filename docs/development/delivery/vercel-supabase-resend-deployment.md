@@ -189,7 +189,9 @@ It fails when the rebuilt fingerprint differs from `STAGING_RUNTIME_TARGET_FINGE
 
 The attestation returns no raw project, deployment, database, host, principal, URL, or secret value.
 
-Require `sslmode=require&sslaccept=strict` on both Prisma Supavisor URLs.
+Require `sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt` on both Prisma Supavisor URLs.
+
+Keep the Supabase CA certificate at `prisma/prod-ca-2021.crt` so Prisma verifies the pooler certificate chain.
 
 Do not run this command from a checkout linked to the pilot or production Vercel project.
 
@@ -198,6 +200,10 @@ Do not replace `pnpm run build` with `next build`. The direct command skips Pris
 ## Database SSL enforcement
 
 Client TLS settings do not prove server SSL enforcement.
+
+Enabling enforcement briefly restarts the database. Keep account-connection flags disabled during this change.
+
+If strict clients fail, restore the last ready deployment and disable enforcement only under incident approval. Repair the certificate path, then repeat both SSL proofs before another deployment.
 
 Check the isolated Supabase project setting through the approved operator session.
 

@@ -53,7 +53,7 @@ function encodedSecret(byte: number) {
 }
 
 function databaseUrl(principal: string, ref: string, connectionLimit: number) {
-  return `postgresql://${principal}.${ref}:${databasePassword}@${poolerHost}:6543/postgres?pgbouncer=true&connection_limit=${connectionLimit}&pool_timeout=10&sslmode=require&sslaccept=strict`;
+  return `postgresql://${principal}.${ref}:${databasePassword}@${poolerHost}:6543/postgres?pgbouncer=true&connection_limit=${connectionLimit}&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt`;
 }
 
 function validEnvironment(ref = projectRef): Record<string, string | undefined> {
