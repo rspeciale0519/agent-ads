@@ -1,9 +1,15 @@
+import { X509Certificate } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const envExample = readFileSync(path.join(root, ".env.example"), "utf8");
+const nextConfig = readFileSync(path.join(root, "next.config.ts"), "utf8");
+const supabaseCaCertificate = readFileSync(
+  path.join(root, "prisma", "prod-ca-2021.crt"),
+  "utf8",
+);
 const roleAssertions = readFileSync(path.join(root, "scripts", "f0", "assertions.sql"), "utf8");
 const tenantRoleProof = readFileSync(
   path.join(root, "scripts", "f0", "tenant-role-proof.sql"),
@@ -36,6 +42,14 @@ describe("database role deployment contract", () => {
     expect(envExample).not.toContain(
       "SECRET_BROKER_DATABASE_URL=postgresql://app_secret_broker:",
     );
+  });
+
+  it("pins and packages the approved Supabase CA certificate", () => {
+    expect(new X509Certificate(supabaseCaCertificate).fingerprint256).toBe(
+      "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+    );
+    expect(envExample.match(/sslcert=prod-ca-2021\.crt/gu)).toHaveLength(3);
+    expect(nextConfig).toContain('"/*": ["./prisma/prod-ca-2021.crt"]');
   });
 
   it("keeps permission roles unable to log in", () => {

@@ -75,6 +75,7 @@ export function databaseQuery(connectionLimit: number) {
     "pool_timeout=10",
     "sslmode=require",
     "sslaccept=strict",
+    "sslcert=prod-ca-2021.crt",
   ].join("&");
 }
 

@@ -222,7 +222,7 @@ describe("staging runtime configuration checker", () => {
         "app_secret_broker_login",
         projectRef,
         6543,
-        "connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict",
+        "connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt",
       );
     }));
     expect(noPgbouncer.codes).toContain(
@@ -242,31 +242,39 @@ describe("staging runtime configuration checker", () => {
     const unsafeQueries = [
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_TLS_INVALID",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=disable&sslaccept=strict",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=disable&sslaccept=strict&sslcert=prod-ca-2021.crt",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_QUERY_PARAMETER_FORBIDDEN",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslaccept=strict",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslaccept=strict&sslcert=prod-ca-2021.crt",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_QUERY_PARAMETER_FORBIDDEN",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslmode=require&sslaccept=strict",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_TLS_INVALID",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=accept_invalid_certs",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=accept_invalid_certs&sslcert=prod-ca-2021.crt",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_QUERY_PARAMETER_FORBIDDEN",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict&schema=public",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict",
+      },
+      {
+        code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_TLS_INVALID",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=other-ca.crt",
+      },
+      {
+        code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_QUERY_PARAMETER_FORBIDDEN",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt&schema=public",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_CONNECTION_LIMIT_INVALID",
-        query: "pgbouncer=true&connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict",
+        query: "pgbouncer=true&connection_limit=2&pool_timeout=10&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt",
       },
       {
         code: "STAGING_RUNTIME_CONFIG_DATABASE_URL_POOL_TIMEOUT_INVALID",
-        query: "pgbouncer=true&connection_limit=4&pool_timeout=11&sslmode=require&sslaccept=strict",
+        query: "pgbouncer=true&connection_limit=4&pool_timeout=11&sslmode=require&sslaccept=strict&sslcert=prod-ca-2021.crt",
       },
     ];
 
@@ -292,7 +300,7 @@ describe("staging runtime configuration checker", () => {
         "app_runtime_login",
         projectRef,
         6543,
-        "sslaccept=strict&pool_timeout=10&pgbouncer=true&sslmode=require&connection_limit=4",
+        "sslcert=prod-ca-2021.crt&sslaccept=strict&pool_timeout=10&pgbouncer=true&sslmode=require&connection_limit=4",
       );
     });
     expect(checkStagingRuntimeConfig(reordered).codes).toEqual(["STAGING_RUNTIME_CONFIG_VALID"]);
