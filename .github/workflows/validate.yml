@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  rate-limit-clock-proof:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_DB: agent_ads_rate_limit_test
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agent_ads_rate_limit_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: psql -h 127.0.0.1 -U postgres -d agent_ads_rate_limit_test -f scripts/rate-limit-clock-regression.sql
+        env:
+          PGPASSWORD: postgres
+
   validate:
     runs-on: ubuntu-24.04
     env:
