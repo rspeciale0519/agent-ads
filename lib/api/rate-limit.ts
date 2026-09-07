@@ -12,7 +12,7 @@ export async function enforceRateLimit(key: string, limit: number, windowMs: num
   const keyHash = hashRateLimitKey(key);
   const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
   const rows: unknown = await prisma.$queryRaw`
-    SELECT * FROM private.consume_rate_limit(${keyHash}, ${limit}, ${windowSeconds}, ${organizationId ?? null}::uuid)
+    SELECT * FROM private.consume_rate_limit(${keyHash}, ${limit}::integer, ${windowSeconds}::integer, ${organizationId ?? null}::uuid)
   `;
   const parsed = resultSchema.safeParse(rows);
   if (!parsed.success) throw new RateLimitConfigurationError("RATE_LIMIT_STORE_INVALID");
