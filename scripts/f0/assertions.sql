@@ -159,6 +159,7 @@ BEGIN
       ('public', 'access_invitations'),
       ('public', 'audit_events'),
       ('public', 'onboarding_submissions'),
+      ('public', 'ai_reach_evidence_snapshots'),
       ('private', 'step_up_grants'),
       ('private', 'credential_references'),
       ('private', 'rate_limit_buckets'),

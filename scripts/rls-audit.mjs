@@ -40,6 +40,8 @@ const required = [
   "connections_credential_owner_fkey",
   "FOREIGN KEY (organization_id, id, credential_reference_id)",
   "REFERENCES private.credential_references (organization_id, connection_id, id)",
+  "ALTER TABLE public.ai_reach_evidence_snapshots FORCE ROW LEVEL SECURITY",
+  "ai_reach_evidence_snapshots_document_check",
 ];
 const missing = required.filter((fragment) => !sql.includes(fragment));
 const orderingErrors = [];
