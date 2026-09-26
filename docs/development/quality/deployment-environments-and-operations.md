@@ -195,6 +195,22 @@ Manual logical restores must follow the nonlogging Vault key-transfer procedure 
 
 Run a restore drill before pilot launch, after each recovery-design change, and quarterly during the pilot.
 
+### Current development recovery set
+
+Decision D-038 keeps development on the Supabase Free plan. Inventory of `aiagent-ads` on 2026-09-26:
+
+| Item | Current state | Recovery source |
+|---|---|---|
+| Schema, roles, grants, RLS | 24 migrations applied | `prisma/migrations`, proven fresh by CI `schema-proof` |
+| Auth users | 3 test accounts | Re-invite or re-create; no production data |
+| Application rows | Test organizations and onboarding records | Re-create through onboarding |
+| Storage | 1 bucket, 8 objects | Re-upload; no Supabase backup covers Storage |
+| Vault secrets | 0 | None to recover; the root-key transfer is not yet needed |
+| External-job extensions | No `pg_cron`, `pg_net`, or wrappers | Nothing to disable |
+| Configuration | Vercel variables, Auth settings, feature flags | Re-enter from the private secret manager |
+
+Before pilot credentials are enabled, repeat this inventory, upgrade to the paid plan, and run the Gate F1 restore drill.
+
 Initial targets, subject to pilot validation:
 
 - Core control-plane RPO: 15 minutes or better.
