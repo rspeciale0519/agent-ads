@@ -23,19 +23,36 @@ export default function AiReachChat({ initialConversation }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  async function reloadConversation() {
+    const response = await fetch("/api/v1/ai-reach/chat", { cache: "no-store" });
+    const body = await response.json() as { conversation?: Props["initialConversation"] };
+    if (response.ok && body.conversation) {
+      setConversationId(body.conversation.conversationId);
+      setMessages(body.conversation.messages);
+    }
+  }
+
   async function ask(value: string) {
     const trimmed = value.trim();
     if (!trimmed || busy) return;
     setBusy(true);
     setError("");
-    // Each question gets its own request identity so a retry cannot save it twice.
-    const intent = `ai-reach-ask:${crypto.randomUUID()}`;
+    // The same pending question keeps one request identity until it succeeds,
+    // so resending after a lost response cannot save it twice.
+    const intent = `ai-reach-ask:${conversationId ?? "new"}:${trimmed}`;
     try {
       const response = await mutationFetch(mutations, intent, "/api/v1/ai-reach/chat", {
         method: "POST",
         body: JSON.stringify(conversationId ? { question: trimmed, conversationId } : { question: trimmed }),
       });
       const body = await response.json() as ResponseBody;
+      if (body.error === "IDEMPOTENCY_ALREADY_COMPLETED" || body.error === "IDEMPOTENCY_RECONCILIATION_REQUIRED") {
+        // The earlier attempt was saved but its answer never arrived. Reload the saved conversation instead of asking again.
+        mutations.reset(intent);
+        await reloadConversation();
+        setQuestion("");
+        return;
+      }
       if (!response.ok || !body.result) {
         mutations.reset(intent);
         throw new Error(body.error === "AI_REACH_QUESTION_CONTAINS_SECRET" ? "That looks like a password or token. Please remove it and ask again." : body.error ?? "AI Reach could not answer right now.");

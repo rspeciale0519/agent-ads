@@ -1,10 +1,28 @@
 import type { AiReachBriefing } from "./briefing";
 
+// Verbs that would change an account. The pilot is read-only, so a request to
+// do one of these is refused before any evidence is read.
+const actionVerbs = "change|pause|stop|increase|decrease|raise|lower|edit|publish|send|launch|delete|adjust|turn off|turn on|cancel|boost|cut";
+
+// A request, not a question about history: the verb opens the sentence
+// ("Pause the campaign"), or someone asks for it to be done ("Can you change…",
+// "I want to increase…"). "How did leads change?" is not matched.
+const actionRequestPatterns = [
+  new RegExp(`^(?:please\\s+)?(?:${actionVerbs})\\b`, "u"),
+  new RegExp(`\\b(?:can|could|would|will|should)\\s+(?:you|i|we|ai reach)\\s+(?:please\\s+)?(?:${actionVerbs})\\b`, "u"),
+  new RegExp(`\\b(?:i|we)\\s+(?:want|need|would like)\\s+(?:you\\s+)?to\\s+(?:${actionVerbs})\\b`, "u"),
+  new RegExp(`\\b(?:help me|go ahead and|let's|lets)\\s+(?:${actionVerbs})\\b`, "u"),
+];
+
+export function isActionRequest(normalized: string) {
+  return actionRequestPatterns.some((pattern) => pattern.test(normalized));
+}
+
 export function answerAiReachQuestion(question: string, organizationName: string, briefing: AiReachBriefing) {
   const normalized = question.trim().toLowerCase();
   if (!normalized) return "Ask a question about your sources, results, or next safe action.";
 
-  if (["change", "pause", "spend", "budget", "bid", "targeting", "publish", "send"].some((term) => normalized.includes(term))) {
+  if (isActionRequest(normalized)) {
     return "Not yet. This pilot is read-only. AI Reach can explain evidence, but it cannot change ads, budgets, bids, targeting, websites, email, or CRM records.";
   }
 

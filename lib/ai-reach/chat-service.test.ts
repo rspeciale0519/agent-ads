@@ -74,6 +74,9 @@ describe("AI Reach chat service", () => {
     expect(result.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
     expect(result.messages[1]).toMatchObject({ content: "Twelve leads.", kind: "evidence" });
     expect(result.messages[1].citations[0].evidenceId).toBe("e-1");
+    // The answer is stamped after the question so reloads keep their order.
+    const [asked, answered] = models.aiReachMessage.create.mock.calls.map((call) => call[0].data.createdAt.getTime());
+    expect(answered).toBeGreaterThan(asked);
   });
 
   it("adds to an existing conversation the caller can see", async () => {

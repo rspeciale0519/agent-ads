@@ -1,5 +1,5 @@
 import type { AiReachBriefing } from "./briefing";
-import { answerAiReachQuestion } from "./chat";
+import { answerAiReachQuestion, isActionRequest } from "./chat";
 import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot, type ReadOnlyMetric } from "./evidence-contract";
 
 export type AiReachCitation = { evidenceId: string; provider: string; method: string; collectedAt: string };
@@ -19,10 +19,6 @@ export type AiReachAnswerInput = {
   snapshot: ReadOnlyEvidenceSnapshot | null;
   now?: Date;
 };
-
-// Words that ask AI Reach to act. The pilot is read-only, so these are refused
-// before anything else, whatever the rest of the question says.
-const actionTerms = ["change", "pause", "stop", "increase", "decrease", "raise", "lower", "edit", "publish", "send", "launch", "delete", "adjust", "turn off", "turn on"];
 
 // Each metric AI Reach can report, with the plain words people use for it.
 // Order matters: the first topic whose words appear in the question wins.
@@ -64,7 +60,7 @@ export function answerFromEvidence(input: AiReachAnswerInput): AiReachAnswer {
   const normalized = input.question.trim().toLowerCase();
   if (!normalized) return { text: "Ask a question about your sources, results, or next safe action.", kind: "guidance", citations: [] };
 
-  if (actionTerms.some((term) => normalized.includes(term))) {
+  if (isActionRequest(normalized)) {
     return { text: "Not yet. This pilot is read-only. AI Reach can explain evidence, but it cannot change ads, budgets, bids, targeting, websites, email, or CRM records.", kind: "boundary", citations: [] };
   }
 

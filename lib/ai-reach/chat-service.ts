@@ -59,11 +59,16 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
       data: { organizationId: context.organizationId, userId: context.userId },
       select: { id: true },
     });
+    // Both rows are written in one transaction, where the database default
+    // would give them the same timestamp. Set them explicitly, a millisecond
+    // apart, so the question always sorts before its answer.
+    const askedAt = new Date();
+    const answeredAt = new Date(askedAt.getTime() + 1);
     const userMessage = await tx.aiReachMessage.create({
-      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "user", content: parsed.question },
+      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "user", content: parsed.question, createdAt: askedAt },
     });
     const assistantMessage = await tx.aiReachMessage.create({
-      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray },
+      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray, createdAt: answeredAt },
     });
     return { conversationId: conversation.id, messages: [toChatMessage(userMessage), toChatMessage(assistantMessage)] };
   });
