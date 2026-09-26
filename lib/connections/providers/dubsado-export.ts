@@ -43,6 +43,7 @@ export type DubsadoOutcomeRecord = {
 export const dubsadoOutcomeStageSchema = z.enum([
   "inquiry",
   "qualified_opportunity",
+  "booked_call",
   "completed_qualified_meeting",
   "proposal_issued",
   "signed_engagement",

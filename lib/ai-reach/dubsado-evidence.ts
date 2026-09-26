@@ -4,6 +4,7 @@ import type { DubsadoOutcomeStage, MappedDubsadoOutcomeRecord } from "../connect
 const stageMetricMap: Partial<Record<DubsadoOutcomeStage, string>> = {
   inquiry: "inquiries",
   qualified_opportunity: "qualified_leads",
+  booked_call: "booked_calls",
   completed_qualified_meeting: "completed_qualified_meetings",
   proposal_issued: "proposals_issued",
   signed_engagement: "signed_engagements",
@@ -27,7 +28,12 @@ function countStage(records: MappedDubsadoOutcomeRecord[], stage: DubsadoOutcome
   return records.filter((record) => record.outcomeStage === stage).length;
 }
 
+// A closed-won deal is a record at the configured closed-won stage, which is
+// the stage that records booked revenue (see docs/development/capabilities/ai-reach.md).
+const closedWonStages: DubsadoOutcomeStage[] = ["booked_revenue"];
+
 function countMetric(records: MappedDubsadoOutcomeRecord[], metricKey: string) {
+  if (metricKey === "closed_won_deals") return closedWonStages.reduce((total, stage) => total + countStage(records, stage), 0);
   const stages = Object.entries(stageMetricMap).filter(([, key]) => key === metricKey).map(([stage]) => stage as DubsadoOutcomeStage);
   return stages.reduce((total, stage) => total + countStage(records, stage), 0);
 }
