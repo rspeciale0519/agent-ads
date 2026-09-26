@@ -98,6 +98,7 @@ Application rollback uses feature flags and a compatible build. Database recover
 - Define the recovery set for database, Storage objects, Vault root key, custom roles, configuration, scheduler, flags, artifact, and migration revision.
 - Complete a restore drill before pilot credentials are enabled.
 - Prove the current recovery-time and recovery-point targets with evidence.
+- Current state (D-038): the development recovery set is inventoried. The restore drill is deferred to the pilot's paid plan.
 
 ## Gate P0: Pilot contract
 

@@ -338,6 +338,16 @@
 - Owner/date: product, security, and engineering owners, 2026-08-27.
 - Affects: APR-001–APR-012, PAID-001–PAID-014, AIR-012–AIR-015, SEC-001–SEC-012.
 
+### D-038 — Development stays on the Supabase Free plan until pilot
+
+- Status: accepted.
+- Context: the only hosted database is the development project `aiagent-ads`. It holds test accounts and no production customer data. The Free plan has no restorable backups or restore-to-new-project, and it limits active projects.
+- Options: upgrade now for a physical-clone drill; run a logical drill in a second Free project; defer the restore drill to the pilot gate.
+- Decision: keep all development work inside the Free plan. Rebuild proof comes from the CI `schema-proof` job, which applies the full migration history to a fresh database on every change. The Gate F1 restore drill runs before pilot credentials are enabled, on the paid plan the pilot requires.
+- Consequence: the development recovery set is documented but its RPO and RTO stay unproven until the pilot drill. Development data is treated as recreatable.
+- Owner/date: product owner, 2026-09-26.
+- Affects: Gate F1.
+
 ## Decision process
 
 New material decisions must state context, options, decision, consequences, owner, date, status, affected requirement IDs, and any migration. Superseded decisions are never deleted.
