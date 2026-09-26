@@ -55,8 +55,10 @@ const input = {
 };
 
 // Serves the connection lookup, then the save transaction, from fake models.
-function mockDatabase(provider = "dubsado", connectionFound = true) {
-  const findFirst = vi.fn().mockResolvedValue(connectionFound ? { id: connectionId, provider } : null);
+const readyConnection = { id: connectionId, provider: "dubsado", status: "active_read_only", accessMode: "read_only", authorizationMethod: "approved_export" };
+
+function mockDatabase(connection: Record<string, string> | null = readyConnection) {
+  const findFirst = vi.fn().mockResolvedValue(connection);
   const create = vi.fn().mockImplementation(async ({ data }) => ({ id: "row-1", snapshotKey: data.snapshotKey, capturedAt: data.capturedAt }));
   withTenantContextMock.mockImplementation(async (_context, callback) => callback({ connection: { findFirst }, aiReachEvidenceSnapshot: { create } }));
   return { findFirst, create };
@@ -71,8 +73,10 @@ describe("Dubsado export import", () => {
     const result = await importDubsadoExport(context, connectionId, input, "corr-1", now);
     const metrics = Object.fromEntries(result.metrics.map((metric) => [metric.key, metric.value]));
     expect(metrics).toMatchObject({ qualified_leads: 1, booked_calls: 1, closed_won_deals: 1, booked_revenue: 1500 });
-    expect(result.summary).toEqual({ rowsRead: 4, rowsCounted: 3, rowsOutsideWindow: 1, blankRowsSkipped: 0, filteredByDate: true });
+    expect(result.summary).toMatchObject({ rowsRead: 4, rowsCounted: 3, rowsOutsideWindow: 1, blankRowsSkipped: 0 });
     expect(create.mock.calls[0][0].data.organizationId).toBe(organizationId);
+    // The saved evidence names the mapping it was counted with.
+    expect(create.mock.calls[0][0].data.collectorVersion).toBe(`dubsado-export-import-1.0.0+map.${result.summary.mappingDigest}`);
   });
 
   it("audits counts only, never row values or record identifiers", async () => {
@@ -99,10 +103,44 @@ describe("Dubsado export import", () => {
 
   it("only accepts a Dubsado connection in this organization", async () => {
     assuranceMock.mockResolvedValue({ aal: "aal2" });
-    mockDatabase("google_ads");
+    mockDatabase({ ...readyConnection, provider: "google_ads" });
     await expect(importDubsadoExport(context, connectionId, input, "corr-1", now)).rejects.toMatchObject({ code: "PROVIDER_NOT_SUPPORTED" });
-    mockDatabase("dubsado", false);
+    mockDatabase(null);
     await expect(importDubsadoExport(context, connectionId, input, "corr-1", now)).rejects.toMatchObject({ code: "CONNECTION_NOT_FOUND", status: 404 });
+  });
+
+  it("refuses a Dubsado route that is not verified as a read-only approved export", async () => {
+    assuranceMock.mockResolvedValue({ aal: "aal2" });
+    for (const connection of [{ ...readyConnection, status: "pending" }, { ...readyConnection, status: "degraded" }, { ...readyConnection, authorizationMethod: "client_owned_integration" }]) {
+      const { create } = mockDatabase(connection);
+      await expect(importDubsadoExport(context, connectionId, input, "corr-1", now)).rejects.toMatchObject({ code: "CONNECTION_NOT_READY", status: 409 });
+      expect(create).not.toHaveBeenCalled();
+    }
+  });
+
+  it("requires a date column so counts match the reporting window", async () => {
+    assuranceMock.mockResolvedValue({ aal: "aal2" });
+    const { sourceDate: _unused, ...withoutDate } = input.mapping;
+    void _unused;
+    await expect(importDubsadoExport(context, connectionId, { ...input, mapping: withoutDate }, "corr-1", now)).rejects.toMatchObject({ code: "DUBSADO_IMPORT_DATE_COLUMN_REQUIRED", status: 422 });
+    expect(withTenantContextMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a record ID that appears twice instead of counting it twice", async () => {
+    assuranceMock.mockResolvedValue({ aal: "aal2" });
+    const { create } = mockDatabase();
+    await expect(importDubsadoExport(context, connectionId, { ...input, csv: `${csv}\nproj-1,Qualified,2026-08-04,,` }, "corr-1", now)).rejects.toMatchObject({ code: "DUBSADO_IMPORT_DUPLICATE_RECORD_ROW_6", status: 422 });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("gives the same mapping the same digest regardless of key order", async () => {
+    assuranceMock.mockResolvedValue({ aal: "aal2" });
+    mockDatabase();
+    const first = await importDubsadoExport(context, connectionId, input, "corr-1", now);
+    mockDatabase();
+    const reordered = { ...input, statusMap: { Booked: "booked_revenue", Call: "booked_call", Qualified: "qualified_opportunity" } };
+    const second = await importDubsadoExport(context, connectionId, reordered, "corr-2", now);
+    expect(second.summary.mappingDigest).toBe(first.summary.mappingDigest);
   });
 
   it("returns fixable file problems as 422 errors without saving", async () => {

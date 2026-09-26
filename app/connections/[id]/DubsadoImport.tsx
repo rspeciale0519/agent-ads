@@ -6,7 +6,7 @@ import { mutationFetch, useMutationIdentityStore } from "../../../lib/api/client
 
 type ImportResult = {
   metrics: Array<{ key: string; value: number; unit: string; currency: string | null }>;
-  summary: { rowsRead: number; rowsCounted: number; rowsOutsideWindow: number; blankRowsSkipped: number; filteredByDate: boolean };
+  summary: { rowsRead: number; rowsCounted: number; rowsOutsideWindow: number; blankRowsSkipped: number; mappingDigest: string };
 };
 type ResponseBody = { error?: string; result?: ImportResult };
 
@@ -35,8 +35,8 @@ export default function DubsadoImport({ connectionId }: { connectionId: string }
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const submit = async () => {
-    if (!file || !start || !end) {
-      setError("Choose the export file and the reporting dates.");
+    if (!file || !start || !end || !columns.sourceDate.trim()) {
+      setError("Choose the export file, the date column, and the reporting dates.");
       return;
     }
     setBusy(true);
@@ -75,7 +75,7 @@ export default function DubsadoImport({ connectionId }: { connectionId: string }
     <fieldset><legend>Export column names</legend>
       <label>Record ID column<input value={columns.recordId} onChange={(event) => setColumns({ ...columns, recordId: event.target.value })} /></label>
       <label>Status column<input value={columns.status} onChange={(event) => setColumns({ ...columns, status: event.target.value })} /></label>
-      <label>Date column (optional, filters to the dates below)<input value={columns.sourceDate} onChange={(event) => setColumns({ ...columns, sourceDate: event.target.value })} /></label>
+      <label>Date column (counts only rows dated inside the dates below)<input value={columns.sourceDate} onChange={(event) => setColumns({ ...columns, sourceDate: event.target.value })} /></label>
       <label>Revenue column (optional)<input value={columns.bookedRevenue} onChange={(event) => setColumns({ ...columns, bookedRevenue: event.target.value })} /></label>
       <label>Currency column (optional)<input value={columns.currency} onChange={(event) => setColumns({ ...columns, currency: event.target.value })} /></label>
     </fieldset>
@@ -94,7 +94,7 @@ export default function DubsadoImport({ connectionId }: { connectionId: string }
     <button type="button" className="primary-button" disabled={busy} onClick={submit}>{busy ? "Importing…" : "Import export"}</button>
     {error && <p className="form-error" role="alert">{error}</p>}
     {result && <div className="form-success" role="status">
-      <p>Saved. Counted {result.summary.rowsCounted} of {result.summary.rowsRead} rows{result.summary.filteredByDate ? ` (${result.summary.rowsOutsideWindow} outside the dates)` : " (no date column, so every row counted)"}.</p>
+      <p>Saved. Counted {result.summary.rowsCounted} of {result.summary.rowsRead} rows{` (${result.summary.rowsOutsideWindow} undated or outside the dates)`}.</p>
       <ul>{result.metrics.map((metric) => <li key={metric.key}>{metric.key.replaceAll("_", " ")}: {metric.unit === "currency" ? `${metric.value} ${metric.currency}` : metric.value}</li>)}</ul>
       <Link href="/ai-reach">See it in AI Reach →</Link>
     </div>}
