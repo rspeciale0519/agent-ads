@@ -7,7 +7,7 @@ const window = { start: "2026-08-01T00:00:00.000Z", end: "2026-08-31T00:00:00.00
 const map = { recordId: "Project ID", status: "Status", bookedRevenue: "Revenue", currency: "Currency" };
 
 function records(csv: string) {
-  return mapDubsadoOutcomeStages(parseDubsadoExport(csv, map).records, { Inquiry: "inquiry", Qualified: "qualified_opportunity", Meeting: "completed_qualified_meeting", Proposal: "proposal_issued", Signed: "signed_engagement", Booked: "booked_revenue", Cancelled: "cancelled", Refunded: "refunded" });
+  return mapDubsadoOutcomeStages(parseDubsadoExport(csv, map).records, { Inquiry: "inquiry", Qualified: "qualified_opportunity", Call: "booked_call", Meeting: "completed_qualified_meeting", Proposal: "proposal_issued", Signed: "signed_engagement", Booked: "booked_revenue", Cancelled: "cancelled", Refunded: "refunded" });
 }
 
 describe("buildDubsadoEvidenceSnapshot", () => {
@@ -23,6 +23,13 @@ describe("buildDubsadoEvidenceSnapshot", () => {
     expect(snapshot.metrics.find((metric) => metric.key === "cancelled_engagements")?.value).toBe(1);
     expect(snapshot.metrics.find((metric) => metric.key === "refunded_engagements")?.value).toBe(1);
     expect(snapshot.evidence[0].method).toBe("authorized_export");
+  });
+
+  it("counts booked calls and closed-won deals from their mapped stages", () => {
+    const snapshot = buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-5", organizationId: "org-1", evidenceId: "dubsado-5", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_calls", records: records("Project ID,Status,Revenue,Currency\nproj-1,Call,,USD\nproj-2,Call,,USD\nproj-3,Booked,900,USD") });
+    expect(snapshot.metrics.find((metric) => metric.key === "booked_calls")?.value).toBe(2);
+    expect(snapshot.metrics.find((metric) => metric.key === "closed_won_deals")?.value).toBe(1);
+    expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-6", organizationId: "org-1", evidenceId: "dubsado-6", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "closed_won_deals", records: records("Project ID,Status,Revenue,Currency\nproj-3,Booked,900,USD") })).not.toThrow();
   });
 
   it("includes booked revenue only when currency is consistent", () => {
