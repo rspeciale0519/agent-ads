@@ -154,10 +154,14 @@ export function hasExactNonemptyValue(environment, name) {
 
 function hasStrongEncodedSecret(value) {
   if (!exactNonemptyStringSchema.safeParse(value).success) return false;
-  if (!/^[A-Za-z0-9_-]+$/u.test(value)) return false;
+  const encoding = /^[A-Za-z0-9_-]+$/u.test(value)
+    ? "base64url"
+    : /^[A-Za-z0-9+/]+={0,2}$/u.test(value) ? "base64" : null;
+  if (!encoding) return false;
   try {
-    const decoded = Buffer.from(value, "base64url");
-    return decoded.length >= 32 && decoded.toString("base64url") === value;
+    // Validate without normalizing: consumers use the original text as HMAC key material.
+    const decoded = Buffer.from(value, encoding);
+    return decoded.length >= 32 && decoded.toString(encoding) === value;
   } catch {
     return false;
   }

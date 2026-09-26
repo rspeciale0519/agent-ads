@@ -34,7 +34,7 @@
     "@prisma/client": "6.19.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
-    "next": "^15.5.23",
+    "next": "^15.5.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.18.1",
@@ -46,10 +46,10 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.5.23",
+    "eslint-config-next": "^15.5.24",
     "prisma": "6.19.3",
     "typescript": "^5.0.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -60,9 +60,10 @@
     ],
     "overrides": {
       "deepmerge-ts": "8.0.0",
+      "js-yaml": "4.3.2",
       "nanoid": "3.3.18",
       "postcss": "8.5.23",
-      "sharp": "0.35.2"
+      "sharp": "0.35.4"
     }
   }
 }
