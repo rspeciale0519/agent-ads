@@ -78,12 +78,52 @@ BEGIN
       RAISE EXCEPTION 'ACCOUNT_CONNECTIONS_BROKER_EXECUTE_CONTRACT_INVALID';
     END IF;
 
-    FOREACH denied_role IN ARRAY ARRAY['anon', 'authenticated', 'service_role', 'app_runtime'] LOOP
+    FOREACH denied_role IN ARRAY ARRAY['anon', 'authenticated', 'app_runtime'] LOOP
       IF has_function_privilege(denied_role::name, to_regprocedure(signature), 'EXECUTE')
         IS DISTINCT FROM false THEN
         RAISE EXCEPTION 'ACCOUNT_CONNECTIONS_VAULT_EXECUTE_REPAIR_FAILED';
       END IF;
     END LOOP;
+
+    -- Managed Supabase keeps a direct supabase_admin grant to service_role that
+    -- project roles cannot revoke. Accept only that platform grant; PUBLIC, any
+    -- other grantor, or an inherited role path still fails the repair.
+    IF has_function_privilege('service_role', to_regprocedure(signature), 'EXECUTE')
+      IS DISTINCT FROM false
+      AND (
+        NOT EXISTS (
+          SELECT 1
+          FROM pg_proc p
+          CROSS JOIN LATERAL aclexplode(p.proacl) AS acl
+          JOIN pg_roles grantee ON grantee.oid = acl.grantee
+          JOIN pg_roles grantor ON grantor.oid = acl.grantor
+          WHERE p.oid = to_regprocedure(signature)
+            AND acl.privilege_type = 'EXECUTE'
+            AND grantee.rolname = 'service_role'
+            AND grantor.rolname = 'supabase_admin'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM pg_proc p
+          CROSS JOIN LATERAL aclexplode(p.proacl) AS acl
+          LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
+          LEFT JOIN pg_roles grantor ON grantor.oid = acl.grantor
+          WHERE p.oid = to_regprocedure(signature)
+            AND acl.privilege_type = 'EXECUTE'
+            AND (acl.grantee = 0 OR grantee.rolname = 'service_role')
+            AND NOT (COALESCE(grantee.rolname, '') = 'service_role'
+              AND COALESCE(grantor.rolname, '') = 'supabase_admin')
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM pg_auth_members m
+          JOIN pg_roles member_role ON member_role.oid = m.member
+          WHERE member_role.rolname = 'service_role'
+            AND has_function_privilege(m.roleid, to_regprocedure(signature), 'EXECUTE')
+        )
+      ) THEN
+      RAISE EXCEPTION 'ACCOUNT_CONNECTIONS_VAULT_EXECUTE_REPAIR_FAILED';
+    END IF;
   END LOOP;
 END
 $security_contract_postconditions$;

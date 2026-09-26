@@ -141,6 +141,7 @@ The Vault boundary migration removes write-function access from public and non-b
 
 `20260830120000_restore_security_contract` restores two existing migration contracts.
 It forces RLS on `private.rate_limit_buckets` and removes two `service_role` Vault function grants.
+Managed Supabase keeps a direct `supabase_admin` grant to `service_role` that project roles cannot revoke. The repair accepts only that platform grant and still fails on PUBLIC, other grantors, or inherited access.
 It preserves data, function bodies, owners, policies, login principals, and Vault relation grants.
 It does not complete the staging release gate.
 
