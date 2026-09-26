@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration"
+    ]
+  },
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "The Supabase project 'aiagent-ads' (ref xhygxfsbvpgalmefncrf) is the owner's development-only database with no production customer data. The owner authorizes Claude to apply this repo's prisma/migrations and run SQL against it."
+    ]
+  }
+}
