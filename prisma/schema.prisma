@@ -29,6 +29,7 @@ model Organization {
   auditEvents          AuditEvent[]
   accessInvitations    AccessInvitation[]
   idempotencyRecords   IdempotencyRecord[]
+  evidenceSnapshots    AiReachEvidenceSnapshot[]
 
   @@index([status, updatedAt])
   @@map("organizations")
@@ -410,5 +411,25 @@ model OnboardingSubmission {
   applicantId        String?   @map("applicant_id") @db.Uuid
 
   @@map("onboarding_submissions")
+  @@schema("public")
+}
+
+model AiReachEvidenceSnapshot {
+  id                   String       @id @default(uuid()) @db.Uuid
+  organizationId       String       @map("organization_id") @db.Uuid
+  snapshotKey          String       @map("snapshot_key")
+  primaryOutcomeKey    String       @map("primary_outcome_key")
+  status               String
+  reportingWindowStart DateTime     @map("reporting_window_start") @db.Timestamptz(6)
+  reportingWindowEnd   DateTime     @map("reporting_window_end") @db.Timestamptz(6)
+  capturedAt           DateTime     @map("captured_at") @db.Timestamptz(6)
+  collectorVersion     String       @map("collector_version")
+  snapshot             Json         @db.JsonB
+  createdAt            DateTime     @default(now()) @map("created_at")
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, snapshotKey])
+  @@index([organizationId, capturedAt])
+  @@map("ai_reach_evidence_snapshots")
   @@schema("public")
 }
