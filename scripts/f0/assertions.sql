@@ -160,6 +160,8 @@ BEGIN
       ('public', 'audit_events'),
       ('public', 'onboarding_submissions'),
       ('public', 'ai_reach_evidence_snapshots'),
+      ('public', 'ai_reach_conversations'),
+      ('public', 'ai_reach_messages'),
       ('private', 'step_up_grants'),
       ('private', 'credential_references'),
       ('private', 'rate_limit_buckets'),
