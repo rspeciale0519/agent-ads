@@ -57,6 +57,9 @@ describe("forward security repair contract", () => {
     expect(migration).toContain("AND grantor.rolname = 'supabase_admin'");
     expect(migration).toContain("AND (acl.grantee = 0 OR grantee.rolname = 'service_role')");
     expect(migration).toContain("FROM pg_auth_members m");
+    // Implicit privileges from superuser or ownership never count as the platform grant.
+    expect(migration).toContain("WHERE rolname = 'service_role' AND rolsuper");
+    expect(migration).toContain("AND owner_role.rolname = 'service_role'");
     expect(migration).toContain("IS DISTINCT FROM true");
     expect(migration).toContain("IS DISTINCT FROM false");
     expect(migration).toContain("ACCOUNT_CONNECTIONS_VAULT_EXECUTE_REPAIR_FAILED");

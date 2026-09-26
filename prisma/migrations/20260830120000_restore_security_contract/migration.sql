@@ -87,11 +87,19 @@ BEGIN
 
     -- Managed Supabase keeps a direct supabase_admin grant to service_role that
     -- project roles cannot revoke. Accept only that platform grant; PUBLIC, any
-    -- other grantor, or an inherited role path still fails the repair.
+    -- other grantor, an inherited role path, superuser, or ownership still fails.
     IF has_function_privilege('service_role', to_regprocedure(signature), 'EXECUTE')
       IS DISTINCT FROM false
       AND (
-        NOT EXISTS (
+        EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role' AND rolsuper)
+        OR EXISTS (
+          SELECT 1
+          FROM pg_proc p
+          JOIN pg_roles owner_role ON owner_role.oid = p.proowner
+          WHERE p.oid = to_regprocedure(signature)
+            AND owner_role.rolname = 'service_role'
+        )
+        OR NOT EXISTS (
           SELECT 1
           FROM pg_proc p
           CROSS JOIN LATERAL aclexplode(p.proacl) AS acl
