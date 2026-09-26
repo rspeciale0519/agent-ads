@@ -91,11 +91,21 @@ describe("AI Reach evidence store", () => {
     expect(await readLatestEvidenceSnapshot(context)).toBeNull();
   });
 
+  it("keeps reading older batches until it finds a valid snapshot", async () => {
+    const broken = Array.from({ length: 20 }, () => ({ snapshot: { snapshotId: "broken" } }));
+    const findMany = vi.fn().mockResolvedValueOnce(broken).mockResolvedValueOnce([{ snapshot: fixture() }]);
+    withTenantContextMock.mockImplementation(async (_context, callback) => callback({ aiReachEvidenceSnapshot: { findMany } }));
+    expect((await readLatestEvidenceSnapshot(context))?.snapshotId).toBe("snapshot-synthetic-1");
+    expect(findMany.mock.calls.map((call) => call[0].skip)).toEqual([0, 20]);
+  });
+
   it("returns null when nothing is saved", async () => {
     mockTenant({ findMany: vi.fn().mockResolvedValue([]) });
     expect(await readLatestEvidenceSnapshot(context)).toBeNull();
   });
 });
+
+const now = new Date("2026-08-30T12:00:00.000Z");
 
 describe("AI Reach outcome tiles", () => {
   it("says an outcome is missing instead of guessing when no snapshot exists", () => {
@@ -104,14 +114,28 @@ describe("AI Reach outcome tiles", () => {
   });
 
   it("shows saved metrics and marks the rest as not measured", () => {
-    const tiles = buildOutcomeTiles(fixture());
+    const tiles = buildOutcomeTiles(fixture(), now);
     expect(tiles[0]).toMatchObject({ label: "Primary outcome: Qualified leads", value: "12" });
-    expect(tiles[0].detail).toContain("complete snapshot");
+    expect(tiles[0].detail).toBe("Aug 1 to Aug 30 · decision-ready");
     expect(tiles[1]).toMatchObject({ label: "Qualified meetings", value: "Not measured" });
     expect(tiles[3]).toMatchObject({ label: "Booked revenue", value: "$4,500" });
   });
 
   it("labels a partial snapshot so the number is not read as final", () => {
-    expect(buildOutcomeTiles(fixture({ status: "partial" }))[0].detail).toContain("partial snapshot");
+    const tiles = buildOutcomeTiles(fixture({ status: "partial" }), now);
+    expect(tiles[0].detail).toContain("not decision-ready: The snapshot is incomplete.");
+    expect(tiles[3].detail).toContain("not decision-ready");
+  });
+
+  it("flags a complete snapshot that is stale or unreconciled", () => {
+    expect(buildOutcomeTiles(fixture(), new Date("2026-09-10T00:00:00.000Z"))[0].detail).toContain("stale");
+    expect(buildOutcomeTiles(fixture({ reconciliation: { state: "blocked", limitation: "Synthetic mismatch." } }), now)[0].detail).toContain("Reconciliation is blocked.");
+  });
+
+  it("shows each metric's own reporting window", () => {
+    const snapshot = fixture();
+    const revenueWindow = { start: "2026-08-15T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" };
+    const tiles = buildOutcomeTiles({ ...snapshot, metrics: snapshot.metrics.map((metric) => metric.key === "booked_revenue" ? { ...metric, reportingWindow: revenueWindow } : metric) }, now);
+    expect(tiles[3].detail).toBe("Aug 15 to Aug 30");
   });
 });

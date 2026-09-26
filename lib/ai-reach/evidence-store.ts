@@ -28,18 +28,24 @@ export async function saveEvidenceSnapshot(context: OrganizationContext, value: 
   }
 }
 
+const readBatchSize = 20;
+
 // Returns the newest valid snapshot, or null when none exists. A stored row
-// that no longer matches the contract is skipped rather than shown.
+// that no longer matches the contract is skipped rather than shown, so older
+// rows are read in batches until a valid one is found.
 export async function readLatestEvidenceSnapshot(context: OrganizationContext): Promise<ReadOnlyEvidenceSnapshot | null> {
-  const rows = await withTenantContext(context, (tx) => tx.aiReachEvidenceSnapshot.findMany({
-    where: { organizationId: context.organizationId },
-    orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }],
-    take: 5,
-    select: { snapshot: true },
-  }));
-  for (const row of rows) {
-    const parsed = readOnlyEvidenceSnapshotSchema.safeParse(row.snapshot);
-    if (parsed.success && parsed.data.organizationId === context.organizationId) return parsed.data;
+  for (let skip = 0; ; skip += readBatchSize) {
+    const rows = await withTenantContext(context, (tx) => tx.aiReachEvidenceSnapshot.findMany({
+      where: { organizationId: context.organizationId },
+      orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      skip,
+      take: readBatchSize,
+      select: { snapshot: true },
+    }));
+    for (const row of rows) {
+      const parsed = readOnlyEvidenceSnapshotSchema.safeParse(row.snapshot);
+      if (parsed.success && parsed.data.organizationId === context.organizationId) return parsed.data;
+    }
+    if (rows.length < readBatchSize) return null;
   }
-  return null;
 }
