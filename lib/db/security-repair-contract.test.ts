@@ -51,7 +51,15 @@ describe("forward security repair contract", () => {
       "REVOKE EXECUTE ON FUNCTION vault.update_secret(uuid, text, text, text, uuid) FROM service_role RESTRICT;",
     ]);
     expect(migration).toContain("has_function_privilege('app_secret_broker'");
-    expect(migration).toContain("ARRAY['anon', 'authenticated', 'service_role', 'app_runtime']");
+    expect(migration).toContain("ARRAY['anon', 'authenticated', 'app_runtime']");
+    // service_role may keep only the managed-platform grant from supabase_admin.
+    expect(migration).toContain("has_function_privilege('service_role'");
+    expect(migration).toContain("AND grantor.rolname = 'supabase_admin'");
+    expect(migration).toContain("AND (acl.grantee = 0 OR grantee.rolname = 'service_role')");
+    expect(migration).toContain("FROM pg_auth_members m");
+    // Implicit privileges from superuser or ownership never count as the platform grant.
+    expect(migration).toContain("WHERE rolname = 'service_role' AND rolsuper");
+    expect(migration).toContain("AND owner_role.rolname = 'service_role'");
     expect(migration).toContain("IS DISTINCT FROM true");
     expect(migration).toContain("IS DISTINCT FROM false");
     expect(migration).toContain("ACCOUNT_CONNECTIONS_VAULT_EXECUTE_REPAIR_FAILED");
