@@ -10,7 +10,7 @@ describe("auth callback redirects", () => {
   it("allows only approved local destinations", () => {
     expect(safeAuthCallbackNext(SIGNUP_CALLBACK_NEXT)).toBe(SIGNUP_CALLBACK_NEXT);
     expect(safeAuthCallbackNext(RECOVERY_CALLBACK_NEXT)).toBe(RECOVERY_CALLBACK_NEXT);
-    expect(safeAuthCallbackNext("https://attacker.test")).toBe("/dashboard");
-    expect(safeAuthCallbackNext("/auth?mode=login&next=https://attacker.test")).toBe("/dashboard");
+    expect(safeAuthCallbackNext("https://attacker.test")).toBe("/ai-reach");
+    expect(safeAuthCallbackNext("/auth?mode=login&next=https://attacker.test")).toBe("/ai-reach");
   });
 });

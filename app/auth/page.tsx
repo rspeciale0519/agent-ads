@@ -9,7 +9,7 @@ type AuthPageProps = { searchParams?: Promise<{ mode?: string; verified?: string
 export default async function AuthPage({ searchParams }: AuthPageProps) {
   const supabase = await getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) redirect("/dashboard");
+  if (user) redirect("/ai-reach");
   const params = searchParams ? await searchParams : {};
   const initialMode = params.mode === "login" ? "login" : "signup";
   const initialNotice = params.verified === "1"

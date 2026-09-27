@@ -4,7 +4,7 @@ export const RECOVERY_CALLBACK_NEXT = "/auth/reset" as const;
 export type AuthCallbackNext =
   | typeof SIGNUP_CALLBACK_NEXT
   | typeof RECOVERY_CALLBACK_NEXT
-  | "/dashboard"
+  | "/ai-reach"
   | "/onboarding"
   | "/connections";
 
@@ -16,5 +16,6 @@ export function buildAuthCallbackUrl(origin: string, next: AuthCallbackNext) {
 
 export function safeAuthCallbackNext(value: string | null): AuthCallbackNext {
   if (value === SIGNUP_CALLBACK_NEXT || value === RECOVERY_CALLBACK_NEXT || value === "/onboarding" || value === "/connections") return value;
-  return "/dashboard";
+  // Anything unexpected lands on the home page, AI Reach.
+  return "/ai-reach";
 }
