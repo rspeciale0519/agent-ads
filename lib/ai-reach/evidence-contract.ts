@@ -149,11 +149,16 @@ export function combineReadOnlyEvidenceSnapshots(input: {
   });
 }
 
+// True while the snapshot is marked fresh and still inside its maximum age.
+export function isReadOnlyEvidenceSnapshotFresh(snapshot: ReadOnlyEvidenceSnapshot, now = new Date()) {
+  const checkedAt = Date.parse(snapshot.freshness.checkedAt);
+  return snapshot.freshness.state === "fresh" && now.getTime() <= checkedAt + snapshot.freshness.maxAgeHours * 60 * 60 * 1000;
+}
+
 export function assessReadOnlyEvidenceSnapshot(snapshot: ReadOnlyEvidenceSnapshot, now = new Date()) {
   const blockers: string[] = [];
-  const checkedAt = Date.parse(snapshot.freshness.checkedAt);
   if (snapshot.status !== "complete") blockers.push("The snapshot is incomplete.");
-  if (snapshot.freshness.state !== "fresh" || now.getTime() > checkedAt + snapshot.freshness.maxAgeHours * 60 * 60 * 1000) blockers.push("The snapshot is stale or its freshness is unknown.");
+  if (!isReadOnlyEvidenceSnapshotFresh(snapshot, now)) blockers.push("The snapshot is stale or its freshness is unknown.");
   if (snapshot.reconciliation.state !== "passed") blockers.push(`Reconciliation is ${snapshot.reconciliation.state}.`);
   return { ready: blockers.length === 0, blockers };
 }

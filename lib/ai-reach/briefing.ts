@@ -1,6 +1,6 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
-import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { assessReadOnlyEvidenceSnapshot, isReadOnlyEvidenceSnapshotFresh, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { buildOutcomeFunnel, formatRate, minimumStepRecords, type OutcomeFunnel } from "./funnel";
 
 export type AiReachRecommendation = {
@@ -127,7 +127,10 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const connectedSources = sources.filter((source) => source.state === "connected").length;
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
-  const funnel = dubsadoOutcomeEvidence ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
+  // Old counts should not drive step-level advice, so the funnel is only
+  // built while the saved export is still fresh.
+  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isReadOnlyEvidenceSnapshotFresh(data.evidenceSnapshot, now));
+  const funnel = dubsadoOutcomeEvidence && dubsadoEvidenceFresh ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
   const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {
     status: snapshotReady ? "ready" : "limited",
@@ -180,7 +183,9 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         evidence: [
           dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail,
           // Saved stages exist but no step has enough records to compare fairly.
-          funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
+          dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
+            ? "The saved export is out of date. Import a new export before comparing sales steps."
+            : funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
         ],
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",

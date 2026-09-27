@@ -79,6 +79,13 @@ describe("briefing with a sales funnel", () => {
     expect(JSON.stringify(action)).not.toMatch(/caused|because|increase|change your/i);
   });
 
+  it("does not give step advice from an out-of-date export", () => {
+    // The fixture export is fresh for 48 hours from Sep 2, 10:00.
+    const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc) }, new Date("2026-09-05T12:00:00.000Z")).recommendations[2];
+    expect(action.title).toBe("Review Dubsado outcome evidence");
+    expect(action.evidence.join(" ")).toContain("The saved export is out of date");
+  });
+
   it("says when there are too few records to compare", () => {
     const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot({ qualified_leads: 2, booked_calls: 1 }) }, now).recommendations[2];
     expect(action.title).toBe("Review Dubsado outcome evidence");

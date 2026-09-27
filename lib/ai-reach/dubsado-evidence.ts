@@ -71,8 +71,9 @@ export function buildDubsadoEvidenceSnapshot(input: Input): ReadOnlyEvidenceSnap
   }
   const revenue = buildRevenueMetric(input.records, input.evidenceId, input.reportingWindow, limitations);
   if (revenue) metrics.push(revenue);
-  // The main outcome still needs at least one record; a saved zero is not enough.
-  if (!metrics.some((metric) => metric.key === input.primaryOutcomeKey && metric.value > 0)) throw new Error("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
+  // The main outcome still needs at least one record: a count saved as zero is
+  // not enough. Revenue is saved only when booked records exist, even at $0.
+  if (!metrics.some((metric) => metric.key === input.primaryOutcomeKey && (metric.unit === "currency" || metric.value > 0))) throw new Error("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
   return parseReadOnlyEvidenceSnapshot({
     snapshotId: input.snapshotId,
     organizationId: input.organizationId,
