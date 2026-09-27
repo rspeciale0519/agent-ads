@@ -75,6 +75,8 @@ describe("briefing with a sales funnel", () => {
     expect(action.title).toBe("Find out why booked calls stall before proposals");
     expect(action.reason).toContain("Only 3 of 6 records that reached booked calls went on to proposals (50%)");
     expect(action.evidence).toContain("inquiries → qualified leads: 10 of 12 (83%)");
+    // The step is chosen by rate, so it must be described as a share, not a head count.
+    expect(action.expectedEffect).toContain("largest share");
     // It reports what happened without claiming a cause or asking for a change.
     expect(JSON.stringify(action)).not.toMatch(/caused|because|increase|change your/i);
   });

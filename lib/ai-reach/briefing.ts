@@ -95,7 +95,7 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
       ...funnel.steps.map((step) => `${step.from} → ${step.to}: ${step.advanced} of ${step.entered} (${formatRate(step.rate)})`),
       "Assumes each record passed through the earlier stages. Cancelled and refunded records are not counted.",
     ],
-    expectedEffect: "It focuses review time on the step where the most records stop.",
+    expectedEffect: "It focuses review time on the step that loses the largest share of records.",
     effort: "Medium",
     risk: "Low",
     uncertainty: dubsadoState === "connected" ? "Medium" : "High",
