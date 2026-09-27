@@ -195,6 +195,9 @@ describe("buildAiReachBriefing", () => {
     const briefing = buildAiReachBriefing({ ...base, connections: [connection("dubsado", { resourceCount: 0, selectedResourceCount: 0 })], evidenceSnapshot }, now);
     expect(briefing.sources.find((source) => source.name === "Dubsado outcomes")?.detail).toContain("Commercial outcome metrics are included");
     expect(briefing.recommendations[2].title).toBe("Review Dubsado outcome evidence");
+    // Saved results are shown in the tiles, so the headline must not say they are unmeasured.
+    expect(briefing.summary).toContain("Saved business results are a draft, not ready for decisions.");
+    expect(briefing.summary).not.toContain("not measured");
     expect(briefing.recommendations[2].reason).toContain("reporting window");
     expect(briefing.recommendations).toHaveLength(3);
     expect(JSON.stringify(briefing)).not.toMatch(/complete reconciliation|caused the outcome/i);

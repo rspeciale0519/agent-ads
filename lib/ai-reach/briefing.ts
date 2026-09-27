@@ -111,7 +111,11 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
     status: snapshotReady ? "ready" : "limited",
     summary: snapshotReady && primaryMetric
       ? `AI Reach has a complete read-only outcome snapshot. ${primaryMetric.key.replaceAll("_", " ")} is ${primaryMetric.value}${primaryMetric.unit === "currency" ? ` ${primaryMetric.currency}` : ""}.`
-      : `AI Reach shows read-only access records for ${connectedSources} of ${sources.length} core sources. Business results are not measured in this view.`,
+      : `AI Reach shows read-only access records for ${connectedSources} of ${sources.length} core sources. ${
+        // Saved results appear in the tiles below, so name them as a draft
+        // instead of claiming nothing is measured.
+        primaryMetric ? "Saved business results are a draft, not ready for decisions." : "Business results are not measured in this view."
+      }`,
     limitation: snapshotReady
       ? "This snapshot uses approved read-only evidence. It does not prove that a marketing change caused the outcome."
       : data.evidenceSnapshot && snapshotAssessment
