@@ -22,6 +22,9 @@ type Input = {
   collectorVersion: string;
   primaryOutcomeKey: "qualified_leads" | "booked_calls" | "closed_won_deals" | "booked_revenue";
   records: MappedDubsadoOutcomeRecord[];
+  // Stages named in the approved status map. Their count metrics are saved
+  // even at zero; other stages are saved only when they have records.
+  configuredStages?: readonly string[];
 };
 
 function countStage(records: MappedDubsadoOutcomeRecord[], stage: DubsadoOutcomeStage) {
@@ -58,12 +61,19 @@ export function buildDubsadoEvidenceSnapshot(input: Input): ReadOnlyEvidenceSnap
   const evidence = [{ id: input.evidenceId, sourceClass: "business_outcome_observation" as const, provider: "dubsado", method: "authorized_export" as const, collectedAt: input.capturedAt, collectorVersion: input.collectorVersion, limitations }];
   const metrics: ReadOnlyMetric[] = [];
   const counts: Array<[string, number]> = [["inquiries", countMetric(input.records, "inquiries")], ["qualified_leads", countMetric(input.records, "qualified_leads")], ["booked_calls", countMetric(input.records, "booked_calls")], ["completed_qualified_meetings", countMetric(input.records, "completed_qualified_meetings")], ["proposals_issued", countMetric(input.records, "proposals_issued")], ["signed_engagements", countMetric(input.records, "signed_engagements")], ["closed_won_deals", countMetric(input.records, "closed_won_deals")], ["cancelled_engagements", countMetric(input.records, "cancelled_engagements")], ["refunded_engagements", countMetric(input.records, "refunded_engagements")]];
+  const configured = new Set(input.configuredStages ?? []);
+  // A metric is configured when any stage feeding it is in the approved map.
+  const isConfigured = (key: string) => key === "closed_won_deals"
+    ? closedWonStages.some((stage) => configured.has(stage))
+    : Object.entries(stageMetricMap).some(([stage, metricKey]) => metricKey === key && configured.has(stage));
   for (const [key, value] of counts) {
-    if (value > 0) metrics.push({ key, value, unit: "count", reportingWindow: input.reportingWindow, attribution: "direct_first_party", evidenceIds: [input.evidenceId], limitations });
+    if (value > 0 || isConfigured(key)) metrics.push({ key, value, unit: "count", reportingWindow: input.reportingWindow, attribution: "direct_first_party", evidenceIds: [input.evidenceId], limitations });
   }
   const revenue = buildRevenueMetric(input.records, input.evidenceId, input.reportingWindow, limitations);
   if (revenue) metrics.push(revenue);
-  if (!metrics.some((metric) => metric.key === input.primaryOutcomeKey)) throw new Error("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
+  // The main outcome still needs at least one record: a count saved as zero is
+  // not enough. Revenue is saved only when booked records exist, even at $0.
+  if (!metrics.some((metric) => metric.key === input.primaryOutcomeKey && (metric.unit === "currency" || metric.value > 0))) throw new Error("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
   return parseReadOnlyEvidenceSnapshot({
     snapshotId: input.snapshotId,
     organizationId: input.organizationId,

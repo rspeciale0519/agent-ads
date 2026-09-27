@@ -1,6 +1,7 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
-import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { assessReadOnlyEvidenceSnapshot, isReadOnlyEvidenceSnapshotFresh, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { buildOutcomeFunnel, formatRate, minimumStepRecords, type OutcomeFunnel } from "./funnel";
 
 export type AiReachRecommendation = {
   id: string;
@@ -82,6 +83,26 @@ function sourceRecord(connections: DashboardConnectionSummary[], provider: Conne
     : { name, state: "missing", detail: "No read-only connection is recorded." };
 }
 
+// Points the third action at the sales step where the largest share of
+// records stops, using the saved Dubsado numbers. It describes what happened;
+// it does not claim why, so the action is to review, not to change anything.
+function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<OutcomeFunnel["weakest"]>, dubsadoState: Source["state"]): AiReachRecommendation {
+  return {
+    id: "funnel-weakest-step",
+    title: `Find out why ${weakest.from} stall before ${weakest.to}`,
+    reason: `Only ${weakest.advanced} of ${weakest.entered} records that reached ${weakest.from} went on to ${weakest.to} (${formatRate(weakest.rate)}). That is the weakest step with enough records to compare.`,
+    evidence: [
+      ...funnel.steps.map((step) => `${step.from} → ${step.to}: ${step.advanced} of ${step.entered} (${formatRate(step.rate)})`),
+      "Assumes each record passed through the earlier stages. Cancelled and refunded records are not counted.",
+    ],
+    expectedEffect: "It focuses review time on the step that loses the largest share of records.",
+    effort: "Medium",
+    risk: "Low",
+    uncertainty: dubsadoState === "connected" ? "Medium" : "High",
+    approval: "Customer and measurement owner approval required",
+  };
+}
+
 export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiReachBriefing {
   const checkedAt = now.getTime();
   const google = sourceRecord(data.connections, "google_ads", "Google Ads", checkedAt);
@@ -106,6 +127,10 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const connectedSources = sources.filter((source) => source.state === "connected").length;
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
+  // Old counts should not drive step-level advice, so the funnel is only
+  // built while the saved export is still fresh.
+  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isReadOnlyEvidenceSnapshotFresh(data.evidenceSnapshot, now));
+  const funnel = dubsadoOutcomeEvidence && dubsadoEvidenceFresh ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
   const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {
     status: snapshotReady ? "ready" : "limited",
@@ -147,13 +172,21 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         uncertainty: google.state === "connected" ? "Medium" : "High",
         approval: "Advertising owner approval required",
       },
-      {
+      dubsadoOutcomeEvidence && funnel?.weakest
+        ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
+        : {
         id: "dubsado-map",
         title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
         reason: dubsadoOutcomeEvidence
           ? "Commercial outcome metrics are present. Review their reporting window, stage map, and reconciliation limits before using them for a decision."
           : "Commercial results need approved stage definitions and source data before they can support a decision.",
-        evidence: [dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail, "An approved stage map is not available in this view."],
+        evidence: [
+          dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail,
+          // Saved stages exist but no step has enough records to compare fairly.
+          dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
+            ? "The saved export is out of date. Import a new export before comparing sales steps."
+            : funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
+        ],
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",
         risk: "Medium",

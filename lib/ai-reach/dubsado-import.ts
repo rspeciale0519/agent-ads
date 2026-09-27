@@ -98,6 +98,9 @@ export async function importDubsadoExport(context: OrganizationContext, connecti
       collectorVersion: `${DUBSADO_IMPORT_COLLECTOR_VERSION}+map.${mappingDigest}`,
       primaryOutcomeKey: parsed.primaryOutcomeKey,
       records: inWindow,
+      // Stages in the approved map are saved even with zero records, so
+      // "none reached this stage" is not mistaken for "stage not used".
+      configuredStages: Object.values(parsed.statusMap),
     });
   } catch (error) {
     throw toImportError(error);
