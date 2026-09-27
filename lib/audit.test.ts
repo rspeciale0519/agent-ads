@@ -25,7 +25,9 @@ describe("audit integrity appends", () => {
       const sql = query.join(" ");
       if (sql.includes("pg_advisory_xact_lock")) {
         order.push("lock");
-        return [{ pg_advisory_xact_lock: null }];
+        // Selecting the void result directly makes Prisma fail at runtime.
+        expect(sql).toContain("SELECT 1 AS locked FROM pg_advisory_xact_lock");
+        return [{ locked: 1 }];
       }
       order.push("read");
       expect(sql).toContain("NOT EXISTS");
@@ -55,7 +57,7 @@ describe("audit integrity appends", () => {
     vi.useFakeTimers();
     vi.setSystemTime(timestamp);
     const queryRaw = vi.fn()
-      .mockResolvedValueOnce([{ pg_advisory_xact_lock: null }])
+      .mockResolvedValueOnce([{ locked: 1 }])
       .mockResolvedValueOnce([{ integrityHash: "tied-child-hash", createdAt: timestamp }]);
     const create = vi.fn(async (input: unknown) => input);
     const tx = { $queryRaw: queryRaw, auditEvent: { findFirst: vi.fn(), create } } as unknown as TenantTransaction;
@@ -74,7 +76,7 @@ describe("audit integrity appends", () => {
   it("fails closed when an existing organization chain has multiple tips", async () => {
     const timestamp = new Date("2026-08-27T12:00:00.000Z");
     const queryRaw = vi.fn()
-      .mockResolvedValueOnce([{ pg_advisory_xact_lock: null }])
+      .mockResolvedValueOnce([{ locked: 1 }])
       .mockResolvedValueOnce([
         { integrityHash: "fork-one", createdAt: timestamp },
         { integrityHash: "fork-two", createdAt: timestamp },

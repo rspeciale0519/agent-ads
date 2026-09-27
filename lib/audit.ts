@@ -40,7 +40,9 @@ async function readAuditChainTip(tx: TenantTransaction, organizationId: string) 
 }
 
 export async function appendAuditEvent(tx: TenantTransaction, context: OrganizationContext, input: AuditInput) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${context.organizationId}::text, 0::bigint))`;
+  // pg_advisory_xact_lock returns "void", which Prisma cannot read back, so
+  // select a plain number from it instead. The lock still holds until commit.
+  await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${context.organizationId}::text, 0::bigint))`;
   const previous = await readAuditChainTip(tx, context.organizationId);
   const metadata = safeAuditMetadata(input.metadata ?? {});
   const now = Date.now();
