@@ -30,6 +30,7 @@ model Organization {
   accessInvitations    AccessInvitation[]
   idempotencyRecords   IdempotencyRecord[]
   evidenceSnapshots    AiReachEvidenceSnapshot[]
+  aiReachConversations AiReachConversation[]
 
   @@index([status, updatedAt])
   @@map("organizations")
@@ -431,5 +432,35 @@ model AiReachEvidenceSnapshot {
   @@unique([organizationId, snapshotKey])
   @@index([organizationId, capturedAt])
   @@map("ai_reach_evidence_snapshots")
+  @@schema("public")
+}
+
+model AiReachConversation {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at")
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  messages       AiReachMessage[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, userId, createdAt])
+  @@map("ai_reach_conversations")
+  @@schema("public")
+}
+
+model AiReachMessage {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  conversationId String              @map("conversation_id") @db.Uuid
+  role           String
+  content        String
+  answerKind     String?             @map("answer_kind")
+  citations      Json                @default("[]") @db.JsonB
+  createdAt      DateTime            @default(now()) @map("created_at")
+  conversation   AiReachConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, conversationId, createdAt])
+  @@map("ai_reach_messages")
   @@schema("public")
 }

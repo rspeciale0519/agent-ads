@@ -5,6 +5,7 @@ import { isOrganizationAccessError, requireOrganizationContext } from "../../lib
 import { getDashboardData } from "../../lib/dashboard/dashboard-service";
 import { buildAiReachBriefing } from "../../lib/ai-reach/briefing";
 import { readLatestEvidenceSnapshot } from "../../lib/ai-reach/evidence-store";
+import { readLatestConversation } from "../../lib/ai-reach/chat-service";
 import { buildOutcomeTiles } from "../../lib/ai-reach/outcome-tiles";
 import { getConnectionDetail } from "../../lib/connections/service";
 import AiReachChat from "./AiReachChat";
@@ -24,7 +25,7 @@ export default async function AiReachPage() {
     }
     throw error;
   }
-  const [dashboard, assurance, evidenceSnapshot] = await Promise.all([getDashboardData(context), getAssuranceStatus(context), readLatestEvidenceSnapshot(context)]);
+  const [dashboard, assurance, evidenceSnapshot, conversation] = await Promise.all([getDashboardData(context), getAssuranceStatus(context), readLatestEvidenceSnapshot(context), readLatestConversation(context)]);
   // The newest saved snapshot drives both the briefing status and the outcome tiles.
   const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot });
   const outcomeTiles = buildOutcomeTiles(evidenceSnapshot);
@@ -49,7 +50,7 @@ export default async function AiReachPage() {
     </section>
     <section className="ai-reach-outcomes" aria-label="Outcome snapshot">{outcomeTiles.map((tile) => <div className="ai-reach-outcome" key={tile.label}><span>{tile.label}</span><strong>{tile.value}</strong><small>{tile.detail}</small></div>)}</section>
     <section className="ai-reach-grid" aria-label="AI Reach workspace">
-      <article className="workspace-card ai-reach-chat-card"><div className="workspace-card-heading"><div><span className="eyebrow">Ask AI Reach</span><h2>Start with a simple question</h2></div><span className="ai-reach-readonly">Read-only</span></div><AiReachChat organizationName={dashboard.organization.name} briefing={briefing} /></article>
+      <article className="workspace-card ai-reach-chat-card"><div className="workspace-card-heading"><div><span className="eyebrow">Ask AI Reach</span><h2>Start with a simple question</h2></div><span className="ai-reach-readonly">Read-only</span></div><AiReachChat initialConversation={conversation} /></article>
       <article className="workspace-card ai-reach-sources-card"><div className="workspace-card-heading"><div><span className="eyebrow">Source access</span><h2>Connection records</h2></div><span className="workspace-count">{briefing.sources.length} sources</span></div><div className="ai-reach-source-list">{briefing.sources.map((source) => <div className="ai-reach-source" key={source.name}><span className={`ai-reach-source-dot ai-reach-source-${source.state}`} aria-hidden="true" /><div><strong>{source.name}</strong><small>{source.detail}</small></div><span className="ai-reach-source-state">{source.state === "connected" ? "Recorded" : source.state === "needs_review" ? "Review" : "Missing"}</span></div>)}</div><p className="ai-reach-note">{assurance.aal === "aal2" ? "Your account has MFA protection." : "Set up MFA before authorizing a connection."}</p></article>
     </section>
     <GoogleAdsReportPanel targets={googleAdsTargets} />
