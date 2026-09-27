@@ -46,6 +46,15 @@ describe("buildOutcomeFunnel", () => {
     expect(buildOutcomeFunnel(snapshot({ qualified_leads: 2, booked_calls: 1 }))?.weakest).toBeNull();
   });
 
+  it("treats a saved zero as a real stage, not an unused one", () => {
+    // 8 qualified leads and nobody booked a call: a 0% step, not "no funnel".
+    expect(buildOutcomeFunnel(snapshot({ qualified_leads: 8, booked_calls: 0 }))?.weakest).toMatchObject({ from: "qualified leads", to: "booked calls", advanced: 0, entered: 8, rate: 0 });
+    // An empty middle stage stays in the path, so the right step is named.
+    const funnel = buildOutcomeFunnel(snapshot({ qualified_leads: 4, booked_calls: 0, proposals_issued: 3 }));
+    expect(funnel?.steps.map((step) => `${step.from}>${step.to}`)).toEqual(["qualified leads>booked calls", "booked calls>proposals"]);
+    expect(funnel?.weakest).toMatchObject({ from: "qualified leads", to: "booked calls" });
+  });
+
   it("needs at least two saved stages and authorized Dubsado evidence", () => {
     expect(buildOutcomeFunnel(null)).toBeNull();
     expect(buildOutcomeFunnel(snapshot({ qualified_leads: 9 }))).toBeNull();

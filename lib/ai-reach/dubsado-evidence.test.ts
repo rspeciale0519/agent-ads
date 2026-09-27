@@ -38,6 +38,10 @@ describe("buildDubsadoEvidenceSnapshot", () => {
   });
 
   it("rejects missing primary evidence and currency conflicts", () => {
+    // A mapped stage with zero records is saved as zero, but the main outcome still needs a record.
+    const zeroCalls = buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-7", organizationId: "org-1", evidenceId: "dubsado-7", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "qualified_leads", records: records("Project ID,Status,Revenue,Currency\nproj-1,Qualified,,USD"), configuredStages: ["qualified_opportunity", "booked_call", "booked_revenue"] });
+    expect(zeroCalls.metrics.map((metric) => [metric.key, metric.value])).toEqual([["qualified_leads", 1], ["booked_calls", 0], ["closed_won_deals", 0]]);
+    expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-8", organizationId: "org-1", evidenceId: "dubsado-8", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_calls", records: records("Project ID,Status,Revenue,Currency\nproj-1,Qualified,,USD"), configuredStages: ["qualified_opportunity", "booked_call"] })).toThrow("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
     expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-3", organizationId: "org-1", evidenceId: "dubsado-3", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_calls", records: records("Project ID,Status,Revenue,Currency\nproj-1,Qualified,,USD") })).toThrow("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
     expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-4", organizationId: "org-1", evidenceId: "dubsado-4", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_revenue", records: records("Project ID,Status,Revenue,Currency\nproj-1,Booked,1250,USD\nproj-2,Booked,500,CAD") })).toThrow("DUBSADO_EVIDENCE_REVENUE_CURRENCY_CONFLICT");
   });

@@ -32,7 +32,8 @@ export function buildOutcomeFunnel(snapshot: ReadOnlyEvidenceSnapshot | null | u
       ...stage,
       metric: snapshot.metrics.find((metric) => metric.key === stage.key && metric.unit === "count" && metric.evidenceIds.some((id) => dubsadoEvidenceIds.has(id))),
     }))
-    // Skip stages this business does not use (no saved records).
+    // Skip stages this business does not use. Imports save a zero for every
+    // stage in the approved map, so a missing metric means "not used".
     .filter((stage) => stage.metric !== undefined)
     .map((stage) => ({ label: stage.label, count: stage.metric!.value }));
   if (counts.length < 2) return null;
@@ -44,8 +45,11 @@ export function buildOutcomeFunnel(snapshot: ReadOnlyEvidenceSnapshot | null | u
     to: stage.label,
     entered: reached[index],
     advanced: reached[index + 1],
-    rate: reached[index + 1] / reached[index],
-  }));
+    rate: reached[index] === 0 ? 0 : reached[index + 1] / reached[index],
+  }))
+    // A step nobody entered has no rate to show.
+    .filter((step) => step.entered > 0);
+  if (steps.length === 0) return null;
   // The weakest step is the lowest rate among steps with enough records;
   // ties go to the earlier step because it affects more records.
   const weakest = steps
