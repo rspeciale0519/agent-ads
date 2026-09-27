@@ -42,7 +42,8 @@ export default function AuthForm({ initialMode = "signup", initialNotice = "", i
       if (mode === "signup" && !result.data.session) {
         setNotice("Check your email to confirm your account, then return here to sign in.");
       } else {
-        router.replace("/dashboard");
+        // AI Reach is the home page after login.
+        router.replace("/ai-reach");
         router.refresh();
       }
     } catch (authError) {
