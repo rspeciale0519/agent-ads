@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicModelClient } from "./anthropic-model-client";
 import { buildAiReachBriefing } from "./briefing";
+import { isActionRequest } from "./chat";
 import { parseReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { deterministicAnswerProvider, getAnswerProvider } from "./gateway";
 import { buildModelFacts, createModelAnswerProvider, type AiReachModelClient, type ModelAnswerDraft } from "./model-answer";
@@ -111,6 +112,14 @@ describe("model answers", () => {
       const answer = await createModelAnswerProvider(model).answer(input(question));
       expect(["boundary", "guidance"]).toContain(answer.kind);
       expect(model.calls).toBe(0);
+    },
+  );
+
+  // Read-only questions that use the same words must still reach the model.
+  it.each(["Create a summary of last month's results", "When did we put the campaign on hold?", "Can the report be updated?", "Set up a weekly report"])(
+    "does not treat read-only questions as change requests: %s",
+    (question) => {
+      expect(isActionRequest(question.toLowerCase())).toBe(false);
     },
   );
 
