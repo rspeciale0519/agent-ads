@@ -86,6 +86,12 @@ describe("model answers", () => {
     expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
   });
 
+  it("does not tell the customer to connect a source that only needs review", async () => {
+    const withReview = { ...briefing, sources: briefing.sources.map((source) => source.name === "Google Ads" ? { ...source, state: "needs_review" as const } : source) };
+    const answer = await createModelAnswerProvider(fakeModel(draft({ missingSources: ["Google Ads"] }))).answer({ ...input("How much did I spend?"), briefing: withReview });
+    expect(answer.text).not.toContain("Connecting Google Ads");
+  });
+
   it("gives the read-only answer when the model marks a change request", async () => {
     const answer = await createModelAnswerProvider(fakeModel(draft({ isChangeRequest: true }))).answer(input("Please make my budget higher"));
     expect(answer.kind).toBe("boundary");
@@ -115,7 +121,8 @@ describe("model answers", () => {
       { key: "booked_revenue", label: "booked revenue", value: "$4,500", period: "Aug 1, 2026 to Aug 30, 2026" },
     ]);
     expect(facts.briefing.nextActions.map((action) => action.number)).toEqual([1, 2, 3]);
-    expect(Object.keys(facts)).toEqual(["organizationName", "briefing", "savedResults"]);
+    expect(Object.keys(facts)).toEqual(["briefing", "savedResults"]);
+    expect(JSON.stringify(facts)).not.toContain("Pilot company");
   });
 });
 
