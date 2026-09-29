@@ -1,6 +1,7 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
-import { assessReadOnlyEvidenceSnapshot, isReadOnlyEvidenceSnapshotFresh, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { isDubsadoExportFresh } from "./dubsado-evidence";
+import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { buildOutcomeFunnel, formatRate, minimumStepRecords, type OutcomeFunnel } from "./funnel";
 
 export type AiReachRecommendation = {
@@ -144,8 +145,8 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
   // Old counts should not drive step-level advice, so the funnel is only
-  // built while the saved export is still fresh.
-  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isReadOnlyEvidenceSnapshotFresh(data.evidenceSnapshot, now));
+  // built while the Dubsado export itself is still fresh.
+  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isDubsadoExportFresh(data.evidenceSnapshot, now));
   const funnel = dubsadoOutcomeEvidence && dubsadoEvidenceFresh ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
   const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {

@@ -17,6 +17,19 @@ const stageMetricMap: Partial<Record<DubsadoOutcomeStage, string>> = {
 // before AI Reach asks for a new one.
 export const DUBSADO_EXPORT_MAX_AGE_HOURS = 7 * 24;
 
+// True while the newest authorized Dubsado export in the snapshot is inside
+// today's export window. It uses the export's own collection time, so older
+// saved snapshots follow the current policy and a combined snapshot's shorter
+// window does not make the Dubsado part look out of date.
+export function isDubsadoExportFresh(snapshot: ReadOnlyEvidenceSnapshot, now = new Date()) {
+  const collectedTimes = snapshot.evidence
+    .filter((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export")
+    .map((evidence) => Date.parse(evidence.collectedAt))
+    .filter((time) => Number.isFinite(time) && time <= now.getTime());
+  if (collectedTimes.length === 0) return false;
+  return now.getTime() - Math.max(...collectedTimes) <= DUBSADO_EXPORT_MAX_AGE_HOURS * 60 * 60 * 1000;
+}
+
 type Input = {
   snapshotId: string;
   organizationId: string;

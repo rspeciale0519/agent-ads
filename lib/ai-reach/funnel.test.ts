@@ -81,9 +81,15 @@ describe("briefing with a sales funnel", () => {
     expect(JSON.stringify(action)).not.toMatch(/caused|because|increase|change your/i);
   });
 
-  it("does not give step advice from an out-of-date export", () => {
-    // The fixture export is fresh for 48 hours from Sep 2, 10:00.
+  it("judges the export by its own age under the current 7-day window", () => {
+    // The fixture was saved with a 48-hour window on Sep 2; three days later it is still usable.
     const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc) }, new Date("2026-09-05T12:00:00.000Z")).recommendations[2];
+    expect(action.title).toBe("Find out why booked calls stall before proposals");
+  });
+
+  it("does not give step advice from an out-of-date export", () => {
+    // More than 7 days after the export was collected on Sep 2.
+    const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc) }, new Date("2026-09-10T12:00:00.000Z")).recommendations[2];
     expect(action.title).toBe("Upload a fresh Dubsado export");
     expect(action.reason).toContain("out of date");
   });
