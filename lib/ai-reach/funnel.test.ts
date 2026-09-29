@@ -84,8 +84,8 @@ describe("briefing with a sales funnel", () => {
   it("does not give step advice from an out-of-date export", () => {
     // The fixture export is fresh for 48 hours from Sep 2, 10:00.
     const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc) }, new Date("2026-09-05T12:00:00.000Z")).recommendations[2];
-    expect(action.title).toBe("Review Dubsado outcome evidence");
-    expect(action.evidence.join(" ")).toContain("The saved export is out of date");
+    expect(action.title).toBe("Upload a fresh Dubsado export");
+    expect(action.reason).toContain("out of date");
   });
 
   it("says when there are too few records to compare", () => {

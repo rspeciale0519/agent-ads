@@ -103,6 +103,22 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
   };
 }
 
+// A reminder to upload a new export once the saved one is past its
+// freshness window, so advice never comes from old numbers.
+function staleExportRecommendation(dubsadoState: Source["state"]): AiReachRecommendation {
+  return {
+    id: "dubsado-refresh",
+    title: "Upload a fresh Dubsado export",
+    reason: "The saved Dubsado export is out of date, so AI Reach will not compare sales steps from it. Upload a new export to see current results.",
+    evidence: ["Authorized Dubsado outcome metrics are saved, but they are past their freshness window."],
+    expectedEffect: "Current numbers keep the results and sales-step advice accurate.",
+    effort: "Low",
+    risk: "Low",
+    uncertainty: dubsadoState === "connected" ? "Medium" : "High",
+    approval: "Customer and measurement owner approval required",
+  };
+}
+
 export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiReachBriefing {
   const checkedAt = now.getTime();
   const google = sourceRecord(data.connections, "google_ads", "Google Ads", checkedAt);
@@ -174,7 +190,9 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       },
       dubsadoOutcomeEvidence && funnel?.weakest
         ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
-        : {
+        : dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
+          ? staleExportRecommendation(dubsado.state)
+          : {
         id: "dubsado-map",
         title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
         reason: dubsadoOutcomeEvidence
@@ -183,9 +201,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         evidence: [
           dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail,
           // Saved stages exist but no step has enough records to compare fairly.
-          dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
-            ? "The saved export is out of date. Import a new export before comparing sales steps."
-            : funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
+          funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
         ],
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",

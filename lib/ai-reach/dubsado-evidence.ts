@@ -13,6 +13,10 @@ const stageMetricMap: Partial<Record<DubsadoOutcomeStage, string>> = {
   refunded: "refunded_engagements",
 };
 
+// Exports are uploaded by hand, often weekly, so they stay usable for a week
+// before AI Reach asks for a new one.
+export const DUBSADO_EXPORT_MAX_AGE_HOURS = 7 * 24;
+
 type Input = {
   snapshotId: string;
   organizationId: string;
@@ -82,7 +86,7 @@ export function buildDubsadoEvidenceSnapshot(input: Input): ReadOnlyEvidenceSnap
     capturedAt: input.capturedAt,
     collectorVersion: input.collectorVersion,
     status: "partial",
-    freshness: { state: "fresh", checkedAt: input.capturedAt, maxAgeHours: 48 },
+    freshness: { state: "fresh", checkedAt: input.capturedAt, maxAgeHours: DUBSADO_EXPORT_MAX_AGE_HOURS },
     reconciliation: { state: "warning", limitation: "Cross-system advertising reconciliation is not complete." },
     evidence,
     metrics,
