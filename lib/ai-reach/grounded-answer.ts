@@ -36,6 +36,11 @@ const metricTopics: Array<{ key: string; label: string; terms: string[] }> = [
   { key: "google_ads.conversions", label: "Google Ads conversions", terms: ["conversion"] },
 ];
 
+// The plain-language name for a metric key, e.g. "qualified leads".
+export function metricLabel(key: string) {
+  return metricTopics.find((topic) => topic.key === key)?.label ?? key.replaceAll(".", " ").replaceAll("_", " ");
+}
+
 export function formatValue(metric: ReadOnlyMetric) {
   if (metric.unit === "currency") return new Intl.NumberFormat("en-US", { style: "currency", currency: metric.currency ?? "USD", maximumFractionDigits: 0 }).format(metric.value);
   if (metric.unit === "rate") return `${Math.round(metric.value * 1000) / 10}%`;

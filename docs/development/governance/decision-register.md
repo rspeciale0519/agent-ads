@@ -357,9 +357,10 @@
 - Safety:
   - Change requests never reach a model, and a draft the model marks as a change request gets the read-only answer.
   - Models receive formatted aggregate saved metrics, source states, and next actions only.
-  - A model never writes numbers or dates. It names saved metrics with `{{value:KEY}}` and `{{period:KEY}}` placeholders, and AI Reach fills in the values.
-  - Citations come from the metrics used. AI Reach appends the readiness and causation notes itself.
-  - A draft with its own digits or number words, an unknown placeholder, or a claim that an account was changed is rejected, and the deterministic answer is used instead. Model failures also fall back.
+  - A model never writes a sentence containing a number. It returns the keys of the saved results that answer the question plus a short explanation. AI Reach writes each result line ("Qualified leads: 12 (Aug 1, 2026 to Aug 30, 2026).") from the snapshot, so a value can't carry the wrong label.
+  - Citations come from the chosen results. AI Reach appends the readiness and causation notes itself.
+  - An explanation with digits, number words, causal claims ("caused", "because of", "drove"…) or claims of a change ("is now on hold") is rejected, as is an unknown result key. The deterministic answer is used instead. Model failures also fall back.
+  - Change requests are caught before the model, including passive and "on hold" forms.
 - Switch: the model is used only when `AI_REACH_MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` are both set. Removing either restores deterministic answers.
 - Owner/date: product owner, 2026-09-29.
 - Affects: AI Reach chat, AGT-001–AGT-010.
