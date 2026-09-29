@@ -36,13 +36,13 @@ const metricTopics: Array<{ key: string; label: string; terms: string[] }> = [
   { key: "google_ads.conversions", label: "Google Ads conversions", terms: ["conversion"] },
 ];
 
-function formatValue(metric: ReadOnlyMetric) {
+export function formatValue(metric: ReadOnlyMetric) {
   if (metric.unit === "currency") return new Intl.NumberFormat("en-US", { style: "currency", currency: metric.currency ?? "USD", maximumFractionDigits: 0 }).format(metric.value);
   if (metric.unit === "rate") return `${Math.round(metric.value * 1000) / 10}%`;
   return new Intl.NumberFormat("en-US").format(metric.value);
 }
 
-function formatWindow(metric: ReadOnlyMetric) {
+export function formatWindow(metric: ReadOnlyMetric) {
   const format = (value: string) => new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
   return `${format(metric.reportingWindow.start)} to ${format(metric.reportingWindow.end)}`;
 }
@@ -53,6 +53,13 @@ function citationsFor(metric: ReadOnlyMetric, snapshot: ReadOnlyEvidenceSnapshot
     .map((evidence) => ({ evidenceId: evidence.id, provider: evidence.provider, method: evidence.method, collectedAt: evidence.collectedAt }));
 }
 
+// The reply to any request to change an account; the pilot is read-only.
+export const readOnlyBoundaryAnswer: AiReachAnswer = {
+  text: "Not yet. This pilot is read-only. AI Reach can explain evidence, but it cannot change ads, budgets, bids, targeting, websites, email, or CRM records.",
+  kind: "boundary",
+  citations: [],
+};
+
 // Answers one question using only the saved evidence snapshot and briefing.
 // It never invents a number: a metric either comes from the snapshot with its
 // citations, or the answer says the evidence is not available.
@@ -60,9 +67,7 @@ export function answerFromEvidence(input: AiReachAnswerInput): AiReachAnswer {
   const normalized = input.question.trim().toLowerCase();
   if (!normalized) return { text: "Ask a question about your sources, results, or next safe action.", kind: "guidance", citations: [] };
 
-  if (isActionRequest(normalized)) {
-    return { text: "Not yet. This pilot is read-only. AI Reach can explain evidence, but it cannot change ads, budgets, bids, targeting, websites, email, or CRM records.", kind: "boundary", citations: [] };
-  }
+  if (isActionRequest(normalized)) return readOnlyBoundaryAnswer;
 
   const topic = metricTopics.find((candidate) => candidate.terms.some((term) => normalized.includes(term)));
   if (topic) {

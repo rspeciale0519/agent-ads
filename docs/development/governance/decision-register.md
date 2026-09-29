@@ -354,7 +354,12 @@
 - Amends: D-026 (first model provider).
 - Context: AI Reach chat answered only from fixed rules. The product owner wants model-generated answers and wants the system to stay model-agnostic.
 - Decision: AI Reach answers go through a vendor-neutral contract (`AiReachModelClient`). The first adapter uses Anthropic (`claude-opus-5-5` by default, overridable with `AI_REACH_MODEL`). Other vendors, including OpenAI, plug in as further adapters without changing the safety checks.
-- Safety: change requests never reach a model. Models receive aggregate saved metrics, source states, and next actions only. Every draft is rejected, and the deterministic answer used instead, when it cites unknown evidence or states a number absent from the facts or the question. Model failures also fall back.
+- Safety:
+  - Change requests never reach a model, and a draft the model marks as a change request gets the read-only answer.
+  - Models receive formatted aggregate saved metrics, source states, and next actions only.
+  - A model never writes numbers or dates. It names saved metrics with `{{value:KEY}}` and `{{period:KEY}}` placeholders, and AI Reach fills in the values.
+  - Citations come from the metrics used. AI Reach appends the readiness and causation notes itself.
+  - A draft with its own digits or number words, an unknown placeholder, or a claim that an account was changed is rejected, and the deterministic answer is used instead. Model failures also fall back.
 - Switch: the model is used only when `AI_REACH_MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` are both set. Removing either restores deterministic answers.
 - Owner/date: product owner, 2026-09-29.
 - Affects: AI Reach chat, AGT-001–AGT-010.

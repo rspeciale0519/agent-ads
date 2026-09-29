@@ -2,7 +2,7 @@ import type { AiReachBriefing } from "./briefing";
 
 // Verbs that would change an account. The pilot is read-only, so a request to
 // do one of these is refused before any evidence is read.
-const actionVerbs = "change|pause|stop|increase|decrease|raise|lower|edit|publish|send|launch|delete|adjust|turn off|turn on|cancel|boost|cut";
+const actionVerbs = "change|pause|stop|increase|decrease|raise|lower|edit|publish|send|launch|delete|adjust|turn off|turn on|cancel|boost|cut|set(?!\\s+up)|create|update|modify|remove|schedule|allocate|reallocate|reduce|double|halve|enable|disable|activate|deactivate|resume";
 
 // A request, not a question about history: the verb opens the sentence
 // ("Pause the campaign"), or someone asks for it to be done ("Can you change…",

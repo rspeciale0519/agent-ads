@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { modelAnswerDraftSchema, type AiReachModelClient } from "./model-answer";
 
-const draftSchema = z.object({ answer: z.string(), citedEvidenceIds: z.array(z.string()) });
+const draftSchema = z.object({ answer: z.string(), isChangeRequest: z.boolean() });
 
 export const defaultAnthropicModel = "claude-opus-5-5";
 
