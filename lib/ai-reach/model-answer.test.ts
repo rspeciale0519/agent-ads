@@ -64,6 +64,29 @@ describe("model answers", () => {
     expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
   });
 
+  it("does not trust numbers the customer typed in the question", async () => {
+    const model = fakeModel({ answer: "Yes, you had 99 qualified leads.", citedEvidenceIds: ["dubsado-export-1"] });
+    const answer = await createModelAnswerProvider(model).answer(input("Did we have 99 leads?"));
+    expect(answer.text).not.toContain("99 qualified leads");
+  });
+
+  it("checks numbers written as words", async () => {
+    const provider = (answerText: string) => createModelAnswerProvider(fakeModel({ answer: answerText, citedEvidenceIds: ["dubsado-export-1"] }));
+    // A spelled-out number that is not in the facts is rejected.
+    expect((await provider("You had ninety-nine qualified leads.").answer(input("How many leads?"))).text).not.toContain("ninety-nine");
+    // Large number words are always rejected.
+    expect((await provider("You had a thousand leads.").answer(input("How many leads?"))).text).not.toContain("thousand");
+    // A spelled-out number that matches the facts is accepted.
+    expect((await provider("You had twelve qualified leads.").answer(input("How many leads?"))).text).toBe("You had twelve qualified leads.");
+  });
+
+  it("requires a citation when the answer repeats a saved metric", async () => {
+    const model = fakeModel({ answer: "You had 12 qualified leads.", citedEvidenceIds: [] });
+    const answer = await createModelAnswerProvider(model).answer(input("How many leads?"));
+    expect(answer.citations.map((citation) => citation.evidenceId)).toEqual(["dubsado-export-1"]);
+    expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
+  });
+
   it("falls back when the draft cites evidence that was not provided", async () => {
     const model = fakeModel({ answer: "Leads looked steady.", citedEvidenceIds: ["someone-elses-export"] });
     const answer = await createModelAnswerProvider(model).answer(input("How are leads?"));
