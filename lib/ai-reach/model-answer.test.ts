@@ -49,48 +49,46 @@ function fakeModel(draft: ModelAnswerDraft | null | Error): AiReachModelClient &
 }
 
 describe("model answers", () => {
-  const draft = (metricKeys: string[], explanation: string, isChangeRequest = false): ModelAnswerDraft => ({ isChangeRequest, metricKeys, explanation });
+  const draft = (choices: Partial<ModelAnswerDraft> = {}): ModelAnswerDraft => ({ isChangeRequest: false, metricKeys: [], nextActionNumbers: [], missingSources: [], ...choices });
 
-  it("writes the result lines itself, cites their evidence, and adds the readiness and causation notes", async () => {
-    const answer = await createModelAnswerProvider(fakeModel(draft(["qualified_leads", "booked_revenue"], "August brought steady interest; add Google Ads to compare with ad activity."))).answer(input("How did August go?"));
+  it("writes every sentence itself from the chosen results, cites them, and adds the notes", async () => {
+    const answer = await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads", "booked_revenue"], nextActionNumbers: [2] }))).answer(input("How did August go?"));
     expect(answer.kind).toBe("evidence");
     expect(answer.text).toContain("Qualified leads: 12 (Aug 1, 2026 to Aug 30, 2026). Booked revenue: $4,500 (Aug 1, 2026 to Aug 30, 2026).");
-    expect(answer.text).toContain("August brought steady interest");
+    expect(answer.text).toContain(`Suggested next step: ${briefing.recommendations[1].title}.`);
     expect(answer.text).toContain("Treat these numbers as a draft, not a decision-ready result:");
     expect(answer.text).toContain("does not prove a marketing change caused it");
     expect(answer.citations.map((citation) => citation.evidenceId)).toEqual(["dubsado-export-1"]);
   });
 
+  it("shows a result under its own label whatever the question asked", async () => {
+    const answer = await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads"] }))).answer(input("How many booked calls?"));
+    expect(answer.text).toContain("Qualified leads: 12");
+    expect(answer.text).not.toMatch(/booked calls/u);
+  });
+
+  it("points to missing sources and next actions without saved results", async () => {
+    const answer = await createModelAnswerProvider(fakeModel(draft({ missingSources: ["Google Ads"], nextActionNumbers: [2] }))).answer(input("How much did I spend on ads?"));
+    expect(answer).toEqual({
+      text: `Your saved evidence doesn't cover this yet. Connecting Google Ads would help answer this. Suggested next step: ${briefing.recommendations[1].title}.`,
+      kind: "guidance",
+      citations: [],
+    });
+  });
+
   it.each([
-    ["a number in digits", draft(["qualified_leads"], "That is 99 more than usual.")],
-    ["a number written as a word", draft([], "You had ninety-nine booked calls.")],
-    ["a small number word", draft([], "You had one booked call.")],
-    ["a saved result that does not exist", draft(["booked_calls"], "Here are your calls.")],
-    ["a claim that an account was changed", draft([], "Done. I have paused your campaign.")],
-    ["a passive claim of a change", draft([], "Your campaign is now on hold.")],
-    ["a causal claim", draft(["qualified_leads"], "Google Ads drove these qualified leads.")],
-    ["another causal claim", draft(["qualified_leads"], "Leads rose because of your new offer.")],
-    ["nothing at all", draft([], "")],
-  ])("falls back when the model writes %s", async (_label, badDraft) => {
+    ["a saved result that does not exist", draft({ metricKeys: ["booked_calls"] })],
+    ["a next action that does not exist", draft({ nextActionNumbers: [7] })],
+    ["a source that is not missing or not real", draft({ missingSources: ["Facebook"] })],
+    ["nothing at all", draft()],
+  ])("falls back when the model chooses %s", async (_label, badDraft) => {
     const answer = await createModelAnswerProvider(fakeModel(badDraft)).answer(input("How many leads?"));
     expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
   });
 
-  it("can never put a value under the wrong label", async () => {
-    // The model only picks keys; the label always comes from the metric itself.
-    const answer = await createModelAnswerProvider(fakeModel(draft(["qualified_leads"], "Here is the closest saved result."))).answer(input("How many booked calls?"));
-    expect(answer.text).toContain("Qualified leads: 12");
-    expect(answer.text).not.toMatch(/12 booked calls/u);
-  });
-
   it("gives the read-only answer when the model marks a change request", async () => {
-    const answer = await createModelAnswerProvider(fakeModel(draft([], "Sure.", true))).answer(input("Is it possible to hold my campaign?"));
+    const answer = await createModelAnswerProvider(fakeModel(draft({ isChangeRequest: true }))).answer(input("Please make my budget higher"));
     expect(answer.kind).toBe("boundary");
-  });
-
-  it("returns an explanation without saved results as uncited guidance", async () => {
-    const answer = await createModelAnswerProvider(fakeModel(draft([], "Connect Google Ads next so campaign results can be compared with your sales."))).answer(input("What should I connect first?"));
-    expect(answer).toEqual({ text: "Connect Google Ads next so campaign results can be compared with your sales.", kind: "guidance", citations: [] });
   });
 
   it("falls back when the model fails or returns nothing", async () => {
@@ -101,21 +99,22 @@ describe("model answers", () => {
   });
 
   it.each(["Please increase my budget", "Set my budget to 500", "Create an ad", "Can you update my bids?", "Could my campaign be put on hold?", "Put the search campaign on hold", "Can the budget be raised?", "   "])(
-    "never sends change requests or empty questions to the model: %s",
+    "never sends recognized change requests or empty questions to the model: %s",
     async (question) => {
-      const model = fakeModel(draft([], "Done, budget raised."));
+      const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
       const answer = await createModelAnswerProvider(model).answer(input(question));
       expect(["boundary", "guidance"]).toContain(answer.kind);
       expect(model.calls).toBe(0);
     },
   );
 
-  it("sends only labeled, formatted aggregate values and source names as facts", () => {
+  it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {
     const facts = buildModelFacts(input("How many leads?"));
     expect(facts.savedResults?.metrics).toEqual([
       { key: "qualified_leads", label: "qualified leads", value: "12", period: "Aug 1, 2026 to Aug 30, 2026" },
       { key: "booked_revenue", label: "booked revenue", value: "$4,500", period: "Aug 1, 2026 to Aug 30, 2026" },
     ]);
+    expect(facts.briefing.nextActions.map((action) => action.number)).toEqual([1, 2, 3]);
     expect(Object.keys(facts)).toEqual(["organizationName", "briefing", "savedResults"]);
   });
 });
@@ -137,9 +136,9 @@ describe("Anthropic model adapter", () => {
   }
 
   it("requests a structured draft with fallbacks and parses it", async () => {
-    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], explanation: "Leads look steady." }) }] });
+    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
     const draft = await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "How many leads?" });
-    expect(draft).toEqual({ isChangeRequest: false, metricKeys: ["qualified_leads"], explanation: "Leads look steady." });
+    expect(draft).toEqual({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] });
     const request = create.mock.calls[0][0];
     expect(request.model).toBe("claude-opus-5-5");
     expect(request.output_config.format.type).toBe("json_schema");

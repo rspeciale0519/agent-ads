@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { modelAnswerDraftSchema, type AiReachModelClient } from "./model-answer";
 
-const draftSchema = z.object({ isChangeRequest: z.boolean(), metricKeys: z.array(z.string()), explanation: z.string() });
+const draftSchema = z.object({ isChangeRequest: z.boolean(), metricKeys: z.array(z.string()), nextActionNumbers: z.array(z.number().int()), missingSources: z.array(z.string()) });
 
 export const defaultAnthropicModel = "claude-opus-5-5";
 
@@ -21,7 +21,7 @@ export function createAnthropicModelClient(options: { apiKey: string; model?: st
         max_tokens: 4000,
         system,
         messages: [{ role: "user", content: `Facts (JSON):\n${facts}\n\nCustomer question:\n${question}` }],
-        // Low effort suits short chat answers; the reply must match the draft schema.
+        // Low effort suits routing a short question; the reply must match the draft schema.
         output_config: { effort: "low", format: { type: "json_schema", schema: modelAnswerDraftSchema } },
         // If a safety check declines, the API retries on a suitable fallback model.
         betas: ["server-side-fallback-2026-07-01"],
