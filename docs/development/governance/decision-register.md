@@ -348,6 +348,17 @@
 - Owner/date: product owner, 2026-09-26.
 - Affects: Gate F1.
 
+### D-039 — Model-agnostic AI Reach answers, Anthropic first
+
+- Status: accepted.
+- Amends: D-026 (first model provider).
+- Context: AI Reach chat answered only from fixed rules. The product owner wants model-generated answers and wants the system to stay model-agnostic.
+- Decision: AI Reach answers go through a vendor-neutral contract (`AiReachModelClient`). The first adapter uses Anthropic (`claude-opus-5-5` by default, overridable with `AI_REACH_MODEL`). Other vendors, including OpenAI, plug in as further adapters without changing the safety checks.
+- Safety: change requests never reach a model. Models receive aggregate saved metrics, source states, and next actions only. Every draft is rejected, and the deterministic answer used instead, when it cites unknown evidence or states a number absent from the facts or the question. Model failures also fall back.
+- Switch: the model is used only when `AI_REACH_MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` are both set. Removing either restores deterministic answers.
+- Owner/date: product owner, 2026-09-29.
+- Affects: AI Reach chat, AGT-001–AGT-010.
+
 ## Decision process
 
 New material decisions must state context, options, decision, consequences, owner, date, status, affected requirement IDs, and any migration. Superseded decisions are never deleted.
