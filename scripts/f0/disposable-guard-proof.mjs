@@ -89,12 +89,16 @@ function verifyGuardFailure(label, expectedMessage, selectedMarker = marker) {
 function waitForTemporaryObjectCleanup(label) {
   const query = "SELECT (SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname ~ '^pg_(toast_)?temp_') + (SELECT count(*) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname ~ '^pg_(toast_)?temp_')";
   const pause = new Int32Array(new SharedArrayBuffer(4));
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  // One overall 10-second deadline; each check is also cut off at that deadline.
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
     const result = spawnSync(psql, [...psqlBaseArguments({ quiet: true, tuplesOnly: true, noAlign: true }), "--command", query], {
       cwd: root,
       encoding: "utf8",
       env: networkDatabaseEnvironment(context, "agent_ads_f0", { trustedCatalogs: true }),
       maxBuffer: 10 * 1024 * 1024,
+      timeout: Math.max(1, deadline - Date.now()),
+      killSignal: "SIGKILL",
     });
     if (!result.error && result.status === 0 && result.stdout.trim() === "0") return;
     Atomics.wait(pause, 0, 0, 100);
