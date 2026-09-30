@@ -29,7 +29,8 @@ export function createAnthropicModelClient(options: { apiKey: string; model?: st
         fallbacks: "default",
       });
       // Billed tokens are kept even when the draft is unusable.
-      const tokens = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      // The served model is recorded, since a fallback may answer instead.
+      const tokens = { model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
       if (response.stop_reason !== "end_turn") return { draft: null, ...tokens };
       const text = response.content.find((block) => block.type === "text");
       if (!text || text.type !== "text") return { draft: null, ...tokens };

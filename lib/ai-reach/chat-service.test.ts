@@ -108,6 +108,8 @@ describe("AI Reach chat service", () => {
     const models = mockDatabase(null);
     await expect(askAiReach(context, { question: "Hi", conversationId }, provider)).rejects.toMatchObject({ code: "AI_REACH_CONVERSATION_NOT_FOUND", status: 404 });
     expect(models.aiReachMessage.create).not.toHaveBeenCalled();
+    // The answer (and any billable model call) never runs for it.
+    expect(provider.answer).not.toHaveBeenCalled();
   });
 
   it("refuses a question containing a password before answering or saving it", async () => {

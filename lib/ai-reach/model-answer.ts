@@ -17,7 +17,9 @@ export type ModelAnswerDraft = {
 
 // What one model call returned: the draft (null when unusable) and the tokens
 // the vendor billed, when the vendor reports them.
-export type ModelDraftResult = { draft: ModelAnswerDraft | null; inputTokens: number | null; outputTokens: number | null };
+// `model` is the model that actually served the call, which can differ from
+// the one requested when the vendor falls back to another model.
+export type ModelDraftResult = { draft: ModelAnswerDraft | null; model?: string; inputTokens: number | null; outputTokens: number | null };
 
 // One adapter per model vendor (Anthropic today; others later). An adapter
 // only turns the prompt into a draft.
@@ -45,7 +47,14 @@ export function redactContactDetails(question: string) {
   return question
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, "[email]")
     .replace(/\bhttps?:\/\/\S+|\bwww\.\S+/giu, "[link]")
-    .replace(/\+\d[\d\s().-]{7,}\d|(?:\b\d{1,2}[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/gu, "[phone]");
+    // Any run of digits and phone separators holding seven or more digits is
+    // treated as a phone number, whatever the country format ("555-1212",
+    // "020 7946 0958", "+44 20 7946 0958"). Plain dates ("2026-08-01") stay.
+    .replace(/\+?\(?\d[\d\s().-]*\d/gu, (match) => {
+      const candidate = match.trim();
+      if (/^\d{4}-\d{1,2}(?:-\d{1,2})?$/u.test(candidate)) return match;
+      return (candidate.match(/\d/gu) ?? []).length >= 7 ? "[phone]" : match;
+    });
 }
 
 // JSON schema for the draft, shared by every adapter that supports
@@ -151,7 +160,7 @@ export function createModelAnswerProvider(client: AiReachModelClient): AiReachAn
       if (!normalized || isActionRequest(normalized)) return answerFromEvidence(input);
       const usage = (status: ModelUsage["status"], result?: ModelDraftResult): ModelUsage => ({
         provider: client.provider,
-        model: client.model,
+        model: result?.model ?? client.model,
         status,
         inputTokens: result?.inputTokens ?? null,
         outputTokens: result?.outputTokens ?? null,

@@ -137,10 +137,17 @@ describe("model answers", () => {
     expect((await createModelAnswerProvider(fakeModel(draft())).answer(input("Pause my ads"))).modelUsage).toBeUndefined();
   });
 
+  it("records the model that actually served the call", async () => {
+    const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
+    const draftAnswer = model.draftAnswer;
+    model.draftAnswer = async (prompt) => ({ ...(await draftAnswer(prompt)), model: "fallback-model" });
+    expect((await createModelAnswerProvider(model).answer(input("How many leads?"))).modelUsage?.model).toBe("fallback-model");
+  });
+
   it("removes emails, phone numbers, and links before the question leaves AI Reach", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
-    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 from https://acme.test/x become a lead in 2026-08?"));
-    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] from [link] become a lead in 2026-08?");
+    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
+    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
   });
 
   it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {
@@ -172,9 +179,9 @@ describe("Anthropic model adapter", () => {
   }
 
   it("requests a structured draft with fallbacks and parses it", async () => {
-    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", usage: { input_tokens: 900, output_tokens: 40 }, content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
+    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", model: "claude-opus-5-5", usage: { input_tokens: 900, output_tokens: 40 }, content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
     const result = await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "How many leads?" });
-    expect(result).toEqual({ draft: { isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }, inputTokens: 900, outputTokens: 40 });
+    expect(result).toEqual({ draft: { isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }, model: "claude-opus-5-5", inputTokens: 900, outputTokens: 40 });
     const request = create.mock.calls[0][0];
     expect(request.model).toBe("claude-opus-5-5");
     expect(request.output_config.format.type).toBe("json_schema");
@@ -189,8 +196,9 @@ describe("Anthropic model adapter", () => {
       { stop_reason: "end_turn", content: [{ type: "text", text: "not json" }] },
     ];
     for (const response of responses) {
-      const { client } = fakeAnthropic({ ...response, usage: { input_tokens: 5, output_tokens: 1 } });
-      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toEqual({ draft: null, inputTokens: 5, outputTokens: 1 });
+      // A fallback model served these calls; its name is what gets recorded.
+      const { client } = fakeAnthropic({ ...response, model: "claude-sonnet-5-5", usage: { input_tokens: 5, output_tokens: 1 } });
+      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toEqual({ draft: null, model: "claude-sonnet-5-5", inputTokens: 5, outputTokens: 1 });
     }
   });
 });
