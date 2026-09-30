@@ -457,6 +457,7 @@ model AiReachMessage {
   content        String
   answerKind     String?             @map("answer_kind")
   citations      Json                @default("[]") @db.JsonB
+  modelUsage     Json?               @map("model_usage") @db.JsonB
   createdAt      DateTime            @default(now()) @map("created_at")
   conversation   AiReachConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Restrict)
 

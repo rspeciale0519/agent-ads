@@ -15,12 +15,38 @@ export type ModelAnswerDraft = {
   missingSources: string[];
 };
 
+// What one model call returned: the draft (null when unusable) and the tokens
+// the vendor billed, when the vendor reports them.
+export type ModelDraftResult = { draft: ModelAnswerDraft | null; inputTokens: number | null; outputTokens: number | null };
+
 // One adapter per model vendor (Anthropic today; others later). An adapter
-// only turns the prompt into a draft. It returns null when it cannot answer.
+// only turns the prompt into a draft.
 export type AiReachModelClient = {
-  name: string;
-  draftAnswer(prompt: { system: string; facts: string; question: string }): Promise<ModelAnswerDraft | null>;
+  provider: string;
+  model: string;
+  draftAnswer(prompt: { system: string; facts: string; question: string }): Promise<ModelDraftResult>;
 };
+
+// The usage record saved with every answer that called a model, so provider
+// spending can be audited per organization. The status says what AI Reach
+// did with the call: used it, turned it into the read-only answer, rejected
+// the draft, or fell back after the call failed.
+export type ModelUsage = {
+  provider: string;
+  model: string;
+  status: "accepted" | "change_request" | "rejected" | "failed";
+  inputTokens: number | null;
+  outputTokens: number | null;
+};
+
+// Removes contact details before a question leaves AI Reach. The router only
+// needs the topic of a question, never who it is about.
+export function redactContactDetails(question: string) {
+  return question
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, "[email]")
+    .replace(/\bhttps?:\/\/\S+|\bwww\.\S+/giu, "[link]")
+    .replace(/\+\d[\d\s().-]{7,}\d|(?:\b\d{1,2}[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/gu, "[phone]");
+}
 
 // JSON schema for the draft, shared by every adapter that supports
 // structured output.
@@ -119,21 +145,30 @@ export function acceptModelDraft(draft: ModelAnswerDraft, input: AiReachAnswerIn
 // and writes no text, so it can neither change nor claim to change anything.
 export function createModelAnswerProvider(client: AiReachModelClient): AiReachAnswerProvider {
   return {
-    name: `model:${client.name}`,
+    name: `model:${client.provider}:${client.model}`,
     answer: async (input) => {
       const normalized = input.question.trim().toLowerCase();
       if (!normalized || isActionRequest(normalized)) return answerFromEvidence(input);
+      const usage = (status: ModelUsage["status"], result?: ModelDraftResult): ModelUsage => ({
+        provider: client.provider,
+        model: client.model,
+        status,
+        inputTokens: result?.inputTokens ?? null,
+        outputTokens: result?.outputTokens ?? null,
+      });
+      let result: ModelDraftResult;
       try {
-        const draft = await client.draftAnswer({ system: modelAnswerSystemPrompt, facts: JSON.stringify(buildModelFacts(input)), question: input.question.trim() });
-        if (draft?.isChangeRequest) return readOnlyBoundaryAnswer;
-        const accepted = draft ? acceptModelDraft(draft, input) : null;
-        if (accepted) return accepted;
-        console.warn(`AI Reach model answer rejected; using deterministic answer (provider ${client.name}).`);
+        result = await client.draftAnswer({ system: modelAnswerSystemPrompt, facts: JSON.stringify(buildModelFacts(input)), question: redactContactDetails(input.question.trim()) });
       } catch (error) {
         // Log the failure type only; the question and facts stay out of logs.
-        console.warn(`AI Reach model provider ${client.name} failed: ${error instanceof Error ? error.name : "unknown error"}`);
+        console.warn(`AI Reach model provider ${client.provider} failed: ${error instanceof Error ? error.name : "unknown error"}`);
+        return { ...answerFromEvidence(input), modelUsage: usage("failed") };
       }
-      return answerFromEvidence(input);
+      if (result.draft?.isChangeRequest) return { ...readOnlyBoundaryAnswer, modelUsage: usage("change_request", result) };
+      const accepted = result.draft ? acceptModelDraft(result.draft, input) : null;
+      if (accepted) return { ...accepted, modelUsage: usage("accepted", result) };
+      console.warn(`AI Reach model answer rejected; using deterministic answer (provider ${client.provider}).`);
+      return { ...answerFromEvidence(input), modelUsage: usage("rejected", result) };
     },
   };
 }

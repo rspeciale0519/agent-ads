@@ -68,7 +68,7 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
       data: { organizationId: context.organizationId, conversationId: conversation.id, role: "user", content: parsed.question, createdAt: askedAt },
     });
     const assistantMessage = await tx.aiReachMessage.create({
-      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray, createdAt: answeredAt },
+      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray, modelUsage: answer.modelUsage ?? Prisma.DbNull, createdAt: answeredAt },
     });
     return { conversationId: conversation.id, messages: [toChatMessage(userMessage), toChatMessage(assistantMessage)] };
   });

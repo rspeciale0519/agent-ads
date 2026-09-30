@@ -14,7 +14,8 @@ export function createAnthropicModelClient(options: { apiKey: string; model?: st
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey, timeout: 20_000, maxRetries: 1 });
   const model = options.model ?? defaultAnthropicModel;
   return {
-    name: `anthropic:${model}`,
+    provider: "anthropic",
+    model,
     draftAnswer: async ({ system, facts, question }) => {
       const response = await client.beta.messages.create({
         model,
@@ -27,11 +28,19 @@ export function createAnthropicModelClient(options: { apiKey: string; model?: st
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
       });
-      if (response.stop_reason !== "end_turn") return null;
+      // Billed tokens are kept even when the draft is unusable.
+      const tokens = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      if (response.stop_reason !== "end_turn") return { draft: null, ...tokens };
       const text = response.content.find((block) => block.type === "text");
-      if (!text || text.type !== "text") return null;
-      const parsed = draftSchema.safeParse(JSON.parse(text.text));
-      return parsed.success ? parsed.data : null;
+      if (!text || text.type !== "text") return { draft: null, ...tokens };
+      let json: unknown;
+      try {
+        json = JSON.parse(text.text);
+      } catch {
+        return { draft: null, ...tokens };
+      }
+      const parsed = draftSchema.safeParse(json);
+      return { draft: parsed.success ? parsed.data : null, ...tokens };
     },
   };
 }

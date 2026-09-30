@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const withTenantContextMock = vi.hoisted(() => vi.fn());
@@ -77,6 +78,21 @@ describe("AI Reach chat service", () => {
     // The answer is stamped after the question so reloads keep their order.
     const [asked, answered] = models.aiReachMessage.create.mock.calls.map((call) => call[0].data.createdAt.getTime());
     expect(answered).toBeGreaterThan(asked);
+  });
+
+  it("saves the model usage record with the answer, and none for rule-based answers", async () => {
+    mockAnswerInputs();
+    const models = mockDatabase();
+    const modelUsage = { provider: "anthropic", model: "claude-opus-5-5", status: "accepted" as const, inputTokens: 900, outputTokens: 40 };
+    const modelProvider: AiReachAnswerProvider = { name: "model", answer: vi.fn(async () => ({ text: "Answer.", kind: "guidance" as const, citations: [], modelUsage })) };
+    await askAiReach(context, { question: "How many leads?" }, modelProvider);
+    expect(models.aiReachMessage.create.mock.calls[1][0].data.modelUsage).toEqual(modelUsage);
+    // The question row never carries usage.
+    expect(models.aiReachMessage.create.mock.calls[0][0].data.modelUsage).toBeUndefined();
+
+    const ruleModels = mockDatabase();
+    await askAiReach(context, { question: "How many leads?" }, provider);
+    expect(ruleModels.aiReachMessage.create.mock.calls[1][0].data.modelUsage).toBe(Prisma.DbNull);
   });
 
   it("adds to an existing conversation the caller can see", async () => {

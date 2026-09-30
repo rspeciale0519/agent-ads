@@ -36,14 +36,17 @@ const briefing = buildAiReachBriefing({
 const input = (question: string) => ({ question, organizationName: "Pilot company", briefing, snapshot, now });
 
 // A stand-in model that returns whatever draft the test gives it.
-function fakeModel(draft: ModelAnswerDraft | null | Error): AiReachModelClient & { calls: number } {
+function fakeModel(draft: ModelAnswerDraft | null | Error): AiReachModelClient & { calls: number; questions: string[] } {
   const client = {
-    name: "fake",
+    provider: "fake",
+    model: "test-model",
     calls: 0,
-    draftAnswer: async () => {
+    questions: [] as string[],
+    draftAnswer: async ({ question }: { question: string }) => {
       client.calls += 1;
+      client.questions.push(question);
       if (draft instanceof Error) throw draft;
-      return draft;
+      return { draft, inputTokens: 100, outputTokens: 20 };
     },
   };
   return client;
@@ -74,6 +77,7 @@ describe("model answers", () => {
       text: `Your saved evidence doesn't cover this yet. Connecting Google Ads would help answer this. Suggested next step: ${briefing.recommendations[1].title}.`,
       kind: "guidance",
       citations: [],
+      modelUsage: { provider: "fake", model: "test-model", status: "accepted", inputTokens: 100, outputTokens: 20 },
     });
   });
 
@@ -84,7 +88,7 @@ describe("model answers", () => {
     ["nothing at all", draft()],
   ])("falls back when the model chooses %s", async (_label, badDraft) => {
     const answer = await createModelAnswerProvider(fakeModel(badDraft)).answer(input("How many leads?"));
-    expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
+    expect({ ...answer, modelUsage: undefined }).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
   });
 
   it("does not tell the customer to connect a source that only needs review", async () => {
@@ -101,7 +105,7 @@ describe("model answers", () => {
   it("falls back when the model fails or returns nothing", async () => {
     for (const result of [new Error("timeout"), null]) {
       const answer = await createModelAnswerProvider(fakeModel(result)).answer(input("How many leads?"));
-      expect(answer).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
+      expect({ ...answer, modelUsage: undefined }).toEqual(await deterministicAnswerProvider.answer(input("How many leads?")));
     }
   });
 
@@ -122,6 +126,22 @@ describe("model answers", () => {
       expect(isActionRequest(question.toLowerCase())).toBe(false);
     },
   );
+
+  it("records provider usage for every model call, whatever happens to the draft", async () => {
+    const tokens = { provider: "fake", model: "test-model", inputTokens: 100, outputTokens: 20 };
+    expect((await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads"] }))).answer(input("How many leads?"))).modelUsage).toEqual({ ...tokens, status: "accepted" });
+    expect((await createModelAnswerProvider(fakeModel(draft({ isChangeRequest: true }))).answer(input("Make my budget higher"))).modelUsage).toEqual({ ...tokens, status: "change_request" });
+    expect((await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["unknown"] }))).answer(input("How many leads?"))).modelUsage).toEqual({ ...tokens, status: "rejected" });
+    expect((await createModelAnswerProvider(fakeModel(new Error("timeout"))).answer(input("How many leads?"))).modelUsage).toEqual({ ...tokens, status: "failed", inputTokens: null, outputTokens: null });
+    // Answers that never call a model carry no usage record.
+    expect((await createModelAnswerProvider(fakeModel(draft())).answer(input("Pause my ads"))).modelUsage).toBeUndefined();
+  });
+
+  it("removes emails, phone numbers, and links before the question leaves AI Reach", async () => {
+    const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
+    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 from https://acme.test/x become a lead in 2026-08?"));
+    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] from [link] become a lead in 2026-08?");
+  });
 
   it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {
     const facts = buildModelFacts(input("How many leads?"));
@@ -152,9 +172,9 @@ describe("Anthropic model adapter", () => {
   }
 
   it("requests a structured draft with fallbacks and parses it", async () => {
-    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
-    const draft = await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "How many leads?" });
-    expect(draft).toEqual({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] });
+    const { client, create } = fakeAnthropic({ stop_reason: "end_turn", usage: { input_tokens: 900, output_tokens: 40 }, content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
+    const result = await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "How many leads?" });
+    expect(result).toEqual({ draft: { isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }, inputTokens: 900, outputTokens: 40 });
     const request = create.mock.calls[0][0];
     expect(request.model).toBe("claude-opus-5-5");
     expect(request.output_config.format.type).toBe("json_schema");
@@ -162,10 +182,15 @@ describe("Anthropic model adapter", () => {
     expect(request.betas).toEqual(["server-side-fallback-2026-07-01"]);
   });
 
-  it("returns nothing when the model declines or stops early", async () => {
-    for (const stopReason of ["refusal", "max_tokens"]) {
-      const { client } = fakeAnthropic({ stop_reason: stopReason, content: [] });
-      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toBeNull();
+  it("returns no draft, but keeps the billed tokens, when the model declines, stops early, or sends bad JSON", async () => {
+    const responses = [
+      { stop_reason: "refusal", content: [] },
+      { stop_reason: "max_tokens", content: [] },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "not json" }] },
+    ];
+    for (const response of responses) {
+      const { client } = fakeAnthropic({ ...response, usage: { input_tokens: 5, output_tokens: 1 } });
+      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toEqual({ draft: null, inputTokens: 5, outputTokens: 1 });
     }
   });
 });

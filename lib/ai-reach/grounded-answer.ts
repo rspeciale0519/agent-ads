@@ -1,5 +1,6 @@
 import type { AiReachBriefing } from "./briefing";
 import { answerAiReachQuestion, isActionRequest } from "./chat";
+import type { ModelUsage } from "./model-answer";
 import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot, type ReadOnlyMetric } from "./evidence-contract";
 
 export type AiReachCitation = { evidenceId: string; provider: string; method: string; collectedAt: string };
@@ -10,6 +11,8 @@ export type AiReachAnswer = {
   // abstain: the topic has no saved evidence. guidance: general next-step help.
   kind: "boundary" | "evidence" | "abstain" | "guidance";
   citations: AiReachCitation[];
+  // Set only when a language model was called for this answer.
+  modelUsage?: ModelUsage;
 };
 
 export type AiReachAnswerInput = {
