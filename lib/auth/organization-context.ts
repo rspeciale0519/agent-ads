@@ -41,6 +41,22 @@ export async function getAuthenticatedUser() {
   };
 }
 
+// The remembered workspace choice. Its value is "<account id>:<workspace id>",
+// so a choice made by one person is never applied to another person who
+// later signs in on the same browser.
+export const ORGANIZATION_COOKIE = "miodio_organization";
+
+export function rememberedOrganizationValue(authSubject: string, organizationId: string) {
+  return `${authSubject}:${organizationId}`;
+}
+
+// The remembered workspace id, or undefined if the cookie is missing, in an
+// older format, or belongs to a different account.
+export function rememberedOrganizationFor(cookieValue: string | undefined, authSubject: string) {
+  const [owner, organizationId, ...rest] = (cookieValue ?? "").split(":");
+  return owner === authSubject && organizationId && rest.length === 0 ? organizationId : undefined;
+}
+
 // Picks which workspace a request is for. An explicitly requested workspace
 // must be one of the person's memberships. The remembered choice (the
 // miodio_organization cookie) is only a preference: if it names a workspace
@@ -57,7 +73,8 @@ export async function requireOrganizationContext(requestedOrganizationId?: strin
   const authenticated = await getAuthenticatedUser();
   if (!authenticated) throw new OrganizationAccessError("AUTHENTICATION_REQUIRED");
   const memberships = await queryOrganizationChoices(authenticated.supabaseUser.id);
-  const membership = chooseMembership(memberships, requestedOrganizationId, (await cookies()).get("miodio_organization")?.value);
+  const remembered = rememberedOrganizationFor((await cookies()).get(ORGANIZATION_COOKIE)?.value, authenticated.supabaseUser.id);
+  const membership = chooseMembership(memberships, requestedOrganizationId, remembered);
   if (!membership) {
     throw new OrganizationAccessError(memberships.length > 1 ? "ORGANIZATION_SELECTION_REQUIRED" : "ORGANIZATION_ACCESS_PENDING");
   }

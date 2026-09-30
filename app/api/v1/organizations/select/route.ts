@@ -2,6 +2,7 @@ import { z } from "zod";
 import { contextOrResponse, errorResponse, noStoreJson, requireSameOrigin } from "../../../../../lib/api/http";
 import { enforceRateLimit } from "../../../../../lib/api/rate-limit";
 import { runIdempotentMutation } from "../../../../../lib/api/idempotency";
+import { ORGANIZATION_COOKIE, rememberedOrganizationValue } from "../../../../../lib/auth/organization-context";
 
 export const runtime = "nodejs";
 const selectionSchema = z.object({ organizationId: z.string().uuid() });
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
     await enforceRateLimit(`organization-select:${context.userId}`, 30, 60_000, context.organizationId);
     return runIdempotentMutation(context, request, "organization.select", parsed.data, async () => {
       const response = noStoreJson({ organization: { id: context.organizationId, name: context.organizationName } });
-      response.cookies.set("miodio_organization", context.organizationId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+      // Remembered per account, so it never carries over to another person.
+      response.cookies.set(ORGANIZATION_COOKIE, rememberedOrganizationValue(context.authSubject, context.organizationId), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
       return response;
     });
   } catch (error) {
