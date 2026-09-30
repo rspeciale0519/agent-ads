@@ -343,6 +343,20 @@ export async function startOAuth(context: OrganizationContext, input: { provider
   }
 }
 
+/**
+ * One Google redirect URI serves every Google product (Ads, GA4, GTM, Search Console), so the
+ * callback URL carries the alias "google" instead of a provider. The pending transaction, matched
+ * by the hashed one-time state, records which product the user started.
+ */
+export async function resolveGoogleCallbackProvider(context: OrganizationContext, state: string): Promise<ConnectionProvider> {
+  const transaction = await withTenantContext(context, (tx) => tx.oAuthTransaction.findFirst({
+    where: { stateHash: hashOAuthState(state), organizationId: context.organizationId, userId: context.userId, status: "issued", expiresAt: { gt: new Date() } },
+    select: { provider: true },
+  }));
+  if (!transaction || !transaction.provider.startsWith("google_")) throw new OAuthError("OAUTH_STATE_INVALID");
+  return transaction.provider as ConnectionProvider;
+}
+
 export async function completeOAuth(context: OrganizationContext, input: { provider: ConnectionProvider; state: string; code: string; browserTransactionId: string; correlationId: string }, broker: SecretBroker = getSecretBroker()) {
   requireConnectionPermission(context, "connections.authorize");
   requireAal2(await getAssuranceStatus(context));
