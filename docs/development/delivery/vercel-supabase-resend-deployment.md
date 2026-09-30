@@ -249,6 +249,15 @@ Record only Boolean results, observation time, and one restricted evidence refer
 
 ## Resend
 
+Current production setup (D-042, verified 2026-09-30):
+
+- Production sets `EMAIL_DELIVERY_MODE=live`; Preview deployments keep `disabled`.
+- App email is sent from `onboarding@e.miodiollc.com`, a verified Resend subdomain of `miodiollc.com`.
+- Supabase Auth uses custom SMTP through Resend (`smtp.resend.com`, port 465, username `resend`, the Resend API key as password) with the same sender, named "MioDio Agent Ads".
+- Staging keeps the rules below.
+
+General rules:
+
 - `EMAIL_DELIVERY_MODE` defaults to `disabled` when it is absent.
 - Use `resend-test` only with the official `resend.dev` test recipients.
 - Use `live` only in an approved customer-message environment.

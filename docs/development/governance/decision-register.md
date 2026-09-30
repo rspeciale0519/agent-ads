@@ -393,9 +393,26 @@
   - A failed delete stays queued and is retried on the next save or removal. A failed save deletes the new key, or queues it if that delete also fails.
   - A new key's Vault name is recorded as pending (under the organization's shared lock) before the key is written, and cleared when the save commits or the unused key is deleted by name. Offboarding counts pending keys and deletes abandoned ones (older than 10 minutes), so no key is ever written without a record.
   - Offboarding stops, on every retry, until the queue is empty. Under the final exclusive lock it checks again for any saved or queued AI key before deactivating the workspace.
-- Migrations: `20260930140000_organization_ai_credentials` and `20260930150000_ai_credential_cleanups` (private schema, forced tenant RLS; the editor must be the signed-in user).
+- Migrations: `20260930140000_organization_ai_credentials`, `20260930150000_ai_credential_cleanups` and `20260930160000_ai_credential_pending_keys` (private schema, forced tenant RLS; the editor must be the signed-in user).
 - Owner/date: product owner, 2026-09-30.
 - Affects: AI Reach chat, AGT-001–AGT-010, SEC-001–SEC-012.
+
+### D-042 — Live email in production
+
+- Status: accepted.
+- Amends: D-025 (turns on the Resend path it chose).
+- Context: Email was off, so organization invitations were created and immediately revoked, onboarding submissions were refused, and Supabase's built-in sender reached only the project team.
+- Options: keep email off; send only to Resend test recipients (`resend-test`); turn on live sending in production only.
+- Decision:
+  - Production (`aiagent-ads.vercel.app`) sets `EMAIL_DELIVERY_MODE=live`. Preview deployments keep `disabled`, so test branches never email real people.
+  - App email (invitations, onboarding notices) is sent through Resend from `onboarding@e.miodiollc.com`, a verified subdomain of `miodiollc.com`.
+  - Supabase Auth (sign-up confirmation, password reset) uses custom SMTP through Resend (`smtp.resend.com`, port 465) with the same sender, shown as "MioDio Agent Ads".
+  - Staging stays disabled as its release-evidence checker requires.
+- Verified: 2026-09-30, a password-reset email and an onboarding notice were delivered to real inboxes.
+- Consequences: an email is still only a notification. In-app records remain the source of truth (D-025). Resend's free plan covers 3,000 emails a month (100 a day).
+- Migration: none (environment and Supabase Auth settings only).
+- Owner/date: product owner, 2026-09-30.
+- Affects: ONB-001–ONB-016, UX-006, OPS-003–OPS-005, SEC-005 (the same as D-025).
 
 ## Decision process
 
