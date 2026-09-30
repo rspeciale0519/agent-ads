@@ -6,6 +6,7 @@ import { getSupabaseBrowser } from "../../lib/supabase-browser";
 // A "Log out" button for page headers. Like the onboarding page's "Sign out",
 // it ends the Supabase session in the browser (which clears the login
 // cookies), then opens the login page with a "You're logged out" notice.
+// Only this browser is logged out; other devices stay signed in.
 // If logging out fails, the button says so and can be tried again.
 export default function SignOutButton() {
   const [busy, setBusy] = useState(false);
@@ -13,7 +14,7 @@ export default function SignOutButton() {
   const signOut = async () => {
     setBusy(true);
     setFailed(false);
-    const { error } = await getSupabaseBrowser().auth.signOut().catch((caught: unknown) => ({ error: caught }));
+    const { error } = await getSupabaseBrowser().auth.signOut({ scope: "local" }).catch((caught: unknown) => ({ error: caught }));
     if (error) {
       setBusy(false);
       setFailed(true);
