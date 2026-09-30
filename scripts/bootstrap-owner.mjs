@@ -41,6 +41,7 @@ try {
       "connections.revoke",
       "connections.secrets.rotate",
       "membership.manage",
+      "organization.settings.manage",
     ];
     await tx.membership.create({ data: { organizationId: organization.id, userId: appUser.id, role: "owner", permissions, acceptedAt: new Date() } });
     const correlationId = randomUUID();

@@ -12,6 +12,7 @@ vi.mock("../auth/assurance", () => ({
 }));
 vi.mock("../audit", () => ({ appendAuditEvent: auditMock }));
 
+import { permissionsForRole } from "../auth/permissions";
 import { readOrganizationSettings, updateOrganizationSettings } from "./settings";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
@@ -45,6 +46,13 @@ describe("organization settings", () => {
     expect(await updateOrganizationSettings(owner, { staleUploadDays: 14 }, "correlation-1")).toEqual({ staleUploadDays: 14 });
     expect(table.upsert.mock.calls[0][0].create).toEqual({ organizationId, staleUploadDays: 14, updatedBy: owner.userId });
     expect(auditMock.mock.calls[0][2]).toMatchObject({ action: "organization.settings_updated", metadata: { staleUploadDays: 14, previousStaleUploadDays: 7 } });
+  });
+
+  it("gives the settings permission to owners and administrators only", () => {
+    expect(permissionsForRole("owner")).toContain("organization.settings.manage");
+    expect(permissionsForRole("administrator")).toContain("organization.settings.manage");
+    expect(permissionsForRole("operator")).not.toContain("organization.settings.manage");
+    expect(permissionsForRole("member")).not.toContain("organization.settings.manage");
   });
 
   it("refuses people without the settings permission", async () => {
