@@ -32,6 +32,7 @@ model Organization {
   evidenceSnapshots    AiReachEvidenceSnapshot[]
   aiReachConversations AiReachConversation[]
   settings             OrganizationSettings?
+  aiCredential         OrganizationAiCredential?
 
   @@index([status, updatedAt])
   @@map("organizations")
@@ -478,4 +479,23 @@ model OrganizationSettings {
 
   @@map("organization_settings")
   @@schema("public")
+}
+
+// The AI model an organization chose for AI Reach. The API key itself is
+// only in Supabase Vault; brokerHandle points to it.
+model OrganizationAiCredential {
+  organizationId String       @id @map("organization_id") @db.Uuid
+  provider       String
+  model          String
+  brokerHandle   String       @unique @map("broker_handle")
+  backend        String
+  keyVersion     String       @map("key_version")
+  keyHint        String       @map("key_hint")
+  fingerprint    String
+  updatedBy      String       @map("updated_by") @db.Uuid
+  updatedAt      DateTime     @default(now()) @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("organization_ai_credentials")
+  @@schema("private")
 }

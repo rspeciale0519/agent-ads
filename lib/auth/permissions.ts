@@ -26,6 +26,7 @@ export function hasPermission(permissions: readonly string[], permission: Permis
 
 export function permissionForStepUpAction(actionClass: string): Permission {
   if (actionClass === "membership_manage" || actionClass === "organization_export" || actionClass === "organization_offboard") return "membership.manage";
+  if (actionClass === "ai_model_manage") return "organization.settings.manage";
   if (actionClass === "connection_secret") return "connections.secrets.rotate";
   if (actionClass === "connection_authorize" || actionClass === "connection_reconnect") return "connections.authorize";
   if (actionClass === "connection_role_confirm") return "connections.verify";

@@ -6,7 +6,8 @@ import { getDashboardData } from "../dashboard/dashboard-service";
 import { findSecretPattern } from "../security/secret-material";
 import { buildAiReachBriefing } from "./briefing";
 import { readAiReachEvidence } from "./evidence-store";
-import { getAnswerProvider, type AiReachAnswerProvider } from "./gateway";
+import { getSecretBroker } from "../connections/secrets/supabase-vault";
+import { getAnswerProviderForOrganization, type AiReachAnswerProvider } from "./gateway";
 import type { AiReachAnswer, AiReachCitation } from "./grounded-answer";
 
 export const askInputSchema = z.object({
@@ -40,7 +41,7 @@ function toChatMessage(row: { id: string; role: string; content: string; answerK
 // Answers one question from this organization's saved evidence and saves the
 // question and answer to the caller's own conversation. A question that looks
 // like it contains a password or token is refused before anything is stored.
-export async function askAiReach(context: OrganizationContext, input: unknown, provider: AiReachAnswerProvider = getAnswerProvider()) {
+export async function askAiReach(context: OrganizationContext, input: unknown, provider?: AiReachAnswerProvider) {
   requireConnectionPermission(context, "connections.view");
   const parsed = askInputSchema.parse(input);
   if (findSecretPattern(parsed.question)) throw new ConnectionServiceError("AI_REACH_QUESTION_CONTAINS_SECRET", 422);
@@ -55,7 +56,9 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
 
   const [dashboard, { snapshot, uploadMaxAgeHours }] = await Promise.all([getDashboardData(context), readAiReachEvidence(context)]);
   const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot: snapshot, uploadMaxAgeHours });
-  const answer = await provider.answer({ question: parsed.question, organizationName: context.organizationName, briefing, snapshot });
+  // The organization's own model from Settings, or the platform default.
+  const answerProvider = provider ?? await getAnswerProviderForOrganization(context, getSecretBroker);
+  const answer = await answerProvider.answer({ question: parsed.question, organizationName: context.organizationName, briefing, snapshot });
 
   return withTenantContext(context, async (tx) => {
     const conversation = existing ?? await tx.aiReachConversation.create({

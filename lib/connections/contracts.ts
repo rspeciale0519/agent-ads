@@ -79,7 +79,7 @@ export const providerAuthorizeSchema = z.object({
 });
 
 export const stepUpActionSchema = z.object({
-  actionClass: z.enum(["connection_authorize", "connection_secret", "connection_reconnect", "connection_revoke", "connection_role_confirm", "membership_manage", "organization_export", "organization_offboard"]),
+  actionClass: z.enum(["connection_authorize", "connection_secret", "connection_reconnect", "connection_revoke", "connection_role_confirm", "membership_manage", "organization_export", "organization_offboard", "ai_model_manage"]),
 });
 
 export const readOnlyRoleConfirmationSchema = z.object({

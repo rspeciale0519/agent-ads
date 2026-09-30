@@ -4,6 +4,9 @@ import { withTenantContext, withTenantExclusiveContext, type OrganizationContext
 import { hasPermission } from "../auth/permissions";
 import { redactSensitive } from "../connections/redaction";
 import { archiveConnection, revokeConnection } from "../connections/service";
+import type { SecretBroker } from "../connections/secrets/secret-broker";
+import { getSecretBroker } from "../connections/secrets/supabase-vault";
+import { removeAiModelSettings } from "./ai-model-settings";
 
 const MAX_SYNCHRONOUS_CONNECTIONS = 20;
 const EXPORT_LIMITS = {
@@ -42,7 +45,7 @@ export async function exportOrganizationConnectionData(context: OrganizationCont
   return payload;
 }
 
-export async function offboardOrganization(context: OrganizationContext, confirmation: string, correlationId: string) {
+export async function offboardOrganization(context: OrganizationContext, confirmation: string, correlationId: string, broker: SecretBroker = getSecretBroker()) {
   assertDataLifecyclePermission(context, true);
   requireAal2(await getAssuranceStatus(context));
   if (!isOffboardingConfirmationValid(context.organizationName, confirmation)) throw new DataLifecycleError("OFFBOARDING_CONFIRMATION_INVALID", 400);
@@ -51,6 +54,9 @@ export async function offboardOrganization(context: OrganizationContext, confirm
 
   for (const connection of connections) await revokeConnection(context, connection.id, correlationId);
   for (const connection of connections) await archiveConnection(context, connection.id, correlationId);
+  // The organization's own AI model key is destroyed too; a failure stops
+  // offboarding so no provider secret is left behind.
+  await removeAiModelSettings(context, correlationId, broker, { failClosed: true });
 
   return withTenantExclusiveContext(context, async (tx) => {
     const remainingConnectionCount = await tx.connection.count({ where: { organizationId: context.organizationId, archivedAt: null } });
