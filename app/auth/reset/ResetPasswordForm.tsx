@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "../../../lib/supabase-browser";
+import { leakedPasswordMessage } from "../../../lib/auth/pwned-password";
 import { Icon } from "../../onboarding/ui";
 
 export default function ResetPasswordForm() {
@@ -25,6 +26,12 @@ export default function ResetPasswordForm() {
     }
     setBusy(true);
     try {
+      // A new password can't be one known from data breaches.
+      const leaked = await leakedPasswordMessage(password);
+      if (leaked) {
+        setError(leaked);
+        return;
+      }
       const supabase = getSupabaseBrowser();
       const result = await supabase.auth.updateUser({ password });
       if (result.error) throw new Error("We could not update your password. Request a new reset link and try again.");
