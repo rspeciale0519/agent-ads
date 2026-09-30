@@ -195,6 +195,8 @@ model Connection {
   @@index([createdByUserId])
   @@index([credentialReferenceId])
   @@index([organizationId, credentialReferenceId])
+  @@index([organizationId, id, credentialReferenceId])
+  @@index([organizationId, requestId])
   @@map("connections")
   @@schema("public")
 }
@@ -219,6 +221,7 @@ model ConnectionResource {
   @@unique([organizationId, connectionId, resourceType, externalId])
   @@unique([organizationId, id])
   @@index([organizationId, selected, updatedAt])
+  @@index([connectionId])
   @@map("connection_resources")
   @@schema("public")
 }
@@ -242,6 +245,8 @@ model CapabilitySnapshot {
 
   @@index([organizationId, connectionId, evidenceAt])
   @@index([resourceId])
+  @@index([connectionId])
+  @@index([organizationId, resourceId])
   @@map("capability_snapshots")
   @@schema("public")
 }
@@ -299,6 +304,7 @@ model ConnectionHealthCheck {
   connection      Connection   @relation(fields: [connectionId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, connectionId, checkedAt])
+  @@index([connectionId])
   @@map("connection_health_checks")
   @@schema("public")
 }
@@ -321,6 +327,7 @@ model OAuthTransaction {
 
   @@index([organizationId, userId, provider, status, expiresAt])
   @@index([connectionId, status])
+  @@index([organizationId, connectionId])
   @@map("oauth_transactions")
   @@schema("public")
 }
@@ -349,6 +356,7 @@ model AccessInvitation {
   @@index([organizationId, status, expiresAt])
   @@index([connectionId])
   @@index([createdByUserId])
+  @@index([organizationId, connectionId])
   @@map("access_invitations")
   @@schema("public")
 }
