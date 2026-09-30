@@ -388,8 +388,11 @@
   - Saving or removing requires the settings permission, current MFA, and a single-use `ai_model_manage` step-up grant. Every change is audited without the key.
 - Safety: all D-039 rules apply unchanged: the router writes no text, contact details are redacted, and usage is recorded. Non-Anthropic calls record tokens without a cost (`costUsd: null`), because prices vary by company. If a saved key cannot be read, rule-based answers are used rather than another company's model.
 - Switch: an organization's saved choice takes precedence. Without one, the platform setting from D-039 (`AI_REACH_MODEL_PROVIDER` and `ANTHROPIC_API_KEY`) applies, and otherwise rule-based answers.
-- Lifecycle: a replaced key is destroyed after the new one is saved, and a failed save destroys the new key. Offboarding destroys the key and stops if it cannot.
-- Migration: `20260930140000_organization_ai_credentials` (private schema, forced tenant RLS; the editor must be the signed-in user).
+- Lifecycle:
+  - A key that stops being used is recorded in `private.organization_ai_credential_cleanups`, in the same transaction that replaces or removes it. The record is removed only after the Vault delete succeeds.
+  - A failed delete stays queued and is retried on the next save or removal. A failed save deletes the new key, or queues it if that delete also fails.
+  - Offboarding stops, on every retry, until the queue is empty.
+- Migrations: `20260930140000_organization_ai_credentials` and `20260930150000_ai_credential_cleanups` (private schema, forced tenant RLS; the editor must be the signed-in user).
 - Owner/date: product owner, 2026-09-30.
 - Affects: AI Reach chat, AGT-001–AGT-010, SEC-001–SEC-012.
 

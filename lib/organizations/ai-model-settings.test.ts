@@ -27,7 +27,9 @@ function fakeBroker(): SecretBroker & { put: ReturnType<typeof vi.fn>; destroy: 
 }
 
 type Row = { provider: string; model: string; brokerHandle: string } | null;
-function mockDatabase(existing: Row, options: { failUpsert?: boolean } = {}) {
+// A fake database with the credential table and the key-cleanup queue.
+function mockDatabase(existing: Row, options: { failUpsert?: boolean; queued?: string[] } = {}) {
+  const queue = new Set(options.queued ?? []);
   const table = {
     findUnique: vi.fn().mockResolvedValue(existing),
     upsert: vi.fn().mockImplementation(async ({ create, update }) => {
@@ -37,9 +39,15 @@ function mockDatabase(existing: Row, options: { failUpsert?: boolean } = {}) {
     }),
     delete: vi.fn().mockResolvedValue({}),
   };
+  const cleanup = {
+    queue,
+    create: vi.fn().mockImplementation(async ({ data }) => { queue.add(data.brokerHandle); return data; }),
+    findMany: vi.fn().mockImplementation(async () => [...queue].map((brokerHandle) => ({ brokerHandle }))),
+    deleteMany: vi.fn().mockImplementation(async ({ where }) => { queue.delete(where.brokerHandle); return { count: 1 }; }),
+  };
   const $queryRaw = vi.fn().mockResolvedValue([{ locked: 1 }]);
-  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationAiCredential: table, $queryRaw }));
-  return table;
+  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationAiCredential: table, organizationAiCredentialCleanup: cleanup, $queryRaw }));
+  return Object.assign(table, { cleanup });
 }
 
 afterEach(() => vi.clearAllMocks());
@@ -57,11 +65,25 @@ describe("AI model settings", () => {
     expect(JSON.stringify(saved)).not.toContain(apiKey);
   });
 
-  it("destroys the replaced key only after the new one is saved", async () => {
+  it("queues the replaced key in the save transaction and deletes it afterwards", async () => {
     const broker = fakeBroker();
-    mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
+    const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
     await saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker);
+    expect(table.cleanup.create).toHaveBeenCalledWith({ data: { brokerHandle: "old-handle", organizationId } });
     expect(broker.destroy).toHaveBeenCalledWith("old-handle");
+    expect(table.cleanup.queue.size).toBe(0);
+  });
+
+  it("keeps a replaced key queued when the Vault delete fails, and retries it later", async () => {
+    const broker = fakeBroker();
+    broker.destroy.mockRejectedValueOnce(new Error("VAULT_DOWN"));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
+    await saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker);
+    expect([...table.cleanup.queue]).toEqual(["old-handle"]);
+    // The next change retries the queued delete.
+    await saveAiModelSettings(owner, { provider: "openai", model: "gpt-newer" }, "c", broker);
+    expect(table.cleanup.queue.size).toBe(0);
   });
 
   it("keeps the saved key when only the model name changes", async () => {
@@ -84,9 +106,18 @@ describe("AI model settings", () => {
 
   it("removes the new key from the Vault when the save fails, and keeps the old one", async () => {
     const broker = fakeBroker();
-    mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" }, { failUpsert: true });
+    const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" }, { failUpsert: true });
     await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
     expect(broker.destroy.mock.calls).toEqual([["new-handle"]]);
+    expect(table.cleanup.queue.size).toBe(0);
+  });
+
+  it("queues the new key when the save fails and it cannot be deleted right away", async () => {
+    const broker = fakeBroker();
+    broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
+    const table = mockDatabase(null, { failUpsert: true });
+    await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
+    expect([...table.cleanup.queue]).toEqual(["new-handle"]);
   });
 
   it.each([
@@ -115,15 +146,28 @@ describe("AI model settings", () => {
     expect(broker.destroy).toHaveBeenCalledWith("old-handle");
   });
 
-  it("stops offboarding when the key cannot be destroyed", async () => {
+  it("keeps offboarding stopped on every retry until the key is deleted", async () => {
     const broker = fakeBroker();
     broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
-    mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
+    const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
     await expect(removeAiModelSettings(owner, "c", broker, { failClosed: true })).rejects.toThrow("VAULT_DOWN");
-    // Outside offboarding the failure is logged and the removal still succeeds.
-    mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
+    expect([...table.cleanup.queue]).toEqual(["old-handle"]);
+    // A retry no longer finds the credential row, but the queued key still blocks it.
+    table.findUnique.mockResolvedValue(null);
+    await expect(removeAiModelSettings(owner, "c", broker, { failClosed: true })).rejects.toThrow("VAULT_DOWN");
+    // Once the Vault works again, the retry completes and the queue is empty.
+    broker.destroy.mockResolvedValue(undefined);
+    expect(await removeAiModelSettings(owner, "c", broker, { failClosed: true })).toEqual({ removed: false });
+    expect(table.cleanup.queue.size).toBe(0);
+  });
+
+  it("outside offboarding, a failed delete is logged and stays queued", async () => {
+    const broker = fakeBroker();
+    broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" });
     expect(await removeAiModelSettings(owner, "c", broker)).toEqual({ removed: true });
+    expect([...table.cleanup.queue]).toEqual(["old-handle"]);
   });
 
   it("reads the key only when a model is saved", async () => {

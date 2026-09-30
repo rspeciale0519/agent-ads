@@ -75,32 +75,35 @@ export async function saveAiModelSettings(context: OrganizationContext, input: u
         // Names only; the key and its fingerprint never enter the audit log.
         metadata: { provider: parsed.provider, model: parsed.model, keyReplaced: Boolean(stored), previousProvider: existing?.provider ?? null, previousModel: existing?.model ?? null },
       });
-      return { row, replacedHandle: stored && existing ? existing.brokerHandle : null };
+      // The replaced key is queued for deletion in the same transaction that
+      // stops using it, so it stays tracked until the Vault delete succeeds.
+      if (stored && existing) await tx.organizationAiCredentialCleanup.create({ data: { brokerHandle: existing.brokerHandle, organizationId: context.organizationId } });
+      return row;
     });
   } catch (error) {
-    // The row was not saved, so the new key must not stay in the Vault.
-    if (stored) await broker.destroy(stored.handle).catch(() => undefined);
+    // The row was not saved, so the new key must not stay in the Vault. If
+    // it cannot be deleted now, queue it so a later cleanup retries.
+    if (stored) await broker.destroy(stored.handle).catch(() => queueAiCredentialCleanup(context, stored.handle));
     throw error;
   }
-  // Only after the save has committed is the replaced key unreferenced, so
-  // only then is it removed from the Vault.
-  if (saved.replacedHandle) await broker.destroy(saved.replacedHandle).catch(() => console.warn("AI Reach replaced model key could not be destroyed; it is unreferenced."));
-  const row = saved.row;
+  await drainAiCredentialCleanups(context, broker);
+  const row = saved;
   return { provider: row.provider as AiModelProviderId, model: row.model, keyHint: row.keyHint, updatedAt: row.updatedAt.toISOString() };
 }
 
-// Removes the organization's model choice and destroys its key. AI Reach
+// Removes the organization's model choice and deletes its key. AI Reach
 // then uses rule-based answers (or the platform default, if one is set).
-// With failClosed (used by offboarding), a key that cannot be destroyed
-// stops the operation instead of being left behind.
+// With failClosed (used by offboarding), any key still waiting to be deleted
+// stops the operation, now and on every retry, until the delete succeeds.
 export async function removeAiModelSettings(context: OrganizationContext, correlationId: string, broker: SecretBroker, options: { failClosed?: boolean } = {}) {
   requireManage(context);
   requireAal2(await getAssuranceStatus(context));
   const removed = await withTenantContext(context, async (tx) => {
     await lockAiModelSettings(tx, context.organizationId);
     const existing = await tx.organizationAiCredential.findUnique({ where: { organizationId: context.organizationId }, select: { provider: true, model: true, brokerHandle: true } });
-    if (!existing) return null;
+    if (!existing) return false;
     await tx.organizationAiCredential.delete({ where: { organizationId: context.organizationId } });
+    await tx.organizationAiCredentialCleanup.create({ data: { brokerHandle: existing.brokerHandle, organizationId: context.organizationId } });
     await appendAuditEvent(tx, context, {
       action: "organization.ai_model_removed",
       resourceType: "organization",
@@ -109,11 +112,36 @@ export async function removeAiModelSettings(context: OrganizationContext, correl
       correlationId,
       metadata: { provider: existing.provider, model: existing.model },
     });
-    return existing.brokerHandle;
+    return true;
   });
-  if (removed && options.failClosed) await broker.destroy(removed);
-  else if (removed) await broker.destroy(removed).catch(() => console.warn("AI Reach removed model key could not be destroyed; it is unreferenced."));
-  return { removed: Boolean(removed) };
+  await drainAiCredentialCleanups(context, broker, options);
+  return { removed };
+}
+
+// Records a key that must still be deleted from the Vault.
+async function queueAiCredentialCleanup(context: OrganizationContext, brokerHandle: string) {
+  await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.create({ data: { brokerHandle, organizationId: context.organizationId } }))
+    .catch(() => console.warn("AI Reach model key cleanup could not be queued."));
+}
+
+// Deletes every queued key from the Vault, removing each queue row only after
+// its delete succeeds. Failures stay queued for the next save, removal, or
+// offboarding attempt; with failClosed the first failure is thrown.
+export async function drainAiCredentialCleanups(context: OrganizationContext, broker: SecretBroker, options: { failClosed?: boolean } = {}) {
+  const queued = await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.findMany({
+    where: { organizationId: context.organizationId },
+    orderBy: { queuedAt: "asc" },
+    select: { brokerHandle: true },
+  }));
+  for (const { brokerHandle } of queued) {
+    try {
+      await broker.destroy(brokerHandle);
+      await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.deleteMany({ where: { brokerHandle, organizationId: context.organizationId } }));
+    } catch (error) {
+      if (options.failClosed) throw error;
+      console.warn("AI Reach model key could not be deleted yet; it stays queued for cleanup.");
+    }
+  }
 }
 
 // The saved choice with its key, for answering questions. Returns null when
