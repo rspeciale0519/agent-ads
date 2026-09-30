@@ -120,7 +120,7 @@ describe("model answers", () => {
   );
 
   // Read-only questions that use the same words must still reach the model.
-  it.each(["Create a summary of last month's results", "When did we put the campaign on hold?", "Can the report be updated?", "Set up a weekly report", "Create a Google Ads report", "Create an ad performance summary"])(
+  it.each(["Create a summary of last month's results", "When did we put the campaign on hold?", "Can the report be updated?", "Set up a weekly report", "Create a Google Ads report", "Create an ad performance summary", "Create a Google Ads monthly report", "Create a campaign spend trend chart"])(
     "does not treat read-only questions as change requests: %s",
     (question) => {
       expect(isActionRequest(question.toLowerCase())).toBe(false);

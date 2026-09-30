@@ -10,12 +10,13 @@ const actionVerbs = "change|pause|stop|increase|decrease|raise|lower|edit|publis
 const targetedVerbs = "set|create|update|modify|remove|schedule|allocate|reallocate|reduce|double|halve|enable|disable|activate|deactivate|resume|switch off|switch on|shut off|shut down|turn up|turn down|put|place";
 const accountTargets = "ads?|campaigns?|ad groups?|ad sets?|budgets?|bids?|bidding|keywords?|audiences?|targeting|spend|website|site|landing pages?|pages?|emails?|newsletters?|crm|records?|contacts?|deals?|pipeline|accounts?";
 // Nouns for read-only outputs. A target followed by one of these describes
-// the output ("a Google Ads report"), not the thing being changed.
+// the output ("a Google Ads report", "a Google Ads monthly report"), not the
+// thing being changed. Up to two describing words may sit in between.
 const reportNouns = "reports?|summary|summaries|performance|results?|metrics?|data|stats|statistics|breakdowns?|overviews?|analysis|numbers|trends?|insights?|dashboards?|charts?|graphs?";
 // The verb, up to a few small words ("a new", "my search"), then the target
 // as the direct object. "Create a summary of leads" and "Create a Google Ads
 // report" are not matched: "summary" and "report" are the objects.
-const targetedAction = `(?:${targetedVerbs})\\s+(?:(?:a|an|the|my|our|this|that|these|those|all|new|every)\\s+)*(?:[\\w'-]+\\s+)?(?:${accountTargets})\\b(?!\\s+(?:${reportNouns})\\b)`;
+const targetedAction = `(?:${targetedVerbs})\\s+(?:(?:a|an|the|my|our|this|that|these|those|all|new|every)\\s+)*(?:[\\w'-]+\\s+)?(?:${accountTargets})\\b(?!(?:\\s+[\\w'-]+){0,2}?\\s+(?:${reportNouns})\\b)`;
 const anyAction = `(?:${actionVerbs})\\b|${targetedAction}`;
 
 // A request, not a question about history: the verb opens the sentence
