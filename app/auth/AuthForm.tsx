@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { buildAuthCallbackUrl, RECOVERY_CALLBACK_NEXT, SIGNUP_CALLBACK_NEXT } from "../../lib/auth/redirects";
+import { leakedPasswordMessage } from "../../lib/auth/pwned-password";
 import { Icon } from "../onboarding/ui";
 
 type Mode = "login" | "signup" | "forgot";
@@ -33,6 +34,12 @@ export default function AuthForm({ initialMode = "signup", initialNotice = "", i
         const result = await supabase.auth.resetPasswordForEmail(email, { redirectTo: buildAuthCallbackUrl(window.location.origin, RECOVERY_CALLBACK_NEXT) });
         if (result.error) throw new Error("We could not send a reset email. Try again later.");
         setNotice("If that email has an account, reset instructions are on the way. Check your inbox.");
+        return;
+      }
+      // New accounts can't use a password known from data breaches.
+      const leaked = mode === "signup" ? await leakedPasswordMessage(password) : null;
+      if (leaked) {
+        setError(leaked);
         return;
       }
       const result = mode === "signup"
