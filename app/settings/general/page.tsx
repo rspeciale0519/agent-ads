@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isOrganizationAccessError, requireOrganizationContext } from "../../../lib/auth/organization-context";
+import { hasPermission } from "../../../lib/auth/permissions";
 import { MAX_STALE_UPLOAD_DAYS, MIN_STALE_UPLOAD_DAYS, readOrganizationSettings } from "../../../lib/organizations/settings";
 import { platformModel } from "../../../lib/ai-reach/gateway";
 import { AI_MODEL_PROVIDERS } from "../../../lib/ai-reach/model-providers";
@@ -24,7 +25,7 @@ export default async function GeneralSettingsPage() {
     throw error;
   }
   if (context.role !== "owner" && context.role !== "administrator") redirect("/dashboard");
-  const [settings, aiModel] = await Promise.all([readOrganizationSettings(context), readAiModelSettings(context)]);
+  const [settings, aiModel] = await Promise.all([readOrganizationSettings(context), hasPermission(context.permissions, "organization.settings.manage") ? readAiModelSettings(context) : null]);
   return <main className="workspace-shell">
     <header className="workspace-header"><div><span className="eyebrow">Settings</span><h1>Workspace settings</h1><p className="workspace-muted">Settings for {context.organizationName}. Saving a change requires current 2-step login.</p></div><Link className="secondary-button" href="/ai-reach">AI Reach</Link></header>
     <GeneralSettingsPanel organizationId={context.organizationId} staleUploadDays={settings.staleUploadDays} minDays={MIN_STALE_UPLOAD_DAYS} maxDays={MAX_STALE_UPLOAD_DAYS} />

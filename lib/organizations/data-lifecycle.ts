@@ -61,10 +61,11 @@ export async function offboardOrganization(context: OrganizationContext, confirm
   return withTenantExclusiveContext(context, async (tx) => {
     const remainingConnectionCount = await tx.connection.count({ where: { organizationId: context.organizationId, archivedAt: null } });
     // Checked again under the exclusive lock: an AI model key saved after the
-    // removal above (or one still waiting for deletion) keeps the workspace
-    // active, so the next offboarding attempt deletes it first.
+    // removal above (or one still being written, or waiting for deletion)
+    // keeps the workspace active, so the next offboarding attempt deletes it first.
     const remainingAiKeyCount = await tx.organizationAiCredential.count({ where: { organizationId: context.organizationId } })
-      + await tx.organizationAiCredentialCleanup.count({ where: { organizationId: context.organizationId } });
+      + await tx.organizationAiCredentialCleanup.count({ where: { organizationId: context.organizationId } })
+      + await tx.organizationAiCredentialPendingKey.count({ where: { organizationId: context.organizationId } });
     if (remainingAiKeyCount > 0) {
       await appendAuditEvent(tx, context, { action: "organization.offboarding_batch_completed", resourceType: "organization", resourceId: context.organizationId, outcomeCode: "ai_model_key_remaining", correlationId, metadata: { connectionCount: connections.length, remainingConnectionCount, remainingAiKeyCount } });
       return { status: "offboarding_in_progress" as const, connectionCount: connections.length, remainingConnectionCount };

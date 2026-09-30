@@ -9,6 +9,8 @@ export type SecretBroker = {
   read(handle: string): Promise<string | null>;
   rotate(handle: string, input: { value: string; kind: SecretKind; expiresAt?: Date }): Promise<{ handle: string; fingerprint: string }>;
   destroy(handle: string): Promise<void>;
+  // Deletes a secret by the opaqueName it was created with (a no-op if none exists).
+  destroyByName(name: string): Promise<void>;
 };
 
 export function secretFingerprint(value: string) {
@@ -25,10 +27,13 @@ export class InMemorySecretBroker implements SecretBroker {
   readonly backend = "test-memory";
   readonly keyVersion = "test-v1";
   private readonly values = new Map<string, string>();
+  // Which handle each opaqueName was stored under, for destroyByName.
+  private readonly names = new Map<string, string>();
 
-  async put(input: { value: string; kind: SecretKind }) {
+  async put(input: { value: string; kind: SecretKind; opaqueName?: string }) {
     const handle = randomUUID();
     this.values.set(handle, input.value);
+    if (input.opaqueName) this.names.set(input.opaqueName, handle);
     return { handle, fingerprint: secretFingerprint(input.value) };
   }
 
@@ -44,6 +49,12 @@ export class InMemorySecretBroker implements SecretBroker {
 
   async destroy(handle: string) {
     this.values.delete(handle);
+  }
+
+  async destroyByName(name: string) {
+    const handle = this.names.get(name);
+    if (handle) this.values.delete(handle);
+    this.names.delete(name);
   }
 }
 

@@ -167,6 +167,7 @@ BEGIN
       ('private', 'credential_references'),
       ('private', 'organization_ai_credentials'),
       ('private', 'organization_ai_credential_cleanups'),
+      ('private', 'organization_ai_credential_pending_keys'),
       ('private', 'rate_limit_buckets'),
       ('private', 'idempotency_records')
     ) AS expected(schema_name, table_name)

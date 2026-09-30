@@ -47,6 +47,7 @@ const required = [
   "ALTER TABLE public.organization_settings FORCE ROW LEVEL SECURITY",
   "ALTER TABLE private.organization_ai_credentials FORCE ROW LEVEL SECURITY",
   "ALTER TABLE private.organization_ai_credential_cleanups FORCE ROW LEVEL SECURITY",
+  "ALTER TABLE private.organization_ai_credential_pending_keys FORCE ROW LEVEL SECURITY",
   "AND user_id = private.current_actor_id()",
 ];
 const missing = required.filter((fragment) => !sql.includes(fragment));

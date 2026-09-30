@@ -3,7 +3,7 @@ import { appendAuditEvent } from "../audit";
 import { getAssuranceStatus, requireAal2 } from "../auth/assurance";
 import { withTenantContext, type OrganizationContext } from "../auth/organization-context";
 import { hasPermission } from "../auth/permissions";
-import type { SecretBroker } from "../connections/secrets/secret-broker";
+import { randomOpaqueName, type SecretBroker } from "../connections/secrets/secret-broker";
 import { AI_MODEL_NAME_PATTERN, AI_MODEL_PROVIDER_IDS, type AiModelProviderId } from "../ai-reach/model-providers";
 import { OrganizationSettingsError } from "./settings";
 
@@ -33,7 +33,9 @@ async function lockAiModelSettings(tx: Parameters<Parameters<typeof withTenantCo
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`organization_ai_credentials:${organizationId}`}::text, 0::bigint))`;
 }
 
+// Only people who may change the model see which one is saved and its key hint.
 export async function readAiModelSettings(context: OrganizationContext): Promise<AiModelSettings | null> {
+  requireManage(context);
   const row = await withTenantContext(context, (tx) => tx.organizationAiCredential.findUnique({
     where: { organizationId: context.organizationId },
     select: { provider: true, model: true, keyHint: true, updatedAt: true },
@@ -41,17 +43,30 @@ export async function readAiModelSettings(context: OrganizationContext): Promise
   return row ? { provider: row.provider as AiModelProviderId, model: row.model, keyHint: row.keyHint, updatedAt: row.updatedAt.toISOString() } : null;
 }
 
-// Saves the chosen company, model, and (when given) a new key. The key goes
-// to Supabase Vault first; the old key is destroyed only after the new one is
-// saved. Callers must have consumed an "ai_model_manage" step-up grant.
+// How long a key may take to be written and saved before a leftover
+// "pending" record is treated as abandoned and its Vault secret deleted.
+const PENDING_KEY_GRACE_MS = 10 * 60_000;
+
+// Saves the chosen company, model, and (when given) a new key. The new key's
+// Vault name is recorded first, while holding the organization's shared lock
+// (so offboarding cannot finish in between); then the key goes to the Vault;
+// then the choice is saved. A key is therefore always tracked, even if the
+// save or the process fails midway. The old key is deleted only after the new
+// one is saved. Callers must have consumed an "ai_model_manage" step-up grant.
 export async function saveAiModelSettings(context: OrganizationContext, input: unknown, correlationId: string, broker: SecretBroker): Promise<AiModelSettings> {
   requireManage(context);
   requireAal2(await getAssuranceStatus(context));
   const parsed = aiModelSettingsInputSchema.parse(input);
 
-  const stored = parsed.apiKey ? await broker.put({ value: parsed.apiKey, kind: "provider_api_key" }) : null;
+  // Step 1: record the name the new key will be stored under.
+  const vaultName = parsed.apiKey ? randomOpaqueName() : null;
+  if (vaultName) await withTenantContext(context, (tx) => tx.organizationAiCredentialPendingKey.create({ data: { vaultName, organizationId: context.organizationId } }));
   let saved;
   try {
+    // Step 2: write the key to the Vault under that name.
+    const stored = parsed.apiKey && vaultName ? await broker.put({ value: parsed.apiKey, kind: "provider_api_key", opaqueName: vaultName }) : null;
+    // Step 3: save the choice; the pending record is cleared in the same
+    // transaction because the saved row now tracks the key.
     saved = await withTenantContext(context, async (tx) => {
       await lockAiModelSettings(tx, context.organizationId);
       const existing = await tx.organizationAiCredential.findUnique({ where: { organizationId: context.organizationId }, select: { provider: true, model: true, brokerHandle: true } });
@@ -78,17 +93,25 @@ export async function saveAiModelSettings(context: OrganizationContext, input: u
       // The replaced key is queued for deletion in the same transaction that
       // stops using it, so it stays tracked until the Vault delete succeeds.
       if (stored && existing) await tx.organizationAiCredentialCleanup.create({ data: { brokerHandle: existing.brokerHandle, organizationId: context.organizationId } });
+      if (vaultName) await tx.organizationAiCredentialPendingKey.deleteMany({ where: { vaultName, organizationId: context.organizationId } });
       return row;
     });
   } catch (error) {
-    // The row was not saved, so the new key must not stay in the Vault. If
-    // it cannot be deleted now, queue it so a later cleanup retries.
-    if (stored) await broker.destroy(stored.handle).catch(() => queueAiCredentialCleanup(context, stored.handle));
+    // The choice was not saved, so the new key (if written) must not stay in
+    // the Vault. If this cleanup fails, the pending record stays and a later
+    // cleanup (or offboarding, which waits for it) retries.
+    if (vaultName) await discardPendingKey(context, broker, vaultName).catch(() => console.warn("AI Reach model key could not be deleted yet; it stays pending for cleanup."));
     throw error;
   }
   await drainAiCredentialCleanups(context, broker);
   const row = saved;
   return { provider: row.provider as AiModelProviderId, model: row.model, keyHint: row.keyHint, updatedAt: row.updatedAt.toISOString() };
+}
+
+// Deletes a key that was never saved (by its Vault name), then its pending record.
+async function discardPendingKey(context: OrganizationContext, broker: SecretBroker, vaultName: string) {
+  await broker.destroyByName(vaultName);
+  await withTenantContext(context, (tx) => tx.organizationAiCredentialPendingKey.deleteMany({ where: { vaultName, organizationId: context.organizationId } }));
 }
 
 // Removes the organization's model choice and deletes its key. AI Reach
@@ -118,26 +141,25 @@ export async function removeAiModelSettings(context: OrganizationContext, correl
   return { removed };
 }
 
-// Records a key that must still be deleted from the Vault, retrying a few
-// times. If the database stays unavailable, the Vault handle (an id, not the
-// key) is logged as an error so the orphaned secret can be removed by hand;
-// it is never silently forgotten.
-async function queueAiCredentialCleanup(context: OrganizationContext, brokerHandle: string) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+// Deletes every queued key from the Vault, removing each queue row only after
+// its delete succeeds, plus any abandoned pending key (one whose save never
+// finished within the grace period; newer ones may still be mid-save).
+// Failures stay queued for the next save, removal, or offboarding attempt;
+// with failClosed the first failure is thrown.
+export async function drainAiCredentialCleanups(context: OrganizationContext, broker: SecretBroker, options: { failClosed?: boolean } = {}) {
+  const abandoned = await withTenantContext(context, (tx) => tx.organizationAiCredentialPendingKey.findMany({
+    where: { organizationId: context.organizationId, queuedAt: { lt: new Date(Date.now() - PENDING_KEY_GRACE_MS) } },
+    orderBy: { queuedAt: "asc" },
+    select: { vaultName: true },
+  }));
+  for (const { vaultName } of abandoned) {
     try {
-      await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.create({ data: { brokerHandle, organizationId: context.organizationId } }));
-      return;
-    } catch {
-      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+      await discardPendingKey(context, broker, vaultName);
+    } catch (error) {
+      if (options.failClosed) throw error;
+      console.warn("AI Reach model key could not be deleted yet; it stays pending for cleanup.");
     }
   }
-  console.error(`AI_MODEL_KEY_CLEANUP_UNTRACKED organization=${context.organizationId} vaultHandle=${brokerHandle}: delete this Vault secret manually.`);
-}
-
-// Deletes every queued key from the Vault, removing each queue row only after
-// its delete succeeds. Failures stay queued for the next save, removal, or
-// offboarding attempt; with failClosed the first failure is thrown.
-export async function drainAiCredentialCleanups(context: OrganizationContext, broker: SecretBroker, options: { failClosed?: boolean } = {}) {
   const queued = await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.findMany({
     where: { organizationId: context.organizationId },
     orderBy: { queuedAt: "asc" },

@@ -34,6 +34,7 @@ model Organization {
   settings             OrganizationSettings?
   aiCredential         OrganizationAiCredential?
   aiCredentialCleanups OrganizationAiCredentialCleanup[]
+  aiCredentialPendingKeys OrganizationAiCredentialPendingKey[]
 
   @@index([status, updatedAt])
   @@map("organizations")
@@ -511,5 +512,16 @@ model OrganizationAiCredentialCleanup {
 
   @@index([organizationId])
   @@map("organization_ai_credential_cleanups")
+  @@schema("private")
+}
+
+model OrganizationAiCredentialPendingKey {
+  vaultName      String       @id @map("vault_name")
+  organizationId String       @map("organization_id") @db.Uuid
+  queuedAt       DateTime     @default(now()) @map("queued_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("organization_ai_credential_pending_keys")
   @@schema("private")
 }

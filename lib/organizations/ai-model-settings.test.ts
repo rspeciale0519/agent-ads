@@ -9,13 +9,13 @@ vi.mock("../auth/organization-context", () => ({ withTenantContext: withTenantCo
 vi.mock("../auth/assurance", () => ({ getAssuranceStatus: vi.fn().mockResolvedValue({}), requireAal2: () => undefined }));
 vi.mock("../audit", () => ({ appendAuditEvent: auditMock }));
 
-import { readAiModelCredential, removeAiModelSettings, saveAiModelSettings } from "./ai-model-settings";
+import { readAiModelCredential, readAiModelSettings, removeAiModelSettings, saveAiModelSettings } from "./ai-model-settings";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const owner: OrganizationContext = { organizationId, organizationName: "Pilot Org", userId: "00000000-0000-4000-8000-000000000002", authSubject: "00000000-0000-4000-8000-000000000003", email: "owner@example.test", role: "owner", permissions: ["organization.settings.manage"], sessionId: "session", assurance: "aal2" };
 const apiKey = "sk-live-abcdefghijklmnop1234";
 
-function fakeBroker(): SecretBroker & { put: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; read: ReturnType<typeof vi.fn> } {
+function fakeBroker(): SecretBroker & { put: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; destroyByName: ReturnType<typeof vi.fn>; read: ReturnType<typeof vi.fn> } {
   return {
     backend: "test-memory",
     keyVersion: "test-v1",
@@ -23,12 +23,14 @@ function fakeBroker(): SecretBroker & { put: ReturnType<typeof vi.fn>; destroy: 
     read: vi.fn().mockResolvedValue(apiKey),
     rotate: vi.fn(),
     destroy: vi.fn().mockResolvedValue(undefined),
+    destroyByName: vi.fn().mockResolvedValue(undefined),
   };
 }
 
 type Row = { provider: string; model: string; brokerHandle: string } | null;
-// A fake database with the credential table and the key-cleanup queue.
-function mockDatabase(existing: Row, options: { failUpsert?: boolean; queued?: string[] } = {}) {
+// A fake database with the credential table, the key-cleanup queue, and the
+// pending-key records (Vault name -> when it was recorded).
+function mockDatabase(existing: Row, options: { failUpsert?: boolean; queued?: string[]; pending?: Record<string, Date> } = {}) {
   const queue = new Set(options.queued ?? []);
   const table = {
     findUnique: vi.fn().mockResolvedValue(existing),
@@ -45,9 +47,16 @@ function mockDatabase(existing: Row, options: { failUpsert?: boolean; queued?: s
     findMany: vi.fn().mockImplementation(async () => [...queue].map((brokerHandle) => ({ brokerHandle }))),
     deleteMany: vi.fn().mockImplementation(async ({ where }) => { queue.delete(where.brokerHandle); return { count: 1 }; }),
   };
+  const pendingRows = new Map(Object.entries(options.pending ?? {}));
+  const pending = {
+    rows: pendingRows,
+    create: vi.fn().mockImplementation(async ({ data }) => { pendingRows.set(data.vaultName, new Date()); return data; }),
+    findMany: vi.fn().mockImplementation(async ({ where }) => [...pendingRows].filter(([, queuedAt]) => queuedAt < where.queuedAt.lt).map(([vaultName]) => ({ vaultName }))),
+    deleteMany: vi.fn().mockImplementation(async ({ where }) => { pendingRows.delete(where.vaultName); return { count: 1 }; }),
+  };
   const $queryRaw = vi.fn().mockResolvedValue([{ locked: 1 }]);
-  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationAiCredential: table, organizationAiCredentialCleanup: cleanup, $queryRaw }));
-  return Object.assign(table, { cleanup });
+  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationAiCredential: table, organizationAiCredentialCleanup: cleanup, organizationAiCredentialPendingKey: pending, $queryRaw }));
+  return Object.assign(table, { cleanup, pending });
 }
 
 afterEach(() => vi.clearAllMocks());
@@ -57,7 +66,11 @@ describe("AI model settings", () => {
     const broker = fakeBroker();
     const table = mockDatabase(null);
     const saved = await saveAiModelSettings(owner, { provider: "openai", model: "gpt-test", apiKey }, "c", broker);
-    expect(broker.put).toHaveBeenCalledWith({ value: apiKey, kind: "provider_api_key" });
+    // The Vault name is recorded before the key is written, and cleared once saved.
+    const vaultName = table.pending.create.mock.calls[0][0].data.vaultName;
+    expect(broker.put).toHaveBeenCalledWith({ value: apiKey, kind: "provider_api_key", opaqueName: vaultName });
+    expect(table.pending.create.mock.invocationCallOrder[0]).toBeLessThan(broker.put.mock.invocationCallOrder[0]);
+    expect(table.pending.rows.size).toBe(0);
     expect(table.upsert.mock.calls[0][0].create).toMatchObject({ provider: "openai", model: "gpt-test", brokerHandle: "new-handle", keyHint: "1234", fingerprint: "fp", updatedBy: owner.userId });
     expect(saved).toMatchObject({ provider: "openai", model: "gpt-test", keyHint: "1234" });
     // The key never reaches the audit log or the returned settings.
@@ -104,34 +117,40 @@ describe("AI model settings", () => {
     expect(broker.destroy).not.toHaveBeenCalled();
   });
 
-  it("removes the new key from the Vault when the save fails, and keeps the old one", async () => {
+  it("removes the new key from the Vault by name when the save fails, and keeps the old one", async () => {
     const broker = fakeBroker();
     const table = mockDatabase({ provider: "openai", model: "gpt-old", brokerHandle: "old-handle" }, { failUpsert: true });
     await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
-    expect(broker.destroy.mock.calls).toEqual([["new-handle"]]);
+    const vaultName = table.pending.create.mock.calls[0][0].data.vaultName;
+    expect(broker.destroyByName.mock.calls).toEqual([[vaultName]]);
+    expect(broker.destroy).not.toHaveBeenCalled();
+    expect(table.pending.rows.size).toBe(0);
     expect(table.cleanup.queue.size).toBe(0);
   });
 
-  it("queues the new key when the save fails and it cannot be deleted right away", async () => {
+  it("keeps the new key's pending record when it cannot be deleted right away", async () => {
     const broker = fakeBroker();
-    broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
+    broker.destroyByName.mockRejectedValue(new Error("VAULT_DOWN"));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const table = mockDatabase(null, { failUpsert: true });
     await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
-    expect([...table.cleanup.queue]).toEqual(["new-handle"]);
+    expect(table.pending.rows.size).toBe(1);
   });
 
-  it("never silently forgets a new key: if it can't be deleted or queued, its Vault id is logged", async () => {
+  it("records the pending key before writing to the Vault, so a closed workspace gets no key", async () => {
     const broker = fakeBroker();
-    broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
-    const table = mockDatabase(null, { failUpsert: true });
-    table.cleanup.create.mockRejectedValue(new Error("DB_DOWN"));
-    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
-    expect(table.cleanup.create).toHaveBeenCalledTimes(3);
-    expect(errors.mock.calls[0][0]).toContain("AI_MODEL_KEY_CLEANUP_UNTRACKED");
-    expect(errors.mock.calls[0][0]).toContain("vaultHandle=new-handle");
-    // Only the Vault id is logged, never the key.
-    expect(errors.mock.calls[0][0]).not.toContain(apiKey);
+    const table = mockDatabase(null);
+    table.pending.create.mockRejectedValue(new Error("ORGANIZATION_ACCESS_PENDING"));
+    await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("ORGANIZATION_ACCESS_PENDING");
+    expect(broker.put).not.toHaveBeenCalled();
+  });
+
+  it("deletes abandoned pending keys, but leaves ones that may still be saving", async () => {
+    const broker = fakeBroker();
+    const table = mockDatabase(null, { pending: { "secret-old": new Date(Date.now() - 60 * 60_000), "secret-new": new Date() } });
+    expect(await removeAiModelSettings(owner, "c", broker, { failClosed: true })).toEqual({ removed: false });
+    expect(broker.destroyByName.mock.calls).toEqual([["secret-old"]]);
+    expect([...table.pending.rows.keys()]).toEqual(["secret-new"]);
   });
 
   it.each([
@@ -149,6 +168,8 @@ describe("AI model settings", () => {
   it("refuses people without the settings permission", async () => {
     const broker = fakeBroker();
     await expect(saveAiModelSettings({ ...owner, role: "member", permissions: ["connections.view"] }, { provider: "openai", model: "gpt-test", apiKey }, "c", broker)).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    // Even the saved model and key hint are hidden from them.
+    await expect(readAiModelSettings({ ...owner, role: "member", permissions: ["connections.view"] })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
     await expect(removeAiModelSettings({ ...owner, role: "member", permissions: ["connections.view"] }, "c", broker)).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
   });
 

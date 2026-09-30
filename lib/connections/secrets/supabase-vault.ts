@@ -45,6 +45,10 @@ export class SupabaseVaultSecretBroker implements SecretBroker {
     await this.client.$executeRaw`SELECT private.destroy_broker_secret(${handle}::uuid)`;
   }
 
+  async destroyByName(name: string) {
+    await this.client.$executeRaw`SELECT private.destroy_broker_secret_by_name(${name})`;
+  }
+
   async disconnect() {
     await this.client.$disconnect();
   }
