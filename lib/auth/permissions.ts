@@ -9,7 +9,7 @@ export const CONNECTION_PERMISSIONS = [
 ] as const;
 
 export type ConnectionPermission = (typeof CONNECTION_PERMISSIONS)[number];
-export const ORGANIZATION_PERMISSIONS = ["membership.manage"] as const;
+export const ORGANIZATION_PERMISSIONS = ["membership.manage", "organization.settings.manage"] as const;
 export type OrganizationPermission = (typeof ORGANIZATION_PERMISSIONS)[number];
 export type Permission = ConnectionPermission | OrganizationPermission;
 export type OrganizationRole = "owner" | "administrator" | "operator" | "member";

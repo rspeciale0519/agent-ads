@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { withTenantContext, type OrganizationContext, type TenantTransaction } from "../auth/organization-context";
+import { readOrganizationSettings } from "../organizations/settings";
 import { applyCurrentDubsadoExportWindow } from "./dubsado-evidence";
 import { readOnlyEvidenceSnapshotSchema, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 
@@ -56,4 +57,12 @@ export async function readLatestEvidenceSnapshot(context: OrganizationContext): 
     }
     if (rows.length < readBatchSize) return null;
   }
+}
+
+// The newest snapshot and the organization's upload window, read together so
+// the snapshot's freshness and the briefing both use the saved setting.
+export async function readAiReachEvidence(context: OrganizationContext) {
+  const [settings, snapshot] = await Promise.all([readOrganizationSettings(context), readLatestEvidenceSnapshot(context)]);
+  const uploadMaxAgeHours = settings.staleUploadDays * 24;
+  return { uploadMaxAgeHours, snapshot: snapshot && applyCurrentDubsadoExportWindow(snapshot, uploadMaxAgeHours) };
 }

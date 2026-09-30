@@ -162,6 +162,7 @@ BEGIN
       ('public', 'ai_reach_evidence_snapshots'),
       ('public', 'ai_reach_conversations'),
       ('public', 'ai_reach_messages'),
+      ('public', 'organization_settings'),
       ('private', 'step_up_grants'),
       ('private', 'credential_references'),
       ('private', 'rate_limit_buckets'),

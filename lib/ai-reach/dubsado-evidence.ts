@@ -13,31 +13,32 @@ const stageMetricMap: Partial<Record<DubsadoOutcomeStage, string>> = {
   refunded: "refunded_engagements",
 };
 
-// Exports are uploaded by hand, often weekly, so they stay usable for a week
-// before AI Reach asks for a new one.
+// Exports are uploaded by hand, often weekly, so by default they stay usable
+// for a week before AI Reach asks for a new one. Each organization can pick
+// its own number of days in Settings.
 export const DUBSADO_EXPORT_MAX_AGE_HOURS = 7 * 24;
 
 // True while the newest authorized Dubsado export in the snapshot is inside
-// today's export window. It uses the export's own collection time, so older
-// saved snapshots follow the current policy and a combined snapshot's shorter
-// window does not make the Dubsado part look out of date.
-export function isDubsadoExportFresh(snapshot: ReadOnlyEvidenceSnapshot, now = new Date()) {
+// the organization's export window. It uses the export's own collection time,
+// so older saved snapshots follow the current setting and a combined
+// snapshot's shorter window does not make the Dubsado part look out of date.
+export function isDubsadoExportFresh(snapshot: ReadOnlyEvidenceSnapshot, now = new Date(), maxAgeHours = DUBSADO_EXPORT_MAX_AGE_HOURS) {
   const collectedTimes = snapshot.evidence
     .filter((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export")
     .map((evidence) => Date.parse(evidence.collectedAt))
     .filter((time) => Number.isFinite(time) && time <= now.getTime());
   if (collectedTimes.length === 0) return false;
-  return now.getTime() - Math.max(...collectedTimes) <= DUBSADO_EXPORT_MAX_AGE_HOURS * 60 * 60 * 1000;
+  return now.getTime() - Math.max(...collectedTimes) <= maxAgeHours * 60 * 60 * 1000;
 }
 
-// Snapshots saved before the 7-day window carry a 48-hour window. A snapshot
-// made only from Dubsado exports is read with today's export window so every
+// A snapshot made only from Dubsado exports is read with the organization's
+// current export window (longer or shorter than when it was saved), so every
 // part of AI Reach (status, tiles, chat, actions) agrees on its freshness.
-// Combined snapshots keep their own, shorter window.
-export function applyCurrentDubsadoExportWindow(snapshot: ReadOnlyEvidenceSnapshot): ReadOnlyEvidenceSnapshot {
+// Combined snapshots keep their own window.
+export function applyCurrentDubsadoExportWindow(snapshot: ReadOnlyEvidenceSnapshot, maxAgeHours = DUBSADO_EXPORT_MAX_AGE_HOURS): ReadOnlyEvidenceSnapshot {
   const dubsadoOnly = snapshot.evidence.length > 0 && snapshot.evidence.every((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export");
-  if (!dubsadoOnly || snapshot.freshness.maxAgeHours >= DUBSADO_EXPORT_MAX_AGE_HOURS) return snapshot;
-  return { ...snapshot, freshness: { ...snapshot.freshness, maxAgeHours: DUBSADO_EXPORT_MAX_AGE_HOURS } };
+  if (!dubsadoOnly || snapshot.freshness.maxAgeHours === maxAgeHours) return snapshot;
+  return { ...snapshot, freshness: { ...snapshot.freshness, maxAgeHours } };
 }
 
 type Input = {

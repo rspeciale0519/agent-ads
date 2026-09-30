@@ -4,7 +4,7 @@ import { getAssuranceStatus } from "../../lib/auth/assurance";
 import { isOrganizationAccessError, requireOrganizationContext } from "../../lib/auth/organization-context";
 import { getDashboardData } from "../../lib/dashboard/dashboard-service";
 import { buildAiReachBriefing } from "../../lib/ai-reach/briefing";
-import { readLatestEvidenceSnapshot } from "../../lib/ai-reach/evidence-store";
+import { readAiReachEvidence } from "../../lib/ai-reach/evidence-store";
 import { readLatestConversation } from "../../lib/ai-reach/chat-service";
 import { buildOutcomeTiles } from "../../lib/ai-reach/outcome-tiles";
 import { getConnectionDetail } from "../../lib/connections/service";
@@ -25,9 +25,9 @@ export default async function AiReachPage() {
     }
     throw error;
   }
-  const [dashboard, assurance, evidenceSnapshot, conversation] = await Promise.all([getDashboardData(context), getAssuranceStatus(context), readLatestEvidenceSnapshot(context), readLatestConversation(context)]);
+  const [dashboard, assurance, { snapshot: evidenceSnapshot, uploadMaxAgeHours }, conversation] = await Promise.all([getDashboardData(context), getAssuranceStatus(context), readAiReachEvidence(context), readLatestConversation(context)]);
   // The newest saved snapshot drives both the briefing status and the outcome tiles.
-  const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot });
+  const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot, uploadMaxAgeHours });
   const outcomeTiles = buildOutcomeTiles(evidenceSnapshot);
   const googleAdsTargets = (await Promise.all(dashboard.connections
     .filter((connection) => connection.provider === "google_ads")
@@ -42,7 +42,7 @@ export default async function AiReachPage() {
   return <main className="workspace-shell ai-reach-shell">
     <header className="workspace-header ai-reach-header">
       <div><span className="eyebrow">AI Reach</span><h1>Know what to do next.</h1><p className="workspace-muted">A plain-language view of your marketing evidence, business outcomes, and the next three safe actions.</p></div>
-      <div className="workspace-header-actions"><span className={`ai-reach-status ai-reach-status-${briefing.status}`}>{briefing.status === "ready" ? "Evidence ready" : "Evidence is limited"}</span><Link className="secondary-button" href="/dashboard">Workspace</Link><Link className="secondary-button" href="/connections">Connections</Link></div>
+      <div className="workspace-header-actions"><span className={`ai-reach-status ai-reach-status-${briefing.status}`}>{briefing.status === "ready" ? "Evidence ready" : "Evidence is limited"}</span><Link className="secondary-button" href="/dashboard">Workspace</Link><Link className="secondary-button" href="/connections">Connections</Link>{(context.role === "owner" || context.role === "administrator") && <Link className="secondary-button" href="/settings/general">Settings</Link>}</div>
     </header>
     <section className="ai-reach-summary" aria-label="AI Reach briefing">
       <div><span className="eyebrow">Today’s briefing</span><h2>{briefing.summary}</h2><p>{briefing.limitation}</p><p>AI Reach does not change advertising, websites, email, or CRM records.</p></div>

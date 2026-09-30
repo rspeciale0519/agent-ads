@@ -96,6 +96,16 @@ describe("briefing with a sales funnel", () => {
     expect(action.metricKeys?.length).toBeGreaterThan(0);
   });
 
+  it("uses the organization's own upload window from Settings", () => {
+    // 8 days after the Sep 2 export: stale by default, fresh with a 30-day limit.
+    const longWindow = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc), uploadMaxAgeHours: 30 * 24 }, new Date("2026-09-10T12:00:00.000Z")).recommendations[2];
+    expect(longWindow.title).toBe("Find out why booked calls stall before proposals");
+    // 3 days after the export: fresh by default, stale with a 2-day limit.
+    const shortWindow = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc), uploadMaxAgeHours: 2 * 24 }, new Date("2026-09-05T12:00:00.000Z")).recommendations[2];
+    expect(shortWindow.title).toBe("Upload a fresh Dubsado export");
+    expect(shortWindow.reason).toContain("older than 2 days");
+  });
+
   it("says when there are too few records to compare", () => {
     const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot({ qualified_leads: 2, booked_calls: 1 }) }, now).recommendations[2];
     expect(action.title).toBe("Review Dubsado outcome evidence");
