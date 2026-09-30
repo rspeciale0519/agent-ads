@@ -13,10 +13,14 @@ const accountTargets = "ads?|campaigns?|ad groups?|ad sets?|budgets?|bids?|biddi
 // the output ("a Google Ads report", "a Google Ads monthly report"), not the
 // thing being changed. Up to two describing words may sit in between.
 const reportNouns = "reports?|summary|summaries|performance|results?|metrics?|data|stats|statistics|breakdowns?|overviews?|analysis|numbers|trends?|insights?|dashboards?|charts?|graphs?";
+// A report noun is the requested output only when the phrase ends there
+// ("…monthly report", "…report for May"). "Set campaign performance targets"
+// and "Create a Google Ads performance campaign" are still changes.
+const reportEnd = "(?=\\s*$|\\s*[.,;:!?)]|\\s+(?:for|of|on|about|by|from|in|with|to|that|which|and|so|please|showing|comparing|per|over|across|since|between|this|last)\\b)";
 // The verb, up to a few small words ("a new", "my search"), then the target
 // as the direct object. "Create a summary of leads" and "Create a Google Ads
 // report" are not matched: "summary" and "report" are the objects.
-const targetedAction = `(?:${targetedVerbs})\\s+(?:(?:a|an|the|my|our|this|that|these|those|all|new|every)\\s+)*(?:[\\w'-]+\\s+)?(?:${accountTargets})\\b(?!(?:\\s+[\\w'-]+){0,2}?\\s+(?:${reportNouns})\\b)`;
+const targetedAction = `(?:${targetedVerbs})\\s+(?:(?:a|an|the|my|our|this|that|these|those|all|new|every)\\s+)*(?:[\\w'-]+\\s+)?(?:${accountTargets})\\b(?!(?:\\s+[\\w'-]+){0,2}?\\s+(?:${reportNouns})${reportEnd})`;
 const anyAction = `(?:${actionVerbs})\\b|${targetedAction}`;
 
 // A request, not a question about history: the verb opens the sentence

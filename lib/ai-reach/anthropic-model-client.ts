@@ -6,6 +6,24 @@ const draftSchema = z.object({ isChangeRequest: z.boolean(), metricKeys: z.array
 
 export const defaultAnthropicModel = "claude-opus-5-5";
 
+// Anthropic list prices in USD per million tokens. Update the version with
+// any price change; a served model not listed here is saved with no cost.
+export const anthropicPricingVersion = "anthropic-2026-09";
+const pricesPerMillionTokens: Array<{ model: string; input: number; output: number }> = [
+  { model: "claude-opus-5-5", input: 4, output: 20 },
+  { model: "claude-sonnet-5-5", input: 2, output: 10 },
+  { model: "claude-opus-5", input: 5, output: 25 },
+  { model: "claude-fable-5-1", input: 10, output: 50 },
+];
+
+// The call's cost from its billed tokens, or null for an unlisted model.
+// Dated model ids ("claude-opus-5-5-20260901") match their base name.
+export function anthropicCallCostUsd(model: string, inputTokens: number, outputTokens: number) {
+  const price = pricesPerMillionTokens.find((entry) => model === entry.model || model.startsWith(`${entry.model}-2`));
+  if (!price) return null;
+  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
+}
+
 // Anthropic adapter for AI Reach answers. It only drafts; model-answer.ts
 // checks the draft before anyone sees it.
 export function createAnthropicModelClient(options: { apiKey: string; model?: string; client?: Anthropic }): AiReachModelClient {
@@ -30,7 +48,13 @@ export function createAnthropicModelClient(options: { apiKey: string; model?: st
       });
       // Billed tokens are kept even when the draft is unusable.
       // The served model is recorded, since a fallback may answer instead.
-      const tokens = { model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      const tokens = {
+        model: response.model,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        costUsd: anthropicCallCostUsd(response.model, response.usage.input_tokens, response.usage.output_tokens),
+        pricingVersion: anthropicPricingVersion,
+      };
       if (response.stop_reason !== "end_turn") return { draft: null, ...tokens };
       const text = response.content.find((block) => block.type === "text");
       if (!text || text.type !== "text") return { draft: null, ...tokens };

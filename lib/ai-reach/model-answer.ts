@@ -20,7 +20,17 @@ export type ModelAnswerDraft = {
 // the vendor billed, when the vendor reports them.
 // `model` is the model that actually served the call, which can differ from
 // the one requested when the vendor falls back to another model.
-export type ModelDraftResult = { draft: ModelAnswerDraft | null; model?: string; inputTokens: number | null; outputTokens: number | null };
+// costUsd is what the vendor charges for the call, computed by the adapter
+// from its own price list; pricingVersion names that price list so past
+// costs can be reconciled after prices change.
+export type ModelDraftResult = {
+  draft: ModelAnswerDraft | null;
+  model?: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd?: number | null;
+  pricingVersion?: string | null;
+};
 
 // One adapter per model vendor (Anthropic today; others later). An adapter
 // only turns the prompt into a draft.
@@ -38,8 +48,11 @@ export type ModelUsage = {
   provider: string;
   model: string;
   status: "accepted" | "change_request" | "rejected" | "failed";
+  promptVersion: string;
   inputTokens: number | null;
   outputTokens: number | null;
+  costUsd: number | null;
+  pricingVersion: string | null;
 };
 
 // Removes contact details before a question leaves AI Reach. The router only
@@ -74,6 +87,10 @@ export const modelAnswerDraftSchema = {
   required: ["isChangeRequest", "metricKeys", "nextActionNumbers", "missingSources"],
   additionalProperties: false,
 } as const;
+
+// Change this whenever the system prompt or draft schema changes, so every
+// saved usage record says which revision produced its routing decision.
+export const modelAnswerPromptVersion = "router-2026-09-30";
 
 export const modelAnswerSystemPrompt = [
   "You are the question router for AI Reach, a read-only marketing analyst for a small business.",
@@ -172,8 +189,11 @@ export function createModelAnswerProvider(client: AiReachModelClient): AiReachAn
         provider: client.provider,
         model: result?.model ?? client.model,
         status,
+        promptVersion: modelAnswerPromptVersion,
         inputTokens: result?.inputTokens ?? null,
         outputTokens: result?.outputTokens ?? null,
+        costUsd: result?.costUsd ?? null,
+        pricingVersion: result?.pricingVersion ?? null,
       });
       let result: ModelDraftResult;
       try {

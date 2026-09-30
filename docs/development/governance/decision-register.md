@@ -361,7 +361,7 @@
   - Recognized change requests never reach the model, and a question the model classifies as a change request gets the read-only answer. The model has no tools and writes no text, so it can neither change nor claim to change anything.
   - Models receive formatted aggregate saved metrics, source names and states, and next-action titles only. No business name is sent.
   - Before a question is sent, AI Reach replaces emails, phone numbers, and links with placeholders. People's names in free text cannot be reliably detected, so turning the model on means an organization accepts that its questions go to the chosen provider.
-- Usage: every answer that called a model saves an immutable usage record with the answer (`ai_reach_messages.model_usage`): provider, model, status (accepted, change_request, rejected, failed), and billed input and output tokens when the provider reports them. This meets P-008 and AGT-004 for chat.
+- Usage: every answer that called a model saves an immutable usage record with the answer (`ai_reach_messages.model_usage`): provider, the model that served the call, status (accepted, change_request, rejected, failed), the routing prompt version, billed input and output tokens, and the cost in USD with the price-list version used to compute it (no cost for a model missing from the price list). This meets P-008, AGT-004 and AGT-005 for chat.
 - Switch: the model is used only when `AI_REACH_MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` are both set. Removing either restores deterministic answers.
 - Owner/date: product owner, 2026-09-29.
 - Affects: AI Reach chat, AGT-001–AGT-010.

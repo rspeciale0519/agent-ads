@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { createAnthropicModelClient } from "./anthropic-model-client";
+import { anthropicCallCostUsd, createAnthropicModelClient } from "./anthropic-model-client";
 import { buildAiReachBriefing } from "./briefing";
 import { isActionRequest } from "./chat";
 import { parseReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { deterministicAnswerProvider, getAnswerProvider } from "./gateway";
-import { buildModelFacts, createModelAnswerProvider, type AiReachModelClient, type ModelAnswerDraft } from "./model-answer";
+import { buildModelFacts, createModelAnswerProvider, modelAnswerPromptVersion, type AiReachModelClient, type ModelAnswerDraft } from "./model-answer";
 
 const now = new Date("2026-08-30T12:00:00.000Z");
 const window = { start: "2026-08-01T00:00:00.000Z", end: "2026-08-30T00:00:00.000Z" };
@@ -77,7 +77,7 @@ describe("model answers", () => {
       text: `Your saved evidence doesn't cover this yet. Connecting Google Ads would help answer this. Suggested next step: ${briefing.recommendations[1].title}. ${briefing.recommendations[1].reason}`,
       kind: "guidance",
       citations: [],
-      modelUsage: { provider: "fake", model: "test-model", status: "accepted", inputTokens: 100, outputTokens: 20 },
+      modelUsage: { provider: "fake", model: "test-model", status: "accepted", promptVersion: modelAnswerPromptVersion, inputTokens: 100, outputTokens: 20, costUsd: null, pricingVersion: null },
     });
   });
 
@@ -109,7 +109,7 @@ describe("model answers", () => {
     }
   });
 
-  it.each(["Please increase my budget", "Set my budget to 500", "Create an ad", "Create a Google Ads campaign", "Can you update my bids?", "Could my campaign be put on hold?", "Put the search campaign on hold", "Can the budget be raised?", "   "])(
+  it.each(["Please increase my budget", "Set my budget to 500", "Create an ad", "Create a Google Ads campaign", "Create a Google Ads performance campaign", "Set campaign performance targets", "Can you update my bids?", "Could my campaign be put on hold?", "Put the search campaign on hold", "Can the budget be raised?", "   "])(
     "never sends recognized change requests or empty questions to the model: %s",
     async (question) => {
       const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
@@ -128,7 +128,7 @@ describe("model answers", () => {
   );
 
   it("records provider usage for every model call, whatever happens to the draft", async () => {
-    const tokens = { provider: "fake", model: "test-model", inputTokens: 100, outputTokens: 20 };
+    const tokens = { provider: "fake", model: "test-model", promptVersion: modelAnswerPromptVersion, inputTokens: 100, outputTokens: 20, costUsd: null, pricingVersion: null };
     expect((await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads"] }))).answer(input("How many leads?"))).modelUsage).toEqual({ ...tokens, status: "accepted" });
     expect((await createModelAnswerProvider(fakeModel(draft({ isChangeRequest: true }))).answer(input("Make my budget higher"))).modelUsage).toEqual({ ...tokens, status: "change_request" });
     expect((await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["unknown"] }))).answer(input("How many leads?"))).modelUsage).toEqual({ ...tokens, status: "rejected" });
@@ -207,12 +207,18 @@ describe("Anthropic model adapter", () => {
   it("requests a structured draft with fallbacks and parses it", async () => {
     const { client, create } = fakeAnthropic({ stop_reason: "end_turn", model: "claude-opus-5-5", usage: { input_tokens: 900, output_tokens: 40 }, content: [{ type: "text", text: JSON.stringify({ isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }) }] });
     const result = await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "How many leads?" });
-    expect(result).toEqual({ draft: { isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }, model: "claude-opus-5-5", inputTokens: 900, outputTokens: 40 });
+    expect(result).toEqual({ draft: { isChangeRequest: false, metricKeys: ["qualified_leads"], nextActionNumbers: [1], missingSources: [] }, model: "claude-opus-5-5", inputTokens: 900, outputTokens: 40, costUsd: (900 * 4 + 40 * 20) / 1_000_000, pricingVersion: "anthropic-2026-09" });
     const request = create.mock.calls[0][0];
     expect(request.model).toBe("claude-opus-5-5");
     expect(request.output_config.format.type).toBe("json_schema");
     expect(request.fallbacks).toBe("default");
     expect(request.betas).toEqual(["server-side-fallback-2026-07-01"]);
+  });
+
+  it("prices dated model ids by their base name and leaves unlisted models unpriced", () => {
+    expect(anthropicCallCostUsd("claude-opus-5-5-20260901", 1_000_000, 0)).toBe(4);
+    expect(anthropicCallCostUsd("claude-opus-5", 0, 1_000_000)).toBe(25);
+    expect(anthropicCallCostUsd("some-future-model", 10, 10)).toBeNull();
   });
 
   it("returns no draft, but keeps the billed tokens, when the model declines, stops early, or sends bad JSON", async () => {
@@ -224,7 +230,7 @@ describe("Anthropic model adapter", () => {
     for (const response of responses) {
       // A fallback model served these calls; its name is what gets recorded.
       const { client } = fakeAnthropic({ ...response, model: "claude-sonnet-5-5", usage: { input_tokens: 5, output_tokens: 1 } });
-      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toEqual({ draft: null, model: "claude-sonnet-5-5", inputTokens: 5, outputTokens: 1 });
+      expect(await createAnthropicModelClient({ apiKey: "test-key", client }).draftAnswer({ system: "rules", facts: "{}", question: "Hi" })).toEqual({ draft: null, model: "claude-sonnet-5-5", inputTokens: 5, outputTokens: 1, costUsd: (5 * 2 + 1 * 10) / 1_000_000, pricingVersion: "anthropic-2026-09" });
     }
   });
 });

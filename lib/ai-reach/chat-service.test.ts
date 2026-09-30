@@ -83,7 +83,7 @@ describe("AI Reach chat service", () => {
   it("saves the model usage record with the answer, and none for rule-based answers", async () => {
     mockAnswerInputs();
     const models = mockDatabase();
-    const modelUsage = { provider: "anthropic", model: "claude-opus-5-5", status: "accepted" as const, inputTokens: 900, outputTokens: 40 };
+    const modelUsage = { provider: "anthropic", model: "claude-opus-5-5", status: "accepted" as const, promptVersion: "router-2026-09-30", inputTokens: 900, outputTokens: 40, costUsd: 0.0044, pricingVersion: "anthropic-2026-09" };
     const modelProvider: AiReachAnswerProvider = { name: "model", answer: vi.fn(async () => ({ text: "Answer.", kind: "guidance" as const, citations: [], modelUsage })) };
     await askAiReach(context, { question: "How many leads?" }, modelProvider);
     expect(models.aiReachMessage.create.mock.calls[1][0].data.modelUsage).toEqual(modelUsage);
