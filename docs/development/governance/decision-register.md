@@ -402,6 +402,7 @@
 - Status: accepted.
 - Amends: D-025 (turns on the Resend path it chose).
 - Context: Email was off, so organization invitations were created and immediately revoked, onboarding submissions were refused, and Supabase's built-in sender reached only the project team.
+- Options: keep email off; send only to Resend test recipients (`resend-test`); turn on live sending in production only.
 - Decision:
   - Production (`aiagent-ads.vercel.app`) sets `EMAIL_DELIVERY_MODE=live`. Preview deployments keep `disabled`, so test branches never email real people.
   - App email (invitations, onboarding notices) is sent through Resend from `onboarding@e.miodiollc.com`, a verified subdomain of `miodiollc.com`.
@@ -409,8 +410,9 @@
   - Staging stays disabled as its release-evidence checker requires.
 - Verified: 2026-09-30, a password-reset email and an onboarding notice were delivered to real inboxes.
 - Consequences: an email is still only a notification. In-app records remain the source of truth (D-025). Resend's free plan covers 3,000 emails a month (100 a day).
+- Migration: none (environment and Supabase Auth settings only).
 - Owner/date: product owner, 2026-09-30.
-- Affects: onboarding notices, organization invitations, Supabase Auth email.
+- Affects: ONB-001–ONB-016, UX-006, OPS-003–OPS-005, SEC-005 (the same as D-025).
 
 ## Decision process
 
