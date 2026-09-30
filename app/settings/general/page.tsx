@@ -8,6 +8,7 @@ import { AI_MODEL_PROVIDERS } from "../../../lib/ai-reach/model-providers";
 import { readAiModelSettings } from "../../../lib/organizations/ai-model-settings";
 import AiModelPanel from "./AiModelPanel";
 import GeneralSettingsPanel from "./GeneralSettingsPanel";
+import SignOutButton from "../../auth/SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function GeneralSettingsPage() {
   if (context.role !== "owner" && context.role !== "administrator") redirect("/dashboard");
   const [settings, aiModel] = await Promise.all([readOrganizationSettings(context), hasPermission(context.permissions, "organization.settings.manage") ? readAiModelSettings(context) : null]);
   return <main className="workspace-shell">
-    <header className="workspace-header"><div><span className="eyebrow">Settings</span><h1>Workspace settings</h1><p className="workspace-muted">Settings for {context.organizationName}. Saving a change requires current 2-step login.</p></div><Link className="secondary-button" href="/ai-reach">AI Reach</Link></header>
+    <header className="workspace-header"><div><span className="eyebrow">Settings</span><h1>Workspace settings</h1><p className="workspace-muted">Settings for {context.organizationName}. Saving a change requires current 2-step login.</p></div><div className="workspace-header-actions"><Link className="secondary-button" href="/ai-reach">AI Reach</Link><SignOutButton /></div></header>
     <GeneralSettingsPanel organizationId={context.organizationId} staleUploadDays={settings.staleUploadDays} minDays={MIN_STALE_UPLOAD_DAYS} maxDays={MAX_STALE_UPLOAD_DAYS} />
     <AiModelPanel organizationId={context.organizationId} providers={AI_MODEL_PROVIDERS.map(({ id, label, exampleModel }) => ({ id, label, exampleModel }))} saved={aiModel} platformDefault={platformModel()} />
   </main>;
