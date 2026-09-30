@@ -4,7 +4,7 @@ import { getSupabaseServer } from "../../lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-type AuthPageProps = { searchParams?: Promise<{ mode?: string; verified?: string; reset?: string; error?: string }> };
+type AuthPageProps = { searchParams?: Promise<{ mode?: string; verified?: string; reset?: string; signedout?: string; error?: string }> };
 
 export default async function AuthPage({ searchParams }: AuthPageProps) {
   const supabase = await getSupabaseServer();
@@ -16,7 +16,9 @@ export default async function AuthPage({ searchParams }: AuthPageProps) {
     ? "Your email is confirmed. Sign in to continue."
     : params.reset === "success"
       ? "Your password was changed. Sign in with your new password."
-      : "";
+      : params.signedout === "1"
+        ? "You're logged out."
+        : "";
   const initialError = params.error === "link" ? "That confirmation link is invalid or expired. Request a new link and try again." : "";
   return <AuthForm initialMode={initialMode} initialNotice={initialNotice} initialError={initialError} />;
 }

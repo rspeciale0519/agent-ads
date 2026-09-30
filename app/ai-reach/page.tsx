@@ -10,6 +10,7 @@ import { buildOutcomeTiles } from "../../lib/ai-reach/outcome-tiles";
 import { getConnectionDetail } from "../../lib/connections/service";
 import AiReachChat from "./AiReachChat";
 import GoogleAdsReportPanel, { type GoogleAdsReportTarget } from "./GoogleAdsReportPanel";
+import SignOutButton from "../auth/SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function AiReachPage() {
   return <main className="workspace-shell ai-reach-shell">
     <header className="workspace-header ai-reach-header">
       <div><span className="eyebrow">AI Reach</span><h1>Know what to do next.</h1><p className="workspace-muted">A plain-language view of your marketing evidence, business outcomes, and the next three safe actions.</p></div>
-      <div className="workspace-header-actions"><span className={`ai-reach-status ai-reach-status-${briefing.status}`}>{briefing.status === "ready" ? "Evidence ready" : "Evidence is limited"}</span><Link className="secondary-button" href="/dashboard">Workspace</Link><Link className="secondary-button" href="/connections">Connections</Link>{(context.role === "owner" || context.role === "administrator") && <Link className="secondary-button" href="/settings/general">Settings</Link>}</div>
+      <div className="workspace-header-actions"><span className={`ai-reach-status ai-reach-status-${briefing.status}`}>{briefing.status === "ready" ? "Evidence ready" : "Evidence is limited"}</span><Link className="secondary-button" href="/dashboard">Workspace</Link><Link className="secondary-button" href="/connections">Connections</Link>{(context.role === "owner" || context.role === "administrator") && <Link className="secondary-button" href="/settings/general">Settings</Link>}<SignOutButton /></div>
     </header>
     <section className="ai-reach-summary" aria-label="AI Reach briefing">
       <div><span className="eyebrow">Today’s briefing</span><h2>{briefing.summary}</h2><p>{briefing.limitation}</p><p>AI Reach does not change advertising, websites, email, or CRM records.</p></div>

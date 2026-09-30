@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isOrganizationAccessError, requireOrganizationContext } from "../../../lib/auth/organization-context";
 import DataLifecyclePanel from "./DataLifecyclePanel";
+import SignOutButton from "../../auth/SignOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function DataSettingsPage() {
   }
   if (context.role !== "owner" && context.role !== "administrator") redirect("/dashboard");
   return <main className="workspace-shell">
-    <header className="workspace-header"><div><span className="eyebrow">Data controls</span><h1>Export and offboarding</h1><p className="workspace-muted">Protected lifecycle controls for {context.organizationName}. Every action requires current MFA and an action-bound grant.</p></div><Link className="secondary-button" href="/dashboard">Dashboard</Link></header>
+    <header className="workspace-header"><div><span className="eyebrow">Data controls</span><h1>Export and offboarding</h1><p className="workspace-muted">Protected lifecycle controls for {context.organizationName}. Every action requires current MFA and an action-bound grant.</p></div><div className="workspace-header-actions"><Link className="secondary-button" href="/dashboard">Dashboard</Link><SignOutButton /></div></header>
     <DataLifecyclePanel organizationId={context.organizationId} organizationName={context.organizationName} canOffboard={context.role === "owner"} />
   </main>;
 }
