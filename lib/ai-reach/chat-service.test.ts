@@ -7,7 +7,7 @@ const snapshotMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../auth/organization-context", () => ({ withTenantContext: withTenantContextMock }));
 vi.mock("../dashboard/dashboard-service", () => ({ getDashboardData: dashboardMock }));
-vi.mock("./evidence-store", () => ({ readLatestEvidenceSnapshot: snapshotMock }));
+vi.mock("./evidence-store", () => ({ readAiReachEvidence: snapshotMock }));
 // Keep the real error type and permission check without loading provider adapters.
 vi.mock("../connections/service", () => {
   class ConnectionServiceError extends Error {
@@ -60,7 +60,7 @@ function mockDatabase(existingConversation: { id: string } | null = null) {
 
 function mockAnswerInputs() {
   dashboardMock.mockResolvedValue({ organization: { id: organizationId, name: "Test organization", role: "member" }, onboarding: { status: "submitted", businessName: null, submittedAt: null }, connections: [], verifiedResourceCount: 0 });
-  snapshotMock.mockResolvedValue(null);
+  snapshotMock.mockResolvedValue({ snapshot: null, uploadMaxAgeHours: 168 });
 }
 
 afterEach(() => vi.clearAllMocks());

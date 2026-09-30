@@ -366,6 +366,17 @@
 - Owner/date: product owner, 2026-09-29.
 - Affects: AI Reach chat, AGT-001–AGT-010.
 
+### D-040 — Organization-set upload freshness window
+
+- Status: accepted.
+- Context: Uploaded Dubsado exports were fixed to a 7-day freshness window. The product owner wants each organization to choose how many days an upload stays current.
+- Options: keep a fixed window; make it an environment setting; store it per organization.
+- Decision: a new `organization_settings` table stores `stale_upload_days` (default 7, allowed 1–90). Owners and administrators with current MFA change it on Settings → Workspace settings, and every change is audited (`organization.settings_updated`). A missing row means the default applies.
+- Consequences: AI Reach reads Dubsado-only snapshots with the organization's window, longer or shorter than when they were saved, so status, tiles, chat and actions agree. Combined snapshots keep their own window. The stale-upload action names the limit.
+- Migration: `20260930120000_organization_settings` (tenant RLS, forced; the editor must be the signed-in user).
+- Owner/date: product owner, 2026-09-30.
+- Affects: AI Reach briefing and chat, ORG-001–ORG-011.
+
 ## Decision process
 
 New material decisions must state context, options, decision, consequences, owner, date, status, affected requirement IDs, and any migration. Superseded decisions are never deleted.

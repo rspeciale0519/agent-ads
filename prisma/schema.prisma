@@ -31,6 +31,7 @@ model Organization {
   idempotencyRecords   IdempotencyRecord[]
   evidenceSnapshots    AiReachEvidenceSnapshot[]
   aiReachConversations AiReachConversation[]
+  settings             OrganizationSettings?
 
   @@index([status, updatedAt])
   @@map("organizations")
@@ -463,5 +464,18 @@ model AiReachMessage {
 
   @@index([organizationId, conversationId, createdAt])
   @@map("ai_reach_messages")
+  @@schema("public")
+}
+
+// Settings an organization's owners and administrators can change.
+// A missing row means every default applies.
+model OrganizationSettings {
+  organizationId  String       @id @map("organization_id") @db.Uuid
+  staleUploadDays Int          @default(7) @map("stale_upload_days")
+  updatedBy       String       @map("updated_by") @db.Uuid
+  updatedAt       DateTime     @default(now()) @map("updated_at")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("organization_settings")
   @@schema("public")
 }

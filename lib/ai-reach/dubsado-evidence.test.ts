@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseDubsadoExport } from "../connections/providers/dubsado-export";
 import { mapDubsadoOutcomeStages } from "../connections/providers/dubsado-export";
-import { buildDubsadoEvidenceSnapshot } from "./dubsado-evidence";
+import { applyCurrentDubsadoExportWindow, buildDubsadoEvidenceSnapshot } from "./dubsado-evidence";
 
 const window = { start: "2026-08-01T00:00:00.000Z", end: "2026-08-31T00:00:00.000Z" };
 const map = { recordId: "Project ID", status: "Status", bookedRevenue: "Revenue", currency: "Currency" };
@@ -48,5 +48,22 @@ describe("buildDubsadoEvidenceSnapshot", () => {
     expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-9", organizationId: "org-1", evidenceId: "dubsado-9", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_revenue", records: records("Project ID,Status,Revenue,Currency\nproj-1,Booked,0,USD"), configuredStages: ["booked_revenue"] })).not.toThrow();
     expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-3", organizationId: "org-1", evidenceId: "dubsado-3", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_calls", records: records("Project ID,Status,Revenue,Currency\nproj-1,Qualified,,USD") })).toThrow("DUBSADO_EVIDENCE_PRIMARY_METRIC_MISSING");
     expect(() => buildDubsadoEvidenceSnapshot({ snapshotId: "snapshot-4", organizationId: "org-1", evidenceId: "dubsado-4", reportingWindow: window, capturedAt: "2026-08-31T12:00:00.000Z", collectorVersion: "dubsado-export-1.0.0", primaryOutcomeKey: "booked_revenue", records: records("Project ID,Status,Revenue,Currency\nproj-1,Booked,1250,USD\nproj-2,Booked,500,CAD") })).toThrow("DUBSADO_EVIDENCE_REVENUE_CURRENCY_CONFLICT");
+  });
+});
+
+describe("organization upload window", () => {
+  it("reads a Dubsado-only snapshot with the saved window, shorter or longer", () => {
+    const snapshot = buildDubsadoEvidenceSnapshot({
+      snapshotId: "dubsado-import-window",
+      organizationId: "00000000-0000-4000-8000-000000000001",
+      evidenceId: "dubsado-export-window",
+      reportingWindow: window,
+      capturedAt: "2026-08-31T12:00:00.000Z",
+      collectorVersion: "test",
+      primaryOutcomeKey: "booked_revenue",
+      records: records("Project ID,Status,Revenue,Currency\nP-1,Booked,1000,USD"),
+    });
+    expect(applyCurrentDubsadoExportWindow(snapshot, 48).freshness.maxAgeHours).toBe(48);
+    expect(applyCurrentDubsadoExportWindow(snapshot, 30 * 24).freshness.maxAgeHours).toBe(720);
   });
 });

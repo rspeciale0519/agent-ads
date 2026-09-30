@@ -44,6 +44,7 @@ const required = [
   "ai_reach_evidence_snapshots_document_check",
   "ALTER TABLE public.ai_reach_conversations FORCE ROW LEVEL SECURITY",
   "ALTER TABLE public.ai_reach_messages FORCE ROW LEVEL SECURITY",
+  "ALTER TABLE public.organization_settings FORCE ROW LEVEL SECURITY",
   "AND user_id = private.current_actor_id()",
 ];
 const missing = required.filter((fragment) => !sql.includes(fragment));

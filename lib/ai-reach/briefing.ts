@@ -1,6 +1,6 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
-import { isDubsadoExportFresh } from "./dubsado-evidence";
+import { DUBSADO_EXPORT_MAX_AGE_HOURS, isDubsadoExportFresh } from "./dubsado-evidence";
 import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { buildOutcomeFunnel, formatRate, minimumStepRecords, type OutcomeFunnel } from "./funnel";
 
@@ -27,7 +27,8 @@ export type AiReachBriefing = {
   recommendations: [AiReachRecommendation, AiReachRecommendation, AiReachRecommendation];
 };
 
-type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount"> & { evidenceSnapshot?: ReadOnlyEvidenceSnapshot | null };
+// uploadMaxAgeHours is the organization's upload window (default 7 days).
+type BriefingInput = Pick<DashboardData, "organization" | "onboarding" | "connections" | "verifiedResourceCount"> & { evidenceSnapshot?: ReadOnlyEvidenceSnapshot | null; uploadMaxAgeHours?: number };
 type Source = AiReachBriefing["sources"][number];
 
 const googleAdsMetricKeys = new Set([
@@ -116,11 +117,11 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
 
 // A reminder to upload a new export once the saved one is past its
 // freshness window, so advice never comes from old numbers.
-function staleExportRecommendation(dubsadoState: Source["state"], metricKeys: string[]): AiReachRecommendation {
+function staleExportRecommendation(dubsadoState: Source["state"], metricKeys: string[], maxAgeDays: number): AiReachRecommendation {
   return {
     id: "dubsado-refresh",
     title: "Upload a fresh Dubsado export",
-    reason: "The saved Dubsado export is out of date, so AI Reach will not compare sales steps from it. Upload a new export to see current results.",
+    reason: `The saved Dubsado export is out of date (older than ${maxAgeDays} ${maxAgeDays === 1 ? "day" : "days"}, the limit in Settings), so AI Reach will not compare sales steps from it. Upload a new export to see current results.`,
     evidence: ["Authorized Dubsado outcome metrics are saved, but they are past their freshness window."],
     // The old export is cited so the answer can show why a new one is needed.
     metricKeys,
@@ -160,7 +161,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
   // Old counts should not drive step-level advice, so the funnel is only
   // built while the Dubsado export itself is still fresh.
-  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isDubsadoExportFresh(data.evidenceSnapshot, now));
+  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isDubsadoExportFresh(data.evidenceSnapshot, now, data.uploadMaxAgeHours));
   const funnel = dubsadoOutcomeEvidence && dubsadoEvidenceFresh ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
   const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {
@@ -207,7 +208,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       dubsadoOutcomeEvidence && funnel?.weakest
         ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
         : dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
-          ? staleExportRecommendation(dubsado.state, dubsadoKeys)
+          ? staleExportRecommendation(dubsado.state, dubsadoKeys, Math.round((data.uploadMaxAgeHours ?? DUBSADO_EXPORT_MAX_AGE_HOURS) / 24))
           : {
         id: "dubsado-map",
         title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",

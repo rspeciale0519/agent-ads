@@ -5,7 +5,7 @@ import { ConnectionServiceError, requireConnectionPermission } from "../connecti
 import { getDashboardData } from "../dashboard/dashboard-service";
 import { findSecretPattern } from "../security/secret-material";
 import { buildAiReachBriefing } from "./briefing";
-import { readLatestEvidenceSnapshot } from "./evidence-store";
+import { readAiReachEvidence } from "./evidence-store";
 import { getAnswerProvider, type AiReachAnswerProvider } from "./gateway";
 import type { AiReachAnswer, AiReachCitation } from "./grounded-answer";
 
@@ -53,8 +53,8 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
     : null;
   if (parsed.conversationId && !existing) throw new ConnectionServiceError("AI_REACH_CONVERSATION_NOT_FOUND", 404);
 
-  const [dashboard, snapshot] = await Promise.all([getDashboardData(context), readLatestEvidenceSnapshot(context)]);
-  const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot: snapshot });
+  const [dashboard, { snapshot, uploadMaxAgeHours }] = await Promise.all([getDashboardData(context), readAiReachEvidence(context)]);
+  const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot: snapshot, uploadMaxAgeHours });
   const answer = await provider.answer({ question: parsed.question, organizationName: context.organizationName, briefing, snapshot });
 
   return withTenantContext(context, async (tx) => {
