@@ -116,12 +116,14 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
 
 // A reminder to upload a new export once the saved one is past its
 // freshness window, so advice never comes from old numbers.
-function staleExportRecommendation(dubsadoState: Source["state"]): AiReachRecommendation {
+function staleExportRecommendation(dubsadoState: Source["state"], metricKeys: string[]): AiReachRecommendation {
   return {
     id: "dubsado-refresh",
     title: "Upload a fresh Dubsado export",
     reason: "The saved Dubsado export is out of date, so AI Reach will not compare sales steps from it. Upload a new export to see current results.",
     evidence: ["Authorized Dubsado outcome metrics are saved, but they are past their freshness window."],
+    // The old export is cited so the answer can show why a new one is needed.
+    metricKeys,
     expectedEffect: "Current numbers keep the results and sales-step advice accurate.",
     effort: "Low",
     risk: "Low",
@@ -205,7 +207,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
       dubsadoOutcomeEvidence && funnel?.weakest
         ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
         : dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
-          ? staleExportRecommendation(dubsado.state)
+          ? staleExportRecommendation(dubsado.state, dubsadoKeys)
           : {
         id: "dubsado-map",
         title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",

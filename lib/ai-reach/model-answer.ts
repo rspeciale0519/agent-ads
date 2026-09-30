@@ -1,3 +1,4 @@
+import type { AiReachRecommendation } from "./briefing";
 import { isActionRequest } from "./chat";
 import { assessReadOnlyEvidenceSnapshot, type ReadOnlyMetric } from "./evidence-contract";
 import type { AiReachAnswerProvider } from "./gateway";
@@ -47,8 +48,9 @@ export function redactContactDetails(question: string) {
   return question
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, "[email]")
     // Links with or without a scheme, including any path, query, or fragment
-    // ("https://…", "www.…", "portal.example.com/x", "example.com?token=…").
-    .replace(/\bhttps?:\/\/\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:[/?#]\S*)?/giu, "[link]")
+    // and an optional port ("https://…", "www.…", "portal.example.com:8443/x",
+    // "example.com?token=…", "10.0.0.5/admin").
+    .replace(/\bhttps?:\/\/\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?::\d{1,5})?(?:[/?#]\S*)?|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?(?:[/?#]\S*)?/giu, "[link]")
     // Any run of digits and phone separators holding seven or more digits is
     // treated as a phone number, whatever the country format ("555-1212",
     // "020 7946 0958", "+44 20 7946 0958"). Plain dates ("2026-08-01") stay.
@@ -84,7 +86,7 @@ export const modelAnswerSystemPrompt = [
 ].join("\n");
 
 const maxMetricLines = 6;
-const readinessNote = "Treat these numbers as a draft, not a decision-ready result:";
+const readinessNote = "Treat these results as a draft, not a decision-ready result:";
 const causationNote = "This shows what happened; it does not prove a marketing change caused it.";
 const notCoveredNote = "Your saved evidence doesn't cover this yet.";
 
@@ -125,32 +127,34 @@ export function acceptModelDraft(draft: ModelAnswerDraft, input: AiReachAnswerIn
   if (keys.length > maxMetricLines) return null;
 
   const metrics = new Map((input.snapshot?.metrics ?? []).map((metric) => [metric.key, metric]));
+  const chosenMetrics = keys.map((key) => metrics.get(key));
   const actions = actionNumbers.map((number) => input.briefing.recommendations[number - 1]);
-  if (actions.some((action) => !action)) return null;
-  // A suggested step computed from saved metrics brings those metrics along,
-  // so the answer shows, cites, and qualifies the numbers behind it.
-  const supportingKeys = [...new Set([...keys, ...actions.flatMap((action) => action!.metricKeys ?? [])])];
-  const chosenMetrics = supportingKeys.map((key) => metrics.get(key));
   // Only sources with no connection at all; one that needs review is not "missing".
   const missing = new Set(input.briefing.sources.filter((source) => source.state === "missing").map((source) => source.name));
   if (chosenMetrics.some((metric) => !metric) || actions.some((action) => !action) || sourceNames.some((name) => !missing.has(name))) return null;
-  const usedMetrics = chosenMetrics as ReadOnlyMetric[];
-  if (usedMetrics.length === 0 && sourceNames.length === 0 && actions.length === 0) return null;
+  const shownMetrics = chosenMetrics as ReadOnlyMetric[];
+  const steps = actions as AiReachRecommendation[];
+  if (shownMetrics.length === 0 && sourceNames.length === 0 && steps.length === 0) return null;
+  // A suggested step computed from saved metrics is cited and qualified by
+  // them. Its own reason already states the numbers, so they add citations
+  // and notes, not extra result lines.
+  const stepMetrics = steps.flatMap((step) => step.metricKeys ?? []).map((key) => metrics.get(key)).filter((metric): metric is ReadOnlyMetric => Boolean(metric));
+  const evidenceMetrics = [...shownMetrics, ...stepMetrics];
 
-  const lines: string[] = usedMetrics.map((metric) => `${sentenceCase(metricLabel(metric.key))}: ${formatValue(metric)} (${formatWindow(metric)}).`);
-  if (usedMetrics.length === 0) lines.push(notCoveredNote);
+  const lines: string[] = shownMetrics.map((metric) => `${sentenceCase(metricLabel(metric.key))}: ${formatValue(metric)} (${formatWindow(metric)}).`);
+  if (evidenceMetrics.length === 0) lines.push(notCoveredNote);
   if (sourceNames.length > 0) lines.push(`Connecting ${sourceNames.join(" and ")} would help answer this.`);
-  for (const action of actions) lines.push(`Suggested next step: ${action!.title}.`);
+  for (const step of steps) lines.push(`Suggested next step: ${step.title}. ${step.reason}`);
 
-  if (usedMetrics.length === 0 || !input.snapshot) return { text: lines.join(" "), kind: "guidance", citations: [] };
-  const evidenceIds = new Set(usedMetrics.flatMap((metric) => metric.evidenceIds));
+  if (evidenceMetrics.length === 0 || !input.snapshot) return { text: lines.join(" "), kind: "guidance", citations: [] };
+  const evidenceIds = new Set(evidenceMetrics.flatMap((metric) => metric.evidenceIds));
   const citations: AiReachCitation[] = input.snapshot.evidence
     .filter((item) => evidenceIds.has(item.id))
     .map((item) => ({ evidenceId: item.id, provider: item.provider, method: item.method, collectedAt: item.collectedAt }));
   const assessment = assessReadOnlyEvidenceSnapshot(input.snapshot, input.now);
   if (!assessment.ready) lines.push(`${readinessNote} ${assessment.blockers.join(" ")}`);
   lines.push(causationNote);
-  return { text: lines.join(" "), kind: "evidence", citations };
+  return { text: lines.join(" "), kind: shownMetrics.length > 0 ? "evidence" : "guidance", citations };
 }
 
 // Wraps any model adapter with the same rules. Recognized change requests and

@@ -59,8 +59,8 @@ describe("model answers", () => {
     const answer = await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads", "booked_revenue"], nextActionNumbers: [2] }))).answer(input("How did August go?"));
     expect(answer.kind).toBe("evidence");
     expect(answer.text).toContain("Qualified leads: 12 (Aug 1, 2026 to Aug 30, 2026). Booked revenue: $4,500 (Aug 1, 2026 to Aug 30, 2026).");
-    expect(answer.text).toContain(`Suggested next step: ${briefing.recommendations[1].title}.`);
-    expect(answer.text).toContain("Treat these numbers as a draft, not a decision-ready result:");
+    expect(answer.text).toContain(`Suggested next step: ${briefing.recommendations[1].title}. ${briefing.recommendations[1].reason}`);
+    expect(answer.text).toContain("Treat these results as a draft, not a decision-ready result:");
     expect(answer.text).toContain("does not prove a marketing change caused it");
     expect(answer.citations.map((citation) => citation.evidenceId)).toEqual(["dubsado-export-1"]);
   });
@@ -74,7 +74,7 @@ describe("model answers", () => {
   it("points to missing sources and next actions without saved results", async () => {
     const answer = await createModelAnswerProvider(fakeModel(draft({ missingSources: ["Google Ads"], nextActionNumbers: [2] }))).answer(input("How much did I spend on ads?"));
     expect(answer).toEqual({
-      text: `Your saved evidence doesn't cover this yet. Connecting Google Ads would help answer this. Suggested next step: ${briefing.recommendations[1].title}.`,
+      text: `Your saved evidence doesn't cover this yet. Connecting Google Ads would help answer this. Suggested next step: ${briefing.recommendations[1].title}. ${briefing.recommendations[1].reason}`,
       kind: "guidance",
       citations: [],
       modelUsage: { provider: "fake", model: "test-model", status: "accepted", inputTokens: 100, outputTokens: 20 },
@@ -137,22 +137,30 @@ describe("model answers", () => {
     expect((await createModelAnswerProvider(fakeModel(draft())).answer(input("Pause my ads"))).modelUsage).toBeUndefined();
   });
 
-  it("shows, cites, and qualifies the saved metrics behind a suggested step", async () => {
+  it("cites and qualifies the saved metrics behind a suggested step without extra result lines", async () => {
     const recommendations = briefing.recommendations.map((recommendation, index) => index === 2 ? { ...recommendation, metricKeys: ["qualified_leads"] } : recommendation) as typeof briefing.recommendations;
     const answer = await createModelAnswerProvider(fakeModel(draft({ nextActionNumbers: [3] }))).answer({ ...input("What should I do next?"), briefing: { ...briefing, recommendations } });
-    expect(answer.kind).toBe("evidence");
-    expect(answer.text).toContain("Qualified leads: 12 (Aug 1, 2026 to Aug 30, 2026).");
+    expect(answer.text).toContain(`Suggested next step: ${recommendations[2].title}. ${recommendations[2].reason}`);
+    expect(answer.text).not.toContain("Qualified leads: 12 (");
     expect(answer.text).not.toContain("doesn't cover this");
+    expect(answer.text).toContain("Treat these results as a draft");
     expect(answer.text).toContain("does not prove a marketing change caused it");
-    expect(answer.citations.length).toBeGreaterThan(0);
+    expect(answer.citations.map((citation) => citation.evidenceId)).toEqual(["dubsado-export-1"]);
   });
 
-  it("brings the saved Dubsado metrics along with the Dubsado review step", async () => {
+  it("cites the saved Dubsado metrics behind the Dubsado review step", async () => {
     expect(briefing.recommendations[2].metricKeys).toEqual(["qualified_leads", "booked_revenue"]);
     const answer = await createModelAnswerProvider(fakeModel(draft({ nextActionNumbers: [3] }))).answer(input("What should I do next?"));
-    expect(answer.kind).toBe("evidence");
-    expect(answer.text).toContain("Qualified leads: 12");
+    expect(answer.citations.length).toBeGreaterThan(0);
     expect(answer.text).not.toContain("doesn't cover this");
+  });
+
+  it("keeps result lines within the limit however many metrics the chosen steps use", async () => {
+    const recommendations = briefing.recommendations.map((recommendation) => ({ ...recommendation, metricKeys: ["qualified_leads", "booked_revenue"] })) as typeof briefing.recommendations;
+    const answer = await createModelAnswerProvider(fakeModel(draft({ metricKeys: ["qualified_leads"], nextActionNumbers: [1, 2, 3] }))).answer({ ...input("How are we doing?"), briefing: { ...briefing, recommendations } });
+    // Only the model's own choice becomes a result line.
+    expect(answer.text.match(/Qualified leads: 12 \(/g)).toHaveLength(1);
+    expect(answer.text).not.toContain("Booked revenue: $4,500 (");
   });
 
   it("records the model that actually served the call", async () => {
@@ -164,8 +172,8 @@ describe("model answers", () => {
 
   it("removes emails, phone numbers, and links before the question leaves AI Reach", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
-    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x, portal.example.com/customers/alice or example.com/reset?token=abc or portal.example.com?customer=alice or example.com#reset become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
-    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] [link] or [link] or [link] or [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
+    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x, portal.example.com/customers/alice or example.com/reset?token=abc or portal.example.com?customer=alice or example.com#reset or portal.example.com:8443/customers/alice or 10.0.0.5:8080/admin become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
+    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] [link] or [link] or [link] or [link] or [link] or [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
   });
 
   it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {

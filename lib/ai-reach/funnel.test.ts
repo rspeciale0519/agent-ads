@@ -92,6 +92,8 @@ describe("briefing with a sales funnel", () => {
     const action = buildAiReachBriefing({ ...base, evidenceSnapshot: snapshot(testInc) }, new Date("2026-09-10T12:00:00.000Z")).recommendations[2];
     expect(action.title).toBe("Upload a fresh Dubsado export");
     expect(action.reason).toContain("out of date");
+    // The old export is cited so an answer can show why a new one is needed.
+    expect(action.metricKeys?.length).toBeGreaterThan(0);
   });
 
   it("says when there are too few records to compare", () => {
