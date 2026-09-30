@@ -175,6 +175,8 @@ describe("buildAiReachBriefing", () => {
     expect(briefing.sources.find((source) => source.name === "Google Ads")?.detail).toContain("Campaign performance metrics are included");
     expect(briefing.recommendations[1].title).toBe("Review Google Ads reporting evidence");
     expect(briefing.recommendations[1].reason).toContain("Campaign metrics are present");
+    // Only the official Google Ads metrics back this step.
+    expect(briefing.recommendations[1].metricKeys).toEqual(["google_ads.impressions"]);
   });
 
   it("surfaces authorized Dubsado outcome metrics without claiming complete reconciliation", () => {

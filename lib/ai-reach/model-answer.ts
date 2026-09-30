@@ -46,8 +46,9 @@ export type ModelUsage = {
 export function redactContactDetails(question: string) {
   return question
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, "[email]")
-    // Links with or without a scheme ("https://…", "www.…", "portal.example.com/x").
-    .replace(/\bhttps?:\/\/\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:\/\S*)?/giu, "[link]")
+    // Links with or without a scheme, including any path, query, or fragment
+    // ("https://…", "www.…", "portal.example.com/x", "example.com?token=…").
+    .replace(/\bhttps?:\/\/\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:[/?#]\S*)?/giu, "[link]")
     // Any run of digits and phone separators holding seven or more digits is
     // treated as a phone number, whatever the country format ("555-1212",
     // "020 7946 0958", "+44 20 7946 0958"). Plain dates ("2026-08-01") stay.

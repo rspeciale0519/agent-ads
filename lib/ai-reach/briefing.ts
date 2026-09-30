@@ -51,20 +51,26 @@ const dubsadoMetricKeys = new Set([
   "refunded_engagements",
 ]);
 
-function hasGoogleAdsPerformanceEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
-  if (!snapshot) return false;
+// The saved Google Ads metrics backed by official API evidence.
+function googleAdsPerformanceMetricKeys(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return [];
   const officialGoogleAdsEvidenceIds = new Set(snapshot.evidence
     .filter((evidence) => evidence.provider === "google_ads" && evidence.sourceClass === "official_platform_observation" && evidence.method === "official_api")
     .map((evidence) => evidence.id));
-  return snapshot.metrics.some((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)));
+  return snapshot.metrics
+    .filter((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)))
+    .map((metric) => metric.key);
 }
 
-function hasDubsadoOutcomeEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
-  if (!snapshot) return false;
+// The saved Dubsado outcome metrics backed by an authorized export.
+function dubsadoOutcomeMetricKeys(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return [];
   const approvedDubsadoEvidenceIds = new Set(snapshot.evidence
     .filter((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export")
     .map((evidence) => evidence.id));
-  return snapshot.metrics.some((metric) => dubsadoMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => approvedDubsadoEvidenceIds.has(evidenceId)));
+  return snapshot.metrics
+    .filter((metric) => dubsadoMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => approvedDubsadoEvidenceIds.has(evidenceId)))
+    .map((metric) => metric.key);
 }
 
 function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
@@ -132,8 +138,10 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const website = sourceRecord(data.connections, "wordpress", "Website", checkedAt);
   const dubsado = sourceRecord(data.connections, "dubsado", "Dubsado outcomes", checkedAt);
   const submitted = data.onboarding.status === "submitted";
-  const googleAdsPerformanceEvidence = hasGoogleAdsPerformanceEvidence(data.evidenceSnapshot);
-  const dubsadoOutcomeEvidence = hasDubsadoOutcomeEvidence(data.evidenceSnapshot);
+  const googleAdsKeys = googleAdsPerformanceMetricKeys(data.evidenceSnapshot);
+  const dubsadoKeys = dubsadoOutcomeMetricKeys(data.evidenceSnapshot);
+  const googleAdsPerformanceEvidence = googleAdsKeys.length > 0;
+  const dubsadoOutcomeEvidence = dubsadoKeys.length > 0;
   const sources = [
     website,
     googleAdsPerformanceEvidence
@@ -192,6 +200,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         risk: "Low",
         uncertainty: google.state === "connected" ? "Medium" : "High",
         approval: "Advertising owner approval required",
+        ...(googleAdsPerformanceEvidence ? { metricKeys: googleAdsKeys } : {}),
       },
       dubsadoOutcomeEvidence && funnel?.weakest
         ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
@@ -213,6 +222,7 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         risk: "Medium",
         uncertainty: dubsado.state === "connected" ? "Medium" : "High",
         approval: "Customer and measurement owner approval required",
+        ...(dubsadoOutcomeEvidence ? { metricKeys: dubsadoKeys } : {}),
       },
     ],
   };

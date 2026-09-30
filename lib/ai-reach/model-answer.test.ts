@@ -147,6 +147,14 @@ describe("model answers", () => {
     expect(answer.citations.length).toBeGreaterThan(0);
   });
 
+  it("brings the saved Dubsado metrics along with the Dubsado review step", async () => {
+    expect(briefing.recommendations[2].metricKeys).toEqual(["qualified_leads", "booked_revenue"]);
+    const answer = await createModelAnswerProvider(fakeModel(draft({ nextActionNumbers: [3] }))).answer(input("What should I do next?"));
+    expect(answer.kind).toBe("evidence");
+    expect(answer.text).toContain("Qualified leads: 12");
+    expect(answer.text).not.toContain("doesn't cover this");
+  });
+
   it("records the model that actually served the call", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
     const draftAnswer = model.draftAnswer;
@@ -156,8 +164,8 @@ describe("model answers", () => {
 
   it("removes emails, phone numbers, and links before the question leaves AI Reach", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
-    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x, portal.example.com/customers/alice or example.com/reset?token=abc become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
-    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] [link] or [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
+    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x, portal.example.com/customers/alice or example.com/reset?token=abc or portal.example.com?customer=alice or example.com#reset become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
+    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] [link] or [link] or [link] or [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
   });
 
   it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {
