@@ -377,6 +377,26 @@
 - Owner/date: product owner, 2026-09-30.
 - Affects: AI Reach briefing and chat, ORG-001–ORG-011.
 
+### D-041 — Organization-chosen AI model and API key
+
+- Status: accepted.
+- Amends: D-039 (switch).
+- Context: The product owner wants each organization to choose any AI company's model and use its own API key, set in the app.
+- Decision: Settings → Workspace settings lets owners and administrators pick a company from a fixed list, type a model name, and enter an API key. The companies are Anthropic, OpenAI, Google Gemini, Mistral, Groq, xAI, DeepSeek, Together and OpenRouter.
+  - Anthropic uses the Anthropic SDK adapter. The others use one OpenAI-compatible adapter with fixed base URLs; custom URLs are never accepted.
+  - The key is stored only in Supabase Vault through the secret broker. `private.organization_ai_credentials` holds the handle, a fingerprint, and the last four characters.
+  - Saving or removing requires the settings permission, current MFA, and a single-use `ai_model_manage` step-up grant. Every change is audited without the key.
+- Safety: all D-039 rules apply unchanged: the router writes no text, contact details are redacted, and usage is recorded. Non-Anthropic calls record tokens without a cost (`costUsd: null`), because prices vary by company. If a saved key cannot be read, rule-based answers are used rather than another company's model.
+- Switch: an organization's saved choice takes precedence. Without one, the platform setting from D-039 (`AI_REACH_MODEL_PROVIDER` and `ANTHROPIC_API_KEY`) applies, and otherwise rule-based answers.
+- Lifecycle:
+  - A key that stops being used is recorded in `private.organization_ai_credential_cleanups`, in the same transaction that replaces or removes it. The record is removed only after the Vault delete succeeds.
+  - A failed delete stays queued and is retried on the next save or removal. A failed save deletes the new key, or queues it if that delete also fails.
+  - A new key's Vault name is recorded as pending (under the organization's shared lock) before the key is written, and cleared when the save commits or the unused key is deleted by name. Offboarding counts pending keys and deletes abandoned ones (older than 10 minutes), so no key is ever written without a record.
+  - Offboarding stops, on every retry, until the queue is empty. Under the final exclusive lock it checks again for any saved or queued AI key before deactivating the workspace.
+- Migrations: `20260930140000_organization_ai_credentials` and `20260930150000_ai_credential_cleanups` (private schema, forced tenant RLS; the editor must be the signed-in user).
+- Owner/date: product owner, 2026-09-30.
+- Affects: AI Reach chat, AGT-001–AGT-010, SEC-001–SEC-012.
+
 ## Decision process
 
 New material decisions must state context, options, decision, consequences, owner, date, status, affected requirement IDs, and any migration. Superseded decisions are never deleted.

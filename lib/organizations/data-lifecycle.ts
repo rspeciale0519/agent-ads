@@ -4,6 +4,9 @@ import { withTenantContext, withTenantExclusiveContext, type OrganizationContext
 import { hasPermission } from "../auth/permissions";
 import { redactSensitive } from "../connections/redaction";
 import { archiveConnection, revokeConnection } from "../connections/service";
+import type { SecretBroker } from "../connections/secrets/secret-broker";
+import { getSecretBroker } from "../connections/secrets/supabase-vault";
+import { removeAiModelSettings } from "./ai-model-settings";
 
 const MAX_SYNCHRONOUS_CONNECTIONS = 20;
 const EXPORT_LIMITS = {
@@ -42,7 +45,7 @@ export async function exportOrganizationConnectionData(context: OrganizationCont
   return payload;
 }
 
-export async function offboardOrganization(context: OrganizationContext, confirmation: string, correlationId: string) {
+export async function offboardOrganization(context: OrganizationContext, confirmation: string, correlationId: string, broker: SecretBroker = getSecretBroker()) {
   assertDataLifecyclePermission(context, true);
   requireAal2(await getAssuranceStatus(context));
   if (!isOffboardingConfirmationValid(context.organizationName, confirmation)) throw new DataLifecycleError("OFFBOARDING_CONFIRMATION_INVALID", 400);
@@ -51,9 +54,22 @@ export async function offboardOrganization(context: OrganizationContext, confirm
 
   for (const connection of connections) await revokeConnection(context, connection.id, correlationId);
   for (const connection of connections) await archiveConnection(context, connection.id, correlationId);
+  // The organization's own AI model key is destroyed too; a failure stops
+  // offboarding so no provider secret is left behind.
+  await removeAiModelSettings(context, correlationId, broker, { failClosed: true });
 
   return withTenantExclusiveContext(context, async (tx) => {
     const remainingConnectionCount = await tx.connection.count({ where: { organizationId: context.organizationId, archivedAt: null } });
+    // Checked again under the exclusive lock: an AI model key saved after the
+    // removal above (or one still being written, or waiting for deletion)
+    // keeps the workspace active, so the next offboarding attempt deletes it first.
+    const remainingAiKeyCount = await tx.organizationAiCredential.count({ where: { organizationId: context.organizationId } })
+      + await tx.organizationAiCredentialCleanup.count({ where: { organizationId: context.organizationId } })
+      + await tx.organizationAiCredentialPendingKey.count({ where: { organizationId: context.organizationId } });
+    if (remainingAiKeyCount > 0) {
+      await appendAuditEvent(tx, context, { action: "organization.offboarding_batch_completed", resourceType: "organization", resourceId: context.organizationId, outcomeCode: "ai_model_key_remaining", correlationId, metadata: { connectionCount: connections.length, remainingConnectionCount, remainingAiKeyCount } });
+      return { status: "offboarding_in_progress" as const, connectionCount: connections.length, remainingConnectionCount };
+    }
     if (remainingConnectionCount > 0) {
       await appendAuditEvent(tx, context, { action: "organization.offboarding_batch_completed", resourceType: "organization", resourceId: context.organizationId, outcomeCode: "connections_remaining", correlationId, metadata: { connectionCount: connections.length, remainingConnectionCount } });
       return { status: "offboarding_in_progress" as const, connectionCount: connections.length, remainingConnectionCount };

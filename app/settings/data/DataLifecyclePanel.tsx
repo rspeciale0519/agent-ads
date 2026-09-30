@@ -73,7 +73,10 @@ export default function DataLifecyclePanel({ organizationId, organizationName, c
       }
       delete grants.current.organization_offboard;
       if (body.result?.status === "offboarding_in_progress") {
-        setMessage(`A protected revocation batch completed. ${body.result.remainingConnectionCount ?? "Additional"} connections remain; run offboarding again to continue.`);
+        // Zero connections left means other cleanup (such as an AI model key) remains.
+        setMessage(body.result.remainingConnectionCount
+          ? `A protected revocation batch completed. ${body.result.remainingConnectionCount} connections remain; run offboarding again to continue.`
+          : "A protected cleanup step completed. Some cleanup remains; run offboarding again to continue.");
         return;
       }
       setMessage("Offboarding completed. Redirecting to the access screen.");
