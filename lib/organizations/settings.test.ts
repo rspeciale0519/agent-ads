@@ -26,8 +26,9 @@ function mockDatabase(saved: { staleUploadDays: number } | null) {
     findUnique: vi.fn().mockResolvedValue(saved),
     upsert: vi.fn().mockImplementation(async ({ create }) => ({ staleUploadDays: create.staleUploadDays })),
   };
-  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationSettings }));
-  return organizationSettings;
+  const $queryRaw = vi.fn().mockResolvedValue([{ locked: 1 }]);
+  withTenantContextMock.mockImplementation(async (_context, callback) => callback({ organizationSettings, $queryRaw }));
+  return Object.assign(organizationSettings, { $queryRaw });
 }
 
 afterEach(() => vi.clearAllMocks());
@@ -45,6 +46,9 @@ describe("organization settings", () => {
     const table = mockDatabase({ staleUploadDays: 7 });
     expect(await updateOrganizationSettings(owner, { staleUploadDays: 14 }, "correlation-1")).toEqual({ staleUploadDays: 14 });
     expect(table.upsert.mock.calls[0][0].create).toEqual({ organizationId, staleUploadDays: 14, updatedBy: owner.userId });
+    // The organization's settings lock is taken before the previous value is read.
+    expect(table.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(table.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(table.findUnique.mock.invocationCallOrder[0]);
     expect(auditMock.mock.calls[0][2]).toMatchObject({ action: "organization.settings_updated", metadata: { staleUploadDays: 14, previousStaleUploadDays: 7 } });
   });
 

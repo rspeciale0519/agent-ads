@@ -44,6 +44,9 @@ export async function updateOrganizationSettings(context: OrganizationContext, i
   const parsed = organizationSettingsInputSchema.parse(input);
 
   return withTenantContext(context, async (tx) => {
+    // One settings save at a time per organization, so each audit event
+    // records the value it actually replaced. The lock ends with the transaction.
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`organization_settings:${context.organizationId}`}::text, 0::bigint))`;
     const previous = await tx.organizationSettings.findUnique({ where: { organizationId: context.organizationId }, select: { staleUploadDays: true } });
     const saved = await tx.organizationSettings.upsert({
       where: { organizationId: context.organizationId },
