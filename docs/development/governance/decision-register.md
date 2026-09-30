@@ -391,7 +391,7 @@
 - Lifecycle:
   - A key that stops being used is recorded in `private.organization_ai_credential_cleanups`, in the same transaction that replaces or removes it. The record is removed only after the Vault delete succeeds.
   - A failed delete stays queued and is retried on the next save or removal. A failed save deletes the new key, or queues it if that delete also fails.
-  - If a failed save cannot delete or queue its new key after retries, the Vault id (never the key) is logged as `AI_MODEL_KEY_CLEANUP_UNTRACKED` for manual removal.
+  - A new key's Vault name is recorded as pending (under the organization's shared lock) before the key is written, and cleared when the save commits or the unused key is deleted by name. Offboarding counts pending keys and deletes abandoned ones (older than 10 minutes), so no key is ever written without a record.
   - Offboarding stops, on every retry, until the queue is empty. Under the final exclusive lock it checks again for any saved or queued AI key before deactivating the workspace.
 - Migrations: `20260930140000_organization_ai_credentials` and `20260930150000_ai_credential_cleanups` (private schema, forced tenant RLS; the editor must be the signed-in user).
 - Owner/date: product owner, 2026-09-30.
