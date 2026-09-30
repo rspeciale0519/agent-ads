@@ -391,7 +391,8 @@
 - Lifecycle:
   - A key that stops being used is recorded in `private.organization_ai_credential_cleanups`, in the same transaction that replaces or removes it. The record is removed only after the Vault delete succeeds.
   - A failed delete stays queued and is retried on the next save or removal. A failed save deletes the new key, or queues it if that delete also fails.
-  - Offboarding stops, on every retry, until the queue is empty.
+  - If a failed save cannot delete or queue its new key after retries, the Vault id (never the key) is logged as `AI_MODEL_KEY_CLEANUP_UNTRACKED` for manual removal.
+  - Offboarding stops, on every retry, until the queue is empty. Under the final exclusive lock it checks again for any saved or queued AI key before deactivating the workspace.
 - Migrations: `20260930140000_organization_ai_credentials` and `20260930150000_ai_credential_cleanups` (private schema, forced tenant RLS; the editor must be the signed-in user).
 - Owner/date: product owner, 2026-09-30.
 - Affects: AI Reach chat, AGT-001–AGT-010, SEC-001–SEC-012.

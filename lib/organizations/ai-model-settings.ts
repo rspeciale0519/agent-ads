@@ -118,10 +118,20 @@ export async function removeAiModelSettings(context: OrganizationContext, correl
   return { removed };
 }
 
-// Records a key that must still be deleted from the Vault.
+// Records a key that must still be deleted from the Vault, retrying a few
+// times. If the database stays unavailable, the Vault handle (an id, not the
+// key) is logged as an error so the orphaned secret can be removed by hand;
+// it is never silently forgotten.
 async function queueAiCredentialCleanup(context: OrganizationContext, brokerHandle: string) {
-  await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.create({ data: { brokerHandle, organizationId: context.organizationId } }))
-    .catch(() => console.warn("AI Reach model key cleanup could not be queued."));
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await withTenantContext(context, (tx) => tx.organizationAiCredentialCleanup.create({ data: { brokerHandle, organizationId: context.organizationId } }));
+      return;
+    } catch {
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+    }
+  }
+  console.error(`AI_MODEL_KEY_CLEANUP_UNTRACKED organization=${context.organizationId} vaultHandle=${brokerHandle}: delete this Vault secret manually.`);
 }
 
 // Deletes every queued key from the Vault, removing each queue row only after

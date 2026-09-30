@@ -120,6 +120,20 @@ describe("AI model settings", () => {
     expect([...table.cleanup.queue]).toEqual(["new-handle"]);
   });
 
+  it("never silently forgets a new key: if it can't be deleted or queued, its Vault id is logged", async () => {
+    const broker = fakeBroker();
+    broker.destroy.mockRejectedValue(new Error("VAULT_DOWN"));
+    const table = mockDatabase(null, { failUpsert: true });
+    table.cleanup.create.mockRejectedValue(new Error("DB_DOWN"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(saveAiModelSettings(owner, { provider: "openai", model: "gpt-new", apiKey }, "c", broker)).rejects.toThrow("DB_DOWN");
+    expect(table.cleanup.create).toHaveBeenCalledTimes(3);
+    expect(errors.mock.calls[0][0]).toContain("AI_MODEL_KEY_CLEANUP_UNTRACKED");
+    expect(errors.mock.calls[0][0]).toContain("vaultHandle=new-handle");
+    // Only the Vault id is logged, never the key.
+    expect(errors.mock.calls[0][0]).not.toContain(apiKey);
+  });
+
   it.each([
     { provider: "custom", model: "x", apiKey },
     { provider: "openai", model: "gpt test; drop", apiKey },
