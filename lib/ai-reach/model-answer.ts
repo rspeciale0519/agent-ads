@@ -46,7 +46,8 @@ export type ModelUsage = {
 export function redactContactDetails(question: string) {
   return question
     .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu, "[email]")
-    .replace(/\bhttps?:\/\/\S+|\bwww\.\S+/giu, "[link]")
+    // Links with or without a scheme ("https://…", "www.…", "portal.example.com/x").
+    .replace(/\bhttps?:\/\/\S+|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:\/\S*)?/giu, "[link]")
     // Any run of digits and phone separators holding seven or more digits is
     // treated as a phone number, whatever the country format ("555-1212",
     // "020 7946 0958", "+44 20 7946 0958"). Plain dates ("2026-08-01") stay.
@@ -123,8 +124,12 @@ export function acceptModelDraft(draft: ModelAnswerDraft, input: AiReachAnswerIn
   if (keys.length > maxMetricLines) return null;
 
   const metrics = new Map((input.snapshot?.metrics ?? []).map((metric) => [metric.key, metric]));
-  const chosenMetrics = keys.map((key) => metrics.get(key));
   const actions = actionNumbers.map((number) => input.briefing.recommendations[number - 1]);
+  if (actions.some((action) => !action)) return null;
+  // A suggested step computed from saved metrics brings those metrics along,
+  // so the answer shows, cites, and qualifies the numbers behind it.
+  const supportingKeys = [...new Set([...keys, ...actions.flatMap((action) => action!.metricKeys ?? [])])];
+  const chosenMetrics = supportingKeys.map((key) => metrics.get(key));
   // Only sources with no connection at all; one that needs review is not "missing".
   const missing = new Set(input.briefing.sources.filter((source) => source.state === "missing").map((source) => source.name));
   if (chosenMetrics.some((metric) => !metric) || actions.some((action) => !action) || sourceNames.some((name) => !missing.has(name))) return null;

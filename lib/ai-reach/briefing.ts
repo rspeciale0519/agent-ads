@@ -14,6 +14,9 @@ export type AiReachRecommendation = {
   risk: "Low" | "Medium";
   uncertainty: "Low" | "Medium" | "High";
   approval: string;
+  // Saved metrics this recommendation is computed from, if any. Answers that
+  // suggest it show and cite those metrics.
+  metricKeys?: string[];
 };
 
 export type AiReachBriefing = {
@@ -101,6 +104,7 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
     risk: "Low",
     uncertainty: dubsadoState === "connected" ? "Medium" : "High",
     approval: "Customer and measurement owner approval required",
+    metricKeys: funnel.metricKeys,
   };
 }
 

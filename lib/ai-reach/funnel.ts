@@ -18,7 +18,8 @@ const stageOrder: Array<{ key: string; label: string }> = [
 export const minimumStepRecords = 5;
 
 export type FunnelStep = { from: string; to: string; entered: number; advanced: number; rate: number };
-export type OutcomeFunnel = { steps: FunnelStep[]; weakest: FunnelStep | null };
+// metricKeys lists the saved metrics the funnel was built from.
+export type OutcomeFunnel = { steps: FunnelStep[]; weakest: FunnelStep | null; metricKeys: string[] };
 
 // Builds stage-to-stage progress from authorized Dubsado export metrics only.
 // Returns null when fewer than two stages have saved records.
@@ -35,7 +36,7 @@ export function buildOutcomeFunnel(snapshot: ReadOnlyEvidenceSnapshot | null | u
     // Skip stages this business does not use. Imports save a zero for every
     // stage in the approved map, so a missing metric means "not used".
     .filter((stage) => stage.metric !== undefined)
-    .map((stage) => ({ label: stage.label, count: stage.metric!.value }));
+    .map((stage) => ({ key: stage.key, label: stage.label, count: stage.metric!.value }));
   if (counts.length < 2) return null;
 
   // "Reached" = records at this stage or any later stage.
@@ -55,7 +56,7 @@ export function buildOutcomeFunnel(snapshot: ReadOnlyEvidenceSnapshot | null | u
   const weakest = steps
     .filter((step) => step.entered >= minimumStepRecords)
     .reduce<FunnelStep | null>((lowest, step) => (lowest === null || step.rate < lowest.rate ? step : lowest), null);
-  return { steps, weakest };
+  return { steps, weakest, metricKeys: counts.map((stage) => stage.key) };
 }
 
 export function formatRate(rate: number) {

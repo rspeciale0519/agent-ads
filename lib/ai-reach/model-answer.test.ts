@@ -109,7 +109,7 @@ describe("model answers", () => {
     }
   });
 
-  it.each(["Please increase my budget", "Set my budget to 500", "Create an ad", "Can you update my bids?", "Could my campaign be put on hold?", "Put the search campaign on hold", "Can the budget be raised?", "   "])(
+  it.each(["Please increase my budget", "Set my budget to 500", "Create an ad", "Create a Google Ads campaign", "Can you update my bids?", "Could my campaign be put on hold?", "Put the search campaign on hold", "Can the budget be raised?", "   "])(
     "never sends recognized change requests or empty questions to the model: %s",
     async (question) => {
       const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
@@ -120,7 +120,7 @@ describe("model answers", () => {
   );
 
   // Read-only questions that use the same words must still reach the model.
-  it.each(["Create a summary of last month's results", "When did we put the campaign on hold?", "Can the report be updated?", "Set up a weekly report"])(
+  it.each(["Create a summary of last month's results", "When did we put the campaign on hold?", "Can the report be updated?", "Set up a weekly report", "Create a Google Ads report", "Create an ad performance summary"])(
     "does not treat read-only questions as change requests: %s",
     (question) => {
       expect(isActionRequest(question.toLowerCase())).toBe(false);
@@ -137,6 +137,16 @@ describe("model answers", () => {
     expect((await createModelAnswerProvider(fakeModel(draft())).answer(input("Pause my ads"))).modelUsage).toBeUndefined();
   });
 
+  it("shows, cites, and qualifies the saved metrics behind a suggested step", async () => {
+    const recommendations = briefing.recommendations.map((recommendation, index) => index === 2 ? { ...recommendation, metricKeys: ["qualified_leads"] } : recommendation) as typeof briefing.recommendations;
+    const answer = await createModelAnswerProvider(fakeModel(draft({ nextActionNumbers: [3] }))).answer({ ...input("What should I do next?"), briefing: { ...briefing, recommendations } });
+    expect(answer.kind).toBe("evidence");
+    expect(answer.text).toContain("Qualified leads: 12 (Aug 1, 2026 to Aug 30, 2026).");
+    expect(answer.text).not.toContain("doesn't cover this");
+    expect(answer.text).toContain("does not prove a marketing change caused it");
+    expect(answer.citations.length).toBeGreaterThan(0);
+  });
+
   it("records the model that actually served the call", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
     const draftAnswer = model.draftAnswer;
@@ -146,8 +156,8 @@ describe("model answers", () => {
 
   it("removes emails, phone numbers, and links before the question leaves AI Reach", async () => {
     const model = fakeModel(draft({ metricKeys: ["qualified_leads"] }));
-    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
-    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
+    await createModelAnswerProvider(model).answer(input("Did jane.doe@example.com or (555) 123-4567 or +44 20 7946 0958 or 020 7946 0958 or 555-1212 from https://acme.test/x, portal.example.com/customers/alice or example.com/reset?token=abc become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?"));
+    expect(model.questions[0]).toBe("Did [email] or [phone] or [phone] or [phone] or [phone] from [link] [link] or [link] become a lead between 2026-08-01 and 2026-08-30, or in the last 30 days?");
   });
 
   it("sends only labeled, formatted aggregate values, source names, and next actions as facts", () => {
