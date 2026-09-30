@@ -17,7 +17,9 @@ const errorMessages: Record<string, string> = {
   VALIDATION_FAILED: "Check the model name (letters, numbers, and . _ : / @ - only) and the API key.",
 };
 
-export default function AiModelPanel({ organizationId, providers, saved: initial }: { organizationId: string; providers: Provider[]; saved: Saved }) {
+// platformDefault is the model the whole app uses when a workspace has none
+// saved; null means chat falls back to built-in answers.
+export default function AiModelPanel({ organizationId, providers, saved: initial, platformDefault }: { organizationId: string; providers: Provider[]; saved: Saved; platformDefault: { provider: string; model: string } | null }) {
   const mutations = useMutationIdentityStore();
   const grant = useRef<string | null>(null);
   const [saved, setSaved] = useState<Saved>(initial);
@@ -31,6 +33,11 @@ export default function AiModelPanel({ organizationId, providers, saved: initial
   // A key is needed the first time and whenever the company changes.
   const keyRequired = !saved || saved.provider !== provider;
   const chosen = providers.find((entry) => entry.id === provider) ?? providers[0];
+  const labelFor = (id: string) => providers.find((entry) => entry.id === id)?.label ?? id;
+  // What chat uses when nothing is saved for this workspace.
+  const fallback = platformDefault
+    ? `the app's default model (${labelFor(platformDefault.provider)}, model ${platformDefault.model}), so questions go to ${labelFor(platformDefault.provider)}`
+    : "its built-in answers, and no questions are sent to an AI company";
 
   // Asks the server for a one-time MFA grant for this protected change.
   const issueGrant = async () => {
@@ -75,7 +82,7 @@ export default function AiModelPanel({ organizationId, providers, saved: initial
     try {
       await send("DELETE", {});
       setSaved(null);
-      setMessage("Removed. AI Reach chat uses its built-in answers again.");
+      setMessage(`Removed. AI Reach chat now uses ${fallback}.`);
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "The model could not be removed. Try again.");
     } finally { setBusy(false); }
@@ -84,7 +91,7 @@ export default function AiModelPanel({ organizationId, providers, saved: initial
   return <div className="workspace-grid">
     <article className="workspace-card workspace-card-wide">
       <span className="eyebrow">AI model</span><h2>Which AI answers chat questions?</h2>
-      <p>{saved ? `Currently ${providers.find((entry) => entry.id === saved.provider)?.label ?? saved.provider}, model ${saved.model}, key ending in ${saved.keyHint}.` : "No model is saved, so AI Reach chat uses its built-in answers."}</p>
+      <p>{saved ? `Currently ${providers.find((entry) => entry.id === saved.provider)?.label ?? saved.provider}, model ${saved.model}, key ending in ${saved.keyHint}.` : `No model is saved for this workspace, so AI Reach chat uses ${fallback}.`}</p>
       <p className="workspace-muted">Questions are sent to the company you choose, with emails, phone numbers, and links removed first. The model only picks which saved results to show; AI Reach writes every answer itself. Your key is stored encrypted and is never shown again.</p>
       <label htmlFor="ai-provider">Company</label>
       <select id="ai-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setModel(providers.find((entry) => entry.id === event.target.value)?.exampleModel ?? ""); }} disabled={busy}>

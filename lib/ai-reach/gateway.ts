@@ -1,7 +1,7 @@
 import type { OrganizationContext } from "../auth/organization-context";
 import type { SecretBroker } from "../connections/secrets/secret-broker";
 import { readAiModelCredential } from "../organizations/ai-model-settings";
-import { createAnthropicModelClient } from "./anthropic-model-client";
+import { createAnthropicModelClient, defaultAnthropicModel } from "./anthropic-model-client";
 import { aiModelProvider, type AiModelProviderId } from "./model-providers";
 import { createOpenAiCompatibleModelClient } from "./openai-compatible-model-client";
 import { answerFromEvidence, type AiReachAnswer, type AiReachAnswerInput } from "./grounded-answer";
@@ -23,10 +23,19 @@ export const deterministicAnswerProvider: AiReachAnswerProvider = {
 // when AI_REACH_MODEL_PROVIDER names a supported vendor and its key is set;
 // otherwise, or with the setting removed, the deterministic answers apply.
 export function getAnswerProvider(env: Record<string, string | undefined> = process.env): AiReachAnswerProvider {
-  if (env.AI_REACH_MODEL_PROVIDER === "anthropic" && env.ANTHROPIC_API_KEY) {
-    return createModelAnswerProvider(createAnthropicModelClient({ apiKey: env.ANTHROPIC_API_KEY, model: env.AI_REACH_MODEL || undefined }));
+  const platform = platformModel(env);
+  if (platform && env.ANTHROPIC_API_KEY) {
+    return createModelAnswerProvider(createAnthropicModelClient({ apiKey: env.ANTHROPIC_API_KEY, model: platform.model }));
   }
   return deterministicAnswerProvider;
+}
+
+// The platform default model that applies to organizations with no saved
+// choice, or null when there is none. Settings shows it so people know where
+// their questions go. Never includes the key.
+export function platformModel(env: Record<string, string | undefined> = process.env): { provider: "anthropic"; model: string } | null {
+  if (env.AI_REACH_MODEL_PROVIDER !== "anthropic" || !env.ANTHROPIC_API_KEY) return null;
+  return { provider: "anthropic", model: env.AI_REACH_MODEL || defaultAnthropicModel };
 }
 
 // Builds the adapter for a company the organization chose in Settings.
