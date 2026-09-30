@@ -72,6 +72,16 @@ describe("AI Reach evidence store", () => {
     expect(withTenantContextMock).not.toHaveBeenCalled();
   });
 
+  it("reads a Dubsado-only snapshot saved under the old 48-hour window with today's 7-day window", async () => {
+    const dubsadoEvidence = [{ id: "dubsado-export-1", sourceClass: "business_outcome_observation" as const, provider: "dubsado", method: "authorized_export" as const, collectedAt: "2026-08-30T10:00:00.000Z", collectorVersion: "fixture-1.0.0", limitations: [] }];
+    const legacy = fixture({ evidence: dubsadoEvidence, metrics: fixture().metrics.map((metric) => ({ ...metric, evidenceIds: ["dubsado-export-1"] })) });
+    mockTenant({ findMany: vi.fn().mockResolvedValue([{ snapshot: legacy }]) });
+    expect((await readLatestEvidenceSnapshot(context))?.freshness.maxAgeHours).toBe(168);
+    // Snapshots from other sources keep their own window.
+    mockTenant({ findMany: vi.fn().mockResolvedValue([{ snapshot: fixture() }]) });
+    expect((await readLatestEvidenceSnapshot(context))?.freshness.maxAgeHours).toBe(48);
+  });
+
   it("reports a duplicate snapshot key", async () => {
     const create = vi.fn().mockRejectedValue(new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "test" }));
     mockTenant({ create });

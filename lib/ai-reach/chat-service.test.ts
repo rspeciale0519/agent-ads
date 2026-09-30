@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const withTenantContextMock = vi.hoisted(() => vi.fn());
@@ -79,6 +80,21 @@ describe("AI Reach chat service", () => {
     expect(answered).toBeGreaterThan(asked);
   });
 
+  it("saves the model usage record with the answer, and none for rule-based answers", async () => {
+    mockAnswerInputs();
+    const models = mockDatabase();
+    const modelUsage = { provider: "anthropic", model: "claude-opus-5-5", status: "accepted" as const, promptVersion: "router-2026-09-30", inputTokens: 900, outputTokens: 40, costUsd: 0.0044, pricingVersion: "anthropic-2026-09" };
+    const modelProvider: AiReachAnswerProvider = { name: "model", answer: vi.fn(async () => ({ text: "Answer.", kind: "guidance" as const, citations: [], modelUsage })) };
+    await askAiReach(context, { question: "How many leads?" }, modelProvider);
+    expect(models.aiReachMessage.create.mock.calls[1][0].data.modelUsage).toEqual(modelUsage);
+    // The question row never carries usage.
+    expect(models.aiReachMessage.create.mock.calls[0][0].data.modelUsage).toBeUndefined();
+
+    const ruleModels = mockDatabase();
+    await askAiReach(context, { question: "How many leads?" }, provider);
+    expect(ruleModels.aiReachMessage.create.mock.calls[1][0].data.modelUsage).toBe(Prisma.DbNull);
+  });
+
   it("adds to an existing conversation the caller can see", async () => {
     mockAnswerInputs();
     const models = mockDatabase({ id: conversationId });
@@ -92,6 +108,8 @@ describe("AI Reach chat service", () => {
     const models = mockDatabase(null);
     await expect(askAiReach(context, { question: "Hi", conversationId }, provider)).rejects.toMatchObject({ code: "AI_REACH_CONVERSATION_NOT_FOUND", status: 404 });
     expect(models.aiReachMessage.create).not.toHaveBeenCalled();
+    // The answer (and any billable model call) never runs for it.
+    expect(provider.answer).not.toHaveBeenCalled();
   });
 
   it("refuses a question containing a password before answering or saving it", async () => {

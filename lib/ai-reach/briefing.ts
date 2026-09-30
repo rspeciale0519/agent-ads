@@ -1,6 +1,7 @@
 import type { ConnectionProvider } from "../connections/contracts";
 import type { DashboardConnectionSummary, DashboardData } from "../dashboard/dashboard-service";
-import { assessReadOnlyEvidenceSnapshot, isReadOnlyEvidenceSnapshotFresh, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
+import { isDubsadoExportFresh } from "./dubsado-evidence";
+import { assessReadOnlyEvidenceSnapshot, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 import { buildOutcomeFunnel, formatRate, minimumStepRecords, type OutcomeFunnel } from "./funnel";
 
 export type AiReachRecommendation = {
@@ -13,6 +14,9 @@ export type AiReachRecommendation = {
   risk: "Low" | "Medium";
   uncertainty: "Low" | "Medium" | "High";
   approval: string;
+  // Saved metrics this recommendation is computed from, if any. Answers that
+  // suggest it show and cite those metrics.
+  metricKeys?: string[];
 };
 
 export type AiReachBriefing = {
@@ -47,20 +51,26 @@ const dubsadoMetricKeys = new Set([
   "refunded_engagements",
 ]);
 
-function hasGoogleAdsPerformanceEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
-  if (!snapshot) return false;
+// The saved Google Ads metrics backed by official API evidence.
+function googleAdsPerformanceMetricKeys(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return [];
   const officialGoogleAdsEvidenceIds = new Set(snapshot.evidence
     .filter((evidence) => evidence.provider === "google_ads" && evidence.sourceClass === "official_platform_observation" && evidence.method === "official_api")
     .map((evidence) => evidence.id));
-  return snapshot.metrics.some((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)));
+  return snapshot.metrics
+    .filter((metric) => googleAdsMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => officialGoogleAdsEvidenceIds.has(evidenceId)))
+    .map((metric) => metric.key);
 }
 
-function hasDubsadoOutcomeEvidence(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
-  if (!snapshot) return false;
+// The saved Dubsado outcome metrics backed by an authorized export.
+function dubsadoOutcomeMetricKeys(snapshot: ReadOnlyEvidenceSnapshot | null | undefined) {
+  if (!snapshot) return [];
   const approvedDubsadoEvidenceIds = new Set(snapshot.evidence
     .filter((evidence) => evidence.provider === "dubsado" && evidence.sourceClass === "business_outcome_observation" && evidence.method === "authorized_export")
     .map((evidence) => evidence.id));
-  return snapshot.metrics.some((metric) => dubsadoMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => approvedDubsadoEvidenceIds.has(evidenceId)));
+  return snapshot.metrics
+    .filter((metric) => dubsadoMetricKeys.has(metric.key) && metric.evidenceIds.some((evidenceId) => approvedDubsadoEvidenceIds.has(evidenceId)))
+    .map((metric) => metric.key);
 }
 
 function hasReadOnlyAccessRecord(connection: DashboardConnectionSummary, now: number) {
@@ -100,6 +110,25 @@ function funnelRecommendation(funnel: OutcomeFunnel, weakest: NonNullable<Outcom
     risk: "Low",
     uncertainty: dubsadoState === "connected" ? "Medium" : "High",
     approval: "Customer and measurement owner approval required",
+    metricKeys: funnel.metricKeys,
+  };
+}
+
+// A reminder to upload a new export once the saved one is past its
+// freshness window, so advice never comes from old numbers.
+function staleExportRecommendation(dubsadoState: Source["state"], metricKeys: string[]): AiReachRecommendation {
+  return {
+    id: "dubsado-refresh",
+    title: "Upload a fresh Dubsado export",
+    reason: "The saved Dubsado export is out of date, so AI Reach will not compare sales steps from it. Upload a new export to see current results.",
+    evidence: ["Authorized Dubsado outcome metrics are saved, but they are past their freshness window."],
+    // The old export is cited so the answer can show why a new one is needed.
+    metricKeys,
+    expectedEffect: "Current numbers keep the results and sales-step advice accurate.",
+    effort: "Low",
+    risk: "Low",
+    uncertainty: dubsadoState === "connected" ? "Medium" : "High",
+    approval: "Customer and measurement owner approval required",
   };
 }
 
@@ -111,8 +140,10 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const website = sourceRecord(data.connections, "wordpress", "Website", checkedAt);
   const dubsado = sourceRecord(data.connections, "dubsado", "Dubsado outcomes", checkedAt);
   const submitted = data.onboarding.status === "submitted";
-  const googleAdsPerformanceEvidence = hasGoogleAdsPerformanceEvidence(data.evidenceSnapshot);
-  const dubsadoOutcomeEvidence = hasDubsadoOutcomeEvidence(data.evidenceSnapshot);
+  const googleAdsKeys = googleAdsPerformanceMetricKeys(data.evidenceSnapshot);
+  const dubsadoKeys = dubsadoOutcomeMetricKeys(data.evidenceSnapshot);
+  const googleAdsPerformanceEvidence = googleAdsKeys.length > 0;
+  const dubsadoOutcomeEvidence = dubsadoKeys.length > 0;
   const sources = [
     website,
     googleAdsPerformanceEvidence
@@ -128,8 +159,8 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
   const snapshotAssessment = data.evidenceSnapshot ? assessReadOnlyEvidenceSnapshot(data.evidenceSnapshot, now) : null;
   const snapshotReady = Boolean(snapshotAssessment?.ready && connectedSources === sources.length);
   // Old counts should not drive step-level advice, so the funnel is only
-  // built while the saved export is still fresh.
-  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isReadOnlyEvidenceSnapshotFresh(data.evidenceSnapshot, now));
+  // built while the Dubsado export itself is still fresh.
+  const dubsadoEvidenceFresh = Boolean(data.evidenceSnapshot && isDubsadoExportFresh(data.evidenceSnapshot, now));
   const funnel = dubsadoOutcomeEvidence && dubsadoEvidenceFresh ? buildOutcomeFunnel(data.evidenceSnapshot) : null;
   const primaryMetric = data.evidenceSnapshot?.metrics.find((metric) => metric.key === data.evidenceSnapshot?.primaryOutcomeKey);
   return {
@@ -171,10 +202,13 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         risk: "Low",
         uncertainty: google.state === "connected" ? "Medium" : "High",
         approval: "Advertising owner approval required",
+        ...(googleAdsPerformanceEvidence ? { metricKeys: googleAdsKeys } : {}),
       },
       dubsadoOutcomeEvidence && funnel?.weakest
         ? funnelRecommendation(funnel, funnel.weakest, dubsado.state)
-        : {
+        : dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
+          ? staleExportRecommendation(dubsado.state, dubsadoKeys)
+          : {
         id: "dubsado-map",
         title: dubsadoOutcomeEvidence ? "Review Dubsado outcome evidence" : dubsado.state === "connected" ? "Review Dubsado outcome definitions" : dubsado.state === "needs_review" ? "Verify the Dubsado read route" : "Add a Dubsado read route",
         reason: dubsadoOutcomeEvidence
@@ -183,15 +217,14 @@ export function buildAiReachBriefing(data: BriefingInput, now = new Date()): AiR
         evidence: [
           dubsadoOutcomeEvidence ? "Authorized Dubsado outcome metrics are included in the evidence snapshot." : dubsado.detail,
           // Saved stages exist but no step has enough records to compare fairly.
-          dubsadoOutcomeEvidence && !dubsadoEvidenceFresh
-            ? "The saved export is out of date. Import a new export before comparing sales steps."
-            : funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
+          funnel ? `Too few records at each step to compare them yet (at least ${minimumStepRecords} are needed).` : "An approved stage map is not available in this view.",
         ],
         expectedEffect: "Clear definitions help compare qualified opportunities and commercial outcomes.",
         effort: "Medium",
         risk: "Medium",
         uncertainty: dubsado.state === "connected" ? "Medium" : "High",
         approval: "Customer and measurement owner approval required",
+        ...(dubsadoOutcomeEvidence ? { metricKeys: dubsadoKeys } : {}),
       },
     ],
   };

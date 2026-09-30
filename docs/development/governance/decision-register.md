@@ -348,6 +348,24 @@
 - Owner/date: product owner, 2026-09-26.
 - Affects: Gate F1.
 
+### D-039 — Model-agnostic AI Reach answers, Anthropic first
+
+- Status: accepted.
+- Amends: D-026 (first model provider).
+- Context: AI Reach chat answered only from fixed rules. The product owner wants model-generated answers and wants the system to stay model-agnostic.
+- Decision: AI Reach answers go through a vendor-neutral contract (`AiReachModelClient`). The first adapter uses Anthropic (`claude-opus-5-5` by default, overridable with `AI_REACH_MODEL`). Other vendors, including OpenAI, plug in as further adapters without changing the safety checks.
+- Safety:
+  - The model writes no customer-facing text. It returns structured choices only: which saved results answer the question, which next actions help, which not-connected sources would help, and whether the question is a change request.
+  - AI Reach writes every sentence from saved data, with each value under its own metric label. It adds citations, the readiness note, and the causation note itself.
+  - A choice not present in the facts rejects the draft, and the deterministic answer is used instead. Model failures also fall back.
+  - Recognized change requests never reach the model, and a question the model classifies as a change request gets the read-only answer. The model has no tools and writes no text, so it can neither change nor claim to change anything.
+  - Models receive formatted aggregate saved metrics, source names and states, and next-action titles only. No business name is sent.
+  - Before a question is sent, AI Reach replaces emails, phone numbers, and links with placeholders. People's names in free text cannot be reliably detected, so turning the model on means an organization accepts that its questions go to the chosen provider.
+- Usage: every answer that called a model saves an immutable usage record with the answer (`ai_reach_messages.model_usage`): provider, the model that served the call, status (accepted, change_request, rejected, failed), the routing prompt version, billed input and output tokens, and the cost in USD with the price-list version used to compute it (no cost for a model missing from the price list). This meets P-008, AGT-004 and AGT-005 for chat.
+- Switch: the model is used only when `AI_REACH_MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` are both set. Removing either restores deterministic answers.
+- Owner/date: product owner, 2026-09-29.
+- Affects: AI Reach chat, AGT-001–AGT-010.
+
 ## Decision process
 
 New material decisions must state context, options, decision, consequences, owner, date, status, affected requirement IDs, and any migration. Superseded decisions are never deleted.

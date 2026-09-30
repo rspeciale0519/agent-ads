@@ -31,6 +31,7 @@
     "bootstrap:owner": "node scripts/bootstrap-owner.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
     "@prisma/client": "6.19.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",

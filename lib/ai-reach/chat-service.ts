@@ -45,16 +45,19 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
   const parsed = askInputSchema.parse(input);
   if (findSecretPattern(parsed.question)) throw new ConnectionServiceError("AI_REACH_QUESTION_CONTAINS_SECRET", 422);
 
+  // Check the conversation first, so a request for one the caller cannot see
+  // never triggers a (possibly billable) answer that would not be saved.
+  // Row-level security only returns a conversation this user owns.
+  const existing = parsed.conversationId
+    ? await withTenantContext(context, (tx) => tx.aiReachConversation.findFirst({ where: { id: parsed.conversationId, organizationId: context.organizationId }, select: { id: true } }))
+    : null;
+  if (parsed.conversationId && !existing) throw new ConnectionServiceError("AI_REACH_CONVERSATION_NOT_FOUND", 404);
+
   const [dashboard, snapshot] = await Promise.all([getDashboardData(context), readLatestEvidenceSnapshot(context)]);
   const briefing = buildAiReachBriefing({ ...dashboard, evidenceSnapshot: snapshot });
   const answer = await provider.answer({ question: parsed.question, organizationName: context.organizationName, briefing, snapshot });
 
   return withTenantContext(context, async (tx) => {
-    // Row-level security only returns a conversation this user owns here.
-    const existing = parsed.conversationId
-      ? await tx.aiReachConversation.findFirst({ where: { id: parsed.conversationId, organizationId: context.organizationId }, select: { id: true } })
-      : null;
-    if (parsed.conversationId && !existing) throw new ConnectionServiceError("AI_REACH_CONVERSATION_NOT_FOUND", 404);
     const conversation = existing ?? await tx.aiReachConversation.create({
       data: { organizationId: context.organizationId, userId: context.userId },
       select: { id: true },
@@ -68,7 +71,7 @@ export async function askAiReach(context: OrganizationContext, input: unknown, p
       data: { organizationId: context.organizationId, conversationId: conversation.id, role: "user", content: parsed.question, createdAt: askedAt },
     });
     const assistantMessage = await tx.aiReachMessage.create({
-      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray, createdAt: answeredAt },
+      data: { organizationId: context.organizationId, conversationId: conversation.id, role: "assistant", content: answer.text, answerKind: answer.kind, citations: answer.citations as Prisma.InputJsonArray, modelUsage: answer.modelUsage ?? Prisma.DbNull, createdAt: answeredAt },
     });
     return { conversationId: conversation.id, messages: [toChatMessage(userMessage), toChatMessage(assistantMessage)] };
   });

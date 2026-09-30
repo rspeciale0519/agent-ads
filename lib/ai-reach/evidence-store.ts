@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { withTenantContext, type OrganizationContext, type TenantTransaction } from "../auth/organization-context";
+import { applyCurrentDubsadoExportWindow } from "./dubsado-evidence";
 import { readOnlyEvidenceSnapshotSchema, type ReadOnlyEvidenceSnapshot } from "./evidence-contract";
 
 // Writes one validated snapshot inside an existing tenant transaction so the
@@ -51,7 +52,7 @@ export async function readLatestEvidenceSnapshot(context: OrganizationContext): 
     }));
     for (const row of rows) {
       const parsed = readOnlyEvidenceSnapshotSchema.safeParse(row.snapshot);
-      if (parsed.success && parsed.data.organizationId === context.organizationId) return parsed.data;
+      if (parsed.success && parsed.data.organizationId === context.organizationId) return applyCurrentDubsadoExportWindow(parsed.data);
     }
     if (rows.length < readBatchSize) return null;
   }
