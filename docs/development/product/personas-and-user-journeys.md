@@ -27,8 +27,8 @@ Agency administration, deep analysis workspaces, and broad channel operations ar
 1. The owner creates an organization and opens AI Reach.
 2. AI Reach asks short questions about the offer, audience, location, funnel, goals, budget, brand, and claims.
 3. Structured cards collect details that need exact values.
-4. The owner connects the website, GA4, Search Console, the selected CRM, and the approved advertising sources.
-5. The owner connects Google Ads, Meta Ads, or both, as selected in the Pilot Scope Record. Both read adapters ship.
+4. The owner connects the sources named in the Pilot Scope Record: the website, the selected outcome source (CRM or approved CSV), and GA4 or Search Console when an enabled decision needs them. (Accepted D-032 scope lists all pilot sources; D-043 makes them follow the record.)
+5. The owner connects the paid channel the workflow uses, as selected in the Pilot Scope Record. Google Ads is the starting hypothesis; Meta has connection discovery only today.
 6. AI Reach shows missing sources and the useful degraded mode for each gap.
 7. The supervisor proposes a Business and Marketing Profile from approved evidence.
 8. The owner corrects assumptions and approves the Pilot Scope Record.
@@ -36,12 +36,22 @@ Agency administration, deep analysis workspaces, and broad channel operations ar
 
 ## Journey 2: Receive the first diagnosis
 
-1. The system checks connector health, tracking, campaign results, landing pages, CRM stages, and AI Reach evidence.
-2. AI Reach explains what works, what wastes money, and what blocks discovery.
+1. The system checks connector health, tracking, campaign results, landing pages, outcome stages, and AI Reach evidence.
+2. The Marketing Director explains what works, what wastes money, and what blocks discovery.
 3. The outcome dashboard shows leads, booked calls, closed-won deals, booked revenue, and data limitations.
-4. AI Reach gives exactly three actions with evidence, expected value, effort, risk, and uncertainty.
-5. The owner can ask plain questions without learning a prompt format.
-6. No recommendation changes an external system.
+4. The Director gives ranked decisions (at most three) with evidence, expected value with a range or an insufficient-evidence state, effort, risk, and uncertainty, or states that no decision is needed today.
+5. The Director says so when the best next step is the offer, tracking, lead handling, or capacity, instead of proposing advertising work.
+6. The owner can ask plain questions without learning a prompt format.
+7. No recommendation changes an external system.
+
+## Journey 2b: Approve a complete campaign package (D-044, accepted)
+
+1. The Director prepares a campaign package for the first paid channel from the approved business memory and offer.
+2. The owner sees complete previews, the exact objects to be created, the destination, the budget cap, the prediction, and the recovery limits.
+3. The owner approves the package, and may approve activation in the same decision.
+4. The system creates paused objects and verifies them against the package; any difference is shown.
+5. The system revalidates account state and the approval, then activates.
+6. The Director monitors delivery and reports mature outcomes beside the prediction after the observation window.
 
 ## Journey 3: Improve advertising safely
 
@@ -79,7 +89,7 @@ Agency administration, deep analysis workspaces, and broad channel operations ar
 
 1. The owner opens AI Reach.
 2. The conversation shows the latest outcome briefing and one compact dashboard.
-3. The briefing explains material changes, data gaps, pending decisions, and three actions.
+3. The briefing explains material changes, data gaps, and pending decisions, with ranked decisions or a one-line statement that none is needed.
 4. The owner asks questions in plain language and can inspect the supporting evidence.
 5. A state-changing request becomes a proposal and never becomes hidden permission.
 

@@ -1,6 +1,6 @@
 # Hermes Multi-Agent Architecture
 
-> Status: expansion target. The pilot uses one supervisor through the application-owned AI gateway. Hermes is not a pilot release gate.
+> Status: expansion target and reference design. The pilot uses one Marketing Director through the application-owned AI gateway, with one bounded paid-search specialist and draft-mode content and creative support (D-043, accepted). The runtime is chosen through the D-046 prototype; Hermes is one candidate expansion runtime, not a pilot release gate. The "chief marketing orchestrator" below is the Marketing Director. The specialist catalog is the expansion target; roles join only after a separate evaluation shows better quality, safety, cost, or context isolation.
 
 ## Role of Hermes
 

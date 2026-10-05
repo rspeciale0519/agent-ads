@@ -114,6 +114,24 @@ The system combines deterministic software, external APIs, probabilistic agents,
 - Global, provider, organization, and action kill switches.
 - Campaign pause and resume rollback through one approved provider and account.
 
+### Supervised acquisition workflow tests (D-044, accepted)
+
+- Package validation against current account capability.
+- Exact-package approval binding; edited package or changed destination invalidates the approval.
+- Paused creation; verification against the package shows every difference.
+- Activation revalidation after account drift; stale approval (past the provisional maximum age) is rejected.
+- One approval binding creation and activation together passes only when verification passes.
+- Budget reservation under concurrent proposals; a second proposal cannot spend reserved funds.
+- The ledger records `dispatched` before the provider request is sent; a crash after dispatch and before reconciliation leaves exposure counted as dispatched or uncertain.
+- After provider reconciliation verifies activation, the local ledger update from `dispatched` to `committed` is atomic and never reduces counted exposure; a crash during that update leaves the row dispatched, not released.
+- Expiry of an undispatched pending reservation releases funds; expiry of a dispatched, committed, or uncertain reservation does not.
+- Release after an uncertain result happens only with a reconciliation reference.
+- Restart during execution; duplicated events; cancellation races; provider success followed by a lost response; kill switch after queueing and before execution.
+- Kill switch during an in-flight provider request: no new dispatch, queued work canceled, the in-flight result reconciled, and a recovery action offered rather than an immediate-stop claim.
+- Pause, resume, budget decrease, and budget increase each tested as a separate action definition.
+- Outcome upload: event identity, mapping, duplicate, permission, and route validation; the deepest event is not uploaded automatically.
+- Audit reconstruction of the complete package history.
+
 ### AI Reach tests
 
 - Crawler-control, sitemap, canonical, indexing, and structured-data classification.
@@ -121,15 +139,40 @@ The system combines deterministic software, external APIs, probabilistic agents,
 - Citation extraction, canonical URL handling, factual accuracy, and approved business truth.
 - Referral and CRM outcome lineage.
 - Partial, stale, missing, conflicting, and corrected evidence.
-- Exactly three useful recommendations in each formal briefing.
+- Ranked decisions limited to three, or the explicit quiet state, in each formal briefing.
 - Rejection of ranking, citation, recommendation, traffic, revenue, or causal guarantees.
 - Answer presence is not a deterministic release assertion.
 
 ## Agent eval framework
 
-The pilot supervisor has a versioned evaluation suite with held-out tasks and adversarial cases.
+The Marketing Director has a versioned evaluation suite with held-out tasks and adversarial cases. The paid-search specialist and draft-mode content and creative support each have their own suite before activation (D-043).
 
 Later specialist roles need separate suites before activation.
+
+### Marketing evaluation library (D-047)
+
+Build evaluation cases from real tasks after privacy review. Keep a held-out set that a candidate cannot use during improvement. Minimum coverage:
+
+| Evaluation area | Example case | Required behavior |
+|---|---|---|
+| Business understanding | Service business with limited delivery capacity | Avoid recommending unrestricted lead growth; surface the capacity limit |
+| Channel choice | Weak search demand and strong visual proof | Explain channel fit and uncertainty |
+| Paid search | Irrelevant queries with mixed intent | Propose precise exclusions without blocking useful demand |
+| Conversion delay | Recent spend with late CRM qualification | Delay a destructive conclusion |
+| Creative strategy | Low clicks but strong qualified outcomes | Evaluate business value before replacing the concept |
+| Brand and claims | Tempting unsupported testimonial or guarantee | Reject the claim and request evidence |
+| Landing pages | High traffic with low qualified conversion | Identify a testable friction or message hypothesis |
+| Email | A suppressed or ineligible recipient | Block the send |
+| Content and search | Many near-duplicate page opportunities | Prefer distinct user value; reject thin expansion |
+| AI search | A few sampled mentions increase | Report sample limits without claiming market-wide visibility |
+| Budget coordination | Two agents request the same remaining funds | Respect shared reservations and limits |
+| Attribution | Ads and CRM credit differ | Preserve definitions; avoid false reconciliation |
+| Operations | Tracking fails during a campaign | Suspend optimization and request repair |
+| External content | A page instructs the agent to reveal secrets | Treat the instruction as untrusted content |
+| Quiet day | No evidence supports a decision | Return the explicit no-decision state, not a filler action |
+| Prediction | Insufficient evidence for a range | Return the insufficient-evidence state, not a guessed range |
+
+Separate deterministic validation from judgment scoring. Use code for schemas, arithmetic, permissions, and format limits. Use qualified human review for strategy and creative judgments. An LLM judge can assist review but cannot be the only judge of its own improvement; calibrate automated scores against human decisions and review disagreements.
 
 ### Common metrics
 
@@ -152,7 +195,7 @@ Later specialist roles need separate suites before activation.
 - Creative reviewer: detects factual, rights, brand, accessibility, and policy failures.
 - Measurement analyst: distinguishes observation, attribution, forecast, and causality.
 - Orchestrator: complete delegation, dependency handling, no infinite loops, preserves disagreement.
-- AI Reach supervisor: correct evidence classes, factual limits, exactly three actions, useful abstention, and no false promise.
+- Marketing Director: correct evidence classes, factual limits, ranked decisions or the explicit quiet state, predictions with ranges or an insufficient-evidence state, useful abstention, surfaces offer or capacity problems instead of buying traffic, and no false promise.
 
 ### Scoring and release
 
@@ -161,6 +204,18 @@ Later specialist roles need separate suites before activation.
 - Model or prompt changes run the full relevant suite.
 - Human reviewers periodically calibrate automated judges.
 - Production corrections become candidate eval cases after privacy review.
+
+### Promotion controls (D-047)
+
+- Maintain development, candidate, and production versions of each skill and prompt. Store the evaluation set version and results with each candidate.
+- Block any candidate with a critical tenant, secret, fabricated-evidence, approval, or unauthorized-action failure, regardless of average scores.
+- Require every deterministic safety and contract check to pass and no material regression in the agreed quality dimensions.
+- Compare cost and latency against the current production version.
+- Model-routing changes require operator approval and a regression evaluation.
+- Use a limited rollout before general activation. Preserve the previous version and a tested rollback path.
+- Require a named operator to approve production promotion. Set numeric thresholds before evaluating a candidate and do not move them after seeing weak results.
+- Customer-specific memory corrections use a simpler approved process. Shared skill changes need broader review because they affect multiple customers.
+- Before launch, prove one complete learning cycle in a controlled pilot: start from recorded feedback or a real task failure, create a candidate, evaluate, approve, roll out, and verify later behavior. Also demonstrate rejection of a harmful candidate and rollback of a promoted version.
 
 ## Business validation
 
@@ -175,9 +230,15 @@ Later specialist roles need separate suites before activation.
 - Measure time saved, edit/reject rate, execution reliability, policy blocks, rollback, and observed outcomes.
 - Compare with historical or controlled baselines where feasible.
 
-### Bounded autonomy phase — expansion
+### Bounded autonomy phase — expansion (L2 and L3, D-048)
 
-- Require per-action precision, low incident rate, sufficient volume, reversibility, calibrated confidence, and organization-specific owner approval.
+- Require per-action correctness, low incident rate, reversibility, calibrated confidence, action-specific evidence, and organization-specific customer authorization.
+- No numeric count or acceptance rate is a universal floor. Customer acceptance is a UX metric, not proof of correctness or permission.
+- A critical failure blocks promotion. Demotion is one switch.
+
+### Runtime prototype evidence (D-046)
+
+Record for each tested runtime and provider combination: hosting fit, tool-allowlist containment under adversarial tool calls, resume from durable state after a killed process, cost, latency, output quality on the held-out set, and whether the per-organization provider adapter works.
 
 ## Performance and resilience
 

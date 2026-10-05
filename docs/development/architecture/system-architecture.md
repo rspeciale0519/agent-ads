@@ -2,17 +2,43 @@
 
 ## Architectural objective
 
-Build a multi-tenant marketing operating system that turns plain-language goals into measured, supervised work.
+Build a multi-tenant marketing service that turns plain-language goals into planned, approved, executed, and measured work.
 
-The pilot proves one narrow outcome loop before broad platform execution. One supervisor uses typed read and proposal tools through an application-owned AI gateway.
+The first complete workflow proves one supervised acquisition loop on one paid channel before broad platform execution. One Marketing Director coordinates bounded specialists through typed task contracts and uses read and proposal tools through an application-owned AI gateway (D-043, accepted).
 
-The application remains the authority for identity, data, metrics, policy, approval, execution, audit, and recovery.
+The application remains the authority for identity, data, metrics, policy, approval, budgets, execution, audit, and recovery.
+
+## Target loop (agreed design)
+
+```mermaid
+flowchart TD
+    Customer["Owner goals and approvals"] --> Director["Marketing Director"]
+    Memory["Business memory and outcome history"] <--> Director
+    Director --> Specialists["Bounded specialists"]
+    Specialists <--> Creative["Creative support (draft mode)"]
+    Specialists <--> Measurement["Measurement service"]
+    Specialists --> Proposal["Versioned proposals with predictions"]
+    Proposal --> Approval["Policy and approval service"]
+    Customer --> Approval
+    Approval --> Worker["Durable execution workers"]
+    Worker --> Provider["Marketing platforms and website"]
+    Provider --> Evidence["Canonical evidence and reconciliation"]
+    Evidence --> Memory
+    Evidence --> Learning["Learning record and controlled review"]
+    Learning --> Evaluation["Evaluation and promotion review"]
+    Evaluation --> Memory
+```
 
 ## Current implementation boundary
 
-The repository currently implements the Next.js control plane, onboarding, identity, and Account Connections work.
+Audit source: worktree HEAD `4358fdf`, inspected on 2026-10-04. Local source inspection only; no target-environment verification. The repository implements:
 
-AI Reach, canonical marketing outcomes, advertising insights, CRM outcomes, supervised actions, Hermes, Temporal, and broad publishing remain target work.
+- the Next.js control plane: identity, organizations, memberships, invitations, MFA and step-up grants, audit chain, forced tenant RLS, idempotency ledger, rate limits, CSRF/origin checks, and SecretBroker on Supabase Vault;
+- the six-step onboarding intake with server drafts and private uploads;
+- Account Connections: Google (OAuth, Ads/GA4/Tag Manager/Search Console discovery, Google Ads campaign report read), Meta and TikTok (OAuth and asset discovery only), Dubsado approved CSV export, and manual inventory records; every provider is read-only and behind kill switches;
+- AI Reach chat with a rule-based briefing and a model router that returns structured choices only (D-039, D-041), with per-answer usage records.
+
+Not implemented: scheduled synchronization, GA4 or Search Console data reads, canonical outcome records, business memory, the Marketing Director, specialists, task contracts, proposals, approvals, any provider write, durable jobs, learning records, billing, Hermes, Temporal, and publishing. These remain agreed or accepted design.
 
 Documentation status never substitutes for implementation and target-environment evidence.
 
@@ -52,22 +78,25 @@ flowchart LR
 
 ### Intelligence plane
 
-- One versioned supervisor profile behind an application-owned, replaceable gateway for the pilot.
-- Versioned instructions, tools, evidence rules, model settings, and evaluation suites.
-- Research, interpretation, strategy, drafting, and recommendation.
+- One versioned Marketing Director profile behind an application-owned, replaceable gateway, plus one bounded paid-search specialist and draft-only content and creative support in the first complete workflow (D-043).
+- Versioned instructions, skills, tools, evidence rules, model settings, and evaluation suites.
+- Research, interpretation, strategy, drafting, package preparation, proposals with predictions, and briefings.
 - Produces artifacts and proposals but does not own authoritative application state.
-- Hermes and separate specialist profiles remain trigger-based expansion components behind the same contract.
+- The runtime is selected through a bounded prototype against an application-owned reference loop (D-046). Hermes and the full specialist catalog remain trigger-based expansion components behind the same contract.
 
 ### Workflow plane
 
-- Durable jobs for connector sync, website crawl, AI Reach samples, briefing refresh, approval, execution, retry, and reconciliation.
-- The pilot can use application-owned database state, an outbox, and bounded scheduled jobs.
+- Durable jobs for connector sync, website crawl, AI Reach samples, briefing refresh, approval waits, execution, retry, reconciliation, and learning capture.
+- Durable application records for jobs, attempts, schedules, leases, approvals, and receipts. A queue delivery is never the only record that work exists.
+- Jobs have bounded retries, backoff, deduplication, worker leases, and cancellation, and recover after a process restart. Late workers must not execute canceled or superseded work.
+- Budget reservations are held across concurrent proposals and workers. The local ledger records dispatch before the provider request, keeps dispatched and uncertain exposure counted across failures, and moves to committed in a local atomic update only after independent provider reconciliation verifies activation. No transaction spans the database and the provider API (ACT-007).
+- A kill switch stops new dispatch and cancels queued work; an in-flight provider request may finish and is reconciled (ACT-012).
 - Temporal remains a later option when measured workflow complexity or reliability needs justify it.
 - Deterministic timers and scripts do not invoke a model unnecessarily.
 
 ### Data plane
 
-- PostgreSQL as the initial transactional and canonical analytical store.
+- PostgreSQL as the initial transactional and canonical analytical store (D-045). Scheduled, incremental, quota-aware reads from official platform APIs land here; the platforms remain the delivery systems of record.
 - Prisma for database access and migrations.
 - Raw connector payloads in append-only object storage plus normalized references in PostgreSQL.
 - S3-compatible object storage for creative, documents, exports, and evidence snapshots.
@@ -108,9 +137,12 @@ Module boundaries must be enforced in code even when initially deployed together
 | Module | Owns | Does not own |
 |---|---|---|
 | Identity and tenancy | organizations, memberships, roles, sessions | platform permissions |
-| Business context | offers, audiences, brand, goals, claims, corrections | raw agent memory |
+| Business memory | offers, audiences, brand, goals, claims, confirmed and inferred facts, corrections, approved and rejected examples | raw agent memory |
 | Conversations | threads, messages, evidence links, proposal links | canonical business state |
-| Briefings | saved outcome summaries and three ranked recommendations | metric calculations |
+| Briefings | saved outcome summaries and ranked decisions (at most three) or the explicit quiet state | metric calculations |
+| Director and tasks | plan state, task contracts, runs, delegation, unresolved questions | approval or execution authority |
+| Campaign packages | package versions, verification results, activation binding | provider writes |
+| Learning | learning records, predictions, experiment conclusions, skill candidates, evaluation results | permission or policy changes |
 | Connections | OAuth grants, account mapping, capabilities, health | campaign strategy |
 | Connector evidence | sync runs, immutable evidence references, collection metadata | metric interpretation |
 | AI Reach | question sets, observations, citations, factual assessments, discovery findings | business truth, content drafts, or authorization |
@@ -132,7 +164,11 @@ Module boundaries must be enforced in code even when initially deployed together
 
 The first useful release does not use this path and has no external mutation principal.
 
-The pilot MVP enables only CMS draft creation, approved lead follow-up, and one campaign pause with a resume path.
+The pilot MVP (D-037, accepted) enables only CMS draft creation, approved lead follow-up, and one campaign pause with a resume path.
+
+The first complete workflow (D-044, accepted amendment to D-037) adds the supervised acquisition workflow: prepare package → approve exact objects and caps → create paused objects → verify → activation approval → activate → monitor → reconcile → learn. Core actions are create-paused, activate, pause, resume, and CMS draft. Existing-campaign edit, budget decrease, budget increase, lead follow-up, and outcome upload are conditional actions with separate gates. Pause, resume, budget decrease, and budget increase are four separate action definitions.
+
+The executor revalidates account state and the approval before every activation. Approval binds the exact package, account, destination, content hash, caps, policy version, and expiry. A material change requires new approval. Budget is reserved across concurrent proposals; the local ledger records dispatch before the provider request, and moves to committed in a local atomic update only after provider reconciliation verifies activation, never reducing counted exposure; exposure stays counted until reconciliation proves safe release. A timeout after a provider write is uncertain; reconciliation precedes any retry. A kill switch stops new dispatch; an in-flight request is reconciled, not assumed stopped.
 
 ```mermaid
 sequenceDiagram
@@ -187,6 +223,20 @@ sequenceDiagram
 
 `draft -> validated -> awaiting_approval -> approved | rejected | expired -> executing -> reconciled | failed | uncertain -> rolled_back`
 
+### Campaign package (D-044, accepted)
+
+`drafting -> validated -> awaiting_package_approval -> approved -> creating_paused -> verifying -> awaiting_activation_approval | activation_bound -> activating -> live -> monitoring -> reconciled | failed | uncertain`
+
+A changed object after approval returns the package to `validated`.
+
+### Learning record (D-047, accepted)
+
+`predicted -> approved | rejected | deferred -> executed -> observing -> matured -> concluded (supported | rejected | inconclusive | blocked_by_data) -> retired`
+
+### Skill candidate (D-047, accepted)
+
+`development -> candidate -> evaluated -> approved_by_operator -> limited_rollout -> production | rejected -> restored_previous`
+
 ### Organic publication
 
 `idea -> brief -> drafting -> review -> approved -> scheduled -> publishing -> published | failed | uncertain -> canceled`
@@ -230,9 +280,9 @@ Transitions occur through domain services and append audit events. Direct status
 - PostgreSQL with Prisma.
 - Application-owned job state and outbox patterns for the narrow pilot; Temporal remains behind a later workflow abstraction.
 - Supabase Storage initially and S3-compatible object storage behind an application-owned storage contract.
-- An application-owned AI gateway and one supervisor profile; Hermes remains compatible with the stable adapter contract.
+- An application-owned AI gateway, one Marketing Director profile, and bounded specialists; the runtime is chosen by prototype (D-046); Hermes remains compatible with the stable adapter contract.
 - OpenTelemetry for tracing and metrics.
-- OpenAI as the managed model provider and Resend as the managed transactional email provider.
+- An organization-selected model provider behind the gateway, Anthropic first (D-039, D-041), and Resend as the managed transactional email provider.
 - Vercel for the client-facing Next.js application and managed Supabase for initial PostgreSQL, Auth, and Storage.
 - Trigger-based deployment definitions for Hermes, Temporal, Postiz, Coolify, workers, and the OpenTelemetry collector.
 - Stripe is the post-pilot payment candidate behind an application-owned billing boundary.
@@ -243,7 +293,7 @@ These are defaults, not permission to couple domain contracts to a vendor.
 
 ## Hosting and service-delivery model
 
-The initial pooled service uses Vercel for the client-facing application and managed Supabase for PostgreSQL, Auth, and Storage. OpenAI and Resend remain managed.
+The initial pooled service uses Vercel for the client-facing application and managed Supabase for PostgreSQL, Auth, and Storage. The model provider is organization-selected (D-041) and Resend remains managed.
 
 GitHub and Sentry can remain managed when their limits meet environment requirements. Stripe can remain managed after billing is enabled.
 

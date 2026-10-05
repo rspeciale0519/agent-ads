@@ -10,11 +10,13 @@ The client submission is not a prerequisite for official API research, inventory
 
 ## Pilot profile
 
-The reference pilot is a sales trainer, public speaker, or similar expert-led service business.
+The reference pilot is a sales trainer, public speaker, or similar expert-led service business. This is the starting hypothesis; milestone A confirms it (D-043, accepted).
 
-The approved funnel is discovery, website visit, qualified lead, booked call, closed-won deal, and booked revenue.
+The approved funnel is discovery, website visit, qualified lead, booked call, closed-won deal, and booked revenue. Booked revenue stays distinct from collected cash.
 
-The private Pilot Scope Record names the exact offer, audience, market, baseline, CRM, CMS, owners, sources, and action gates.
+The private Pilot Scope Record names the exact offer, audience, market, baseline, outcome source (CRM or approved CSV export), CMS if used, first paid channel, owners, sources, enabled action classes, autonomy level per class, and action gates.
+
+Required connections follow the selected workflow. Optional missing connections must not make the product appear broken.
 
 ## Business intake
 
@@ -54,7 +56,7 @@ For Google Ads and Meta Ads:
 - test/sandbox account availability;
 - read and mutation permission owners.
 
-Each organization can connect Google only, Meta only, or both. The product still verifies both read adapters before pilot release.
+Each organization connects the channel its workflow uses. Google Ads is the starting hypothesis for the first complete workflow. Implemented today: Google has a campaign report read verified locally; Meta has connection discovery only. No adapter is verified in a target environment.
 
 Microsoft, LinkedIn, TikTok, Reddit, and X remain expansion inventory and do not block the pilot.
 
@@ -160,20 +162,57 @@ Agree on:
 - Test resume as rollback when current platform state permits it.
 - Every action uses current AAL2, exact destination binding, approval, and reconciliation.
 
-### Bounded autonomy — expansion
+### Supervised acquisition workflow (D-044, accepted)
 
-- Only evidence-qualified, reversible action classes.
-- Explicit scope, cap, expiry, notifications, and kill switch.
-- Not required to prove basic MVP functionality.
+- The Director prepares a campaign package for the first channel; the owner approves the exact objects and caps.
+- Create paused objects, verify, obtain or validate activation approval, activate, monitor, and reconcile.
+- Observe mature outcomes before recommending the next change.
+- Exit when a nontechnical owner completes the package approval and the execution, reconciliation, audit, and failure tests pass.
+
+### First paid supervised pilot (D-049)
+
+- Starts after the acquisition workflow's execution gates and minimum billing, support, recovery, and cancellation controls pass.
+- One closely supervised customer. It does not require three to five existing customers or automatic campaign decisions.
+- Record corrections, incidents, support effort, owner review minutes, and customer decisions.
+
+### Repeatability (milestone E)
+
+- Three to five similar customers for about 30 days, subject to their outcome window.
+- Report mature outcomes, owner time, operator time, quality, cost, incidents, and renewal evidence. This tests repeatability; it cannot prove broad market fit.
+
+### Bounded autonomy — expansion (L2 and L3)
+
+- Only evidence-qualified, reversible action classes, per action and per customer, with the customer's authorization.
+- Explicit scope, cap, expiry, notifications, and kill switch. Demotion is one switch.
+- Not required for a paid launch.
+
+## Pilot scorecard (D-049)
+
+Set thresholds before the pilot starts. Do not select favorable definitions after observing results.
+
+| Dimension | Measure | Interpretation |
+|---|---|---|
+| Activation | Setup completion and time to first approved useful artifact | Whether nontechnical customers can start |
+| Work quality | Accept, edit, reject, and defer rates | Whether outputs reduce specialist labor |
+| Customer effort | Review minutes and repeated clarification requests | Whether management burden falls |
+| Operator effort | Support and intervention minutes per customer | Whether delivery can scale |
+| Execution | Verified completion, uncertain outcomes, retries, and incidents | Whether the service operates reliably |
+| Marketing outcome | Qualified acquisition cost, booked calls, sales, or the approved business metric | Whether work serves the customer goal |
+| Learning | Repeated-error rate and held-out evaluation change | Whether updates improve behavior |
+| Economics | Contribution, setup recovery, usage, and retention | Whether the subscription can sustain itself |
+
+Measure time savings against the same task scope and quality level, including human review and correction time. Do not count generated content as saved labor when nobody would have produced it otherwise.
 
 ## Pilot acceptance evidence
 
 - Signed business/metric/policy profile.
 - Connection and capability inventory.
 - Data reconciliation report.
-- Agent eval report.
+- Agent eval report, including the Director's quiet-state and prediction tests.
 - Security and tenant test report.
 - CMS draft, lead follow-up, and campaign pause/resume execution records.
+- Under D-044: campaign package creation, verification, activation, and reconciliation records.
+- One controlled learning cycle record, including a rejected harmful candidate and a restored version.
 - Audit reconstruction.
 - Incident/kill-switch exercise.
 - Pooled deployment, backup/restore, internal cost-limit, and offboarding evidence.

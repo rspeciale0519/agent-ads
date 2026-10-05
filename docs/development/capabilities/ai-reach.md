@@ -6,7 +6,11 @@ AI Reach is a feature inside the product. It helps a nontechnical owner understa
 
 The feature covers classic search, AI-generated search answers, AI citations, referral traffic, and the business outcomes that follow.
 
-AI Reach is also the primary conversational workspace for the first pilot. It explains results, shows evidence, and recommends three actions.
+AI Reach is also the primary conversational workspace for the first pilot. The Marketing Director briefs the owner here, shows evidence, and presents ranked decisions (at most three) or states that no decision needs attention (D-043, accepted).
+
+## Implemented behavior today
+
+The `/ai-reach` workspace exists with chat, a rule-based briefing, a Google Ads report panel, and a model router that returns structured choices only (D-039, D-041). Website crawl, AI-answer sampling, GA4 and Search Console data reads, and CMS drafts are not implemented.
 
 ## Customer promise
 
@@ -16,7 +20,7 @@ AI Reach answers five plain questions:
 2. Do they describe the business accurately?
 3. Do they cite or recommend the business for relevant questions?
 4. Does this visibility create useful visits, leads, bookings, and booked revenue?
-5. What are the three best actions now?
+5. Which decisions need my attention now, if any?
 
 The user does not need prompt skills, code knowledge, or advertising-platform knowledge.
 
@@ -50,23 +54,25 @@ The pilot uses these source classes:
 - one CRM selected in the approved Pilot Scope Record;
 - calendar and email only when they supply required booking or follow-up evidence.
 
-Google Ads and Meta Ads must both have read adapters. A pilot organization can connect Google only, Meta only, or both.
+The source classes above are the earlier D-032 scope. Under D-043 (accepted 2026-10-04) the required sources follow the Pilot Scope Record: one selected paid channel, one website, and one outcome source (CRM or approved CSV). Implemented today: Google has a campaign report read; Meta has connection discovery only. One paid channel is enough for the first complete workflow; Google Ads is the starting hypothesis.
 
-The first useful release is read-only. It collects evidence, explains results, and gives exactly three recommended actions.
+GA4 and Search Console are required only when an enabled decision needs them (DAT-014). Sampling of AI answer surfaces sits behind its own enabled-capability gate; it is not a launch prerequisite under D-043.
+
+The first useful release is read-only. It collects evidence, explains results, and gives ranked decisions or an explicit quiet state.
 
 ## Staged execution
 
 ### Stage 1: read-only useful release
 
 - Run a website and discovery audit.
-- Read advertising, search, analytics, and CRM outcomes.
-- Collect labeled AI Reach observations.
+- Read advertising, search, analytics, and outcome sources named in the Pilot Scope Record.
+- Collect labeled AI Reach observations where that capability is enabled.
 - Show one outcome dashboard.
 - Explain results in chat.
-- Give three evidence-linked recommended actions.
+- Give ranked evidence-linked decisions (at most three) or state that none is needed.
 - Make no external change.
 
-### Stage 2: supervised actions
+### Stage 2: supervised actions (D-037, accepted)
 
 - Create a CMS draft without publishing it.
 - Create and send an approved lead follow-up when consent and suppression checks pass.
@@ -74,6 +80,13 @@ The first useful release is read-only. It collects evidence, explains results, a
 - Offer resume as the rollback when current platform state permits it.
 
 Each action needs a typed proposal, exact destination, approval, idempotency, reconciliation, audit, and a kill switch.
+
+### Stage 2b: supervised acquisition workflow (D-044, accepted amendment to D-037)
+
+- The Director prepares a campaign package for the first paid channel; the owner approves the exact objects and caps.
+- The system creates paused objects, verifies them, obtains activation approval, activates, monitors, and reconciles.
+- Content and creative support works in draft mode for the same offer: landing-page drafts, copy variants, and creative briefs that reuse business memory. Nothing publishes.
+- See the paid advertising specification for action definitions and gates.
 
 ### Stage 3: approved website publishing
 
@@ -219,21 +232,21 @@ Each briefing shows:
 - important source contributions;
 - AI Reach status;
 - the most important data limitation;
-- exactly three recommended actions.
+- ranked decisions (at most three), or one line stating that no decision needs attention.
 
-Each recommendation shows the reason, evidence, expected benefit, uncertainty, effort, risk, and next approval.
+Each decision shows the reason, evidence, expected benefit with its range or an insufficient-evidence state, uncertainty, effort, risk, cost exposure, recovery limits, and next approval.
 
 The same proposal and approval card appears in chat and in the approval queue.
 
 ## Agent and tool boundary
 
-One supervisor profile prepares the first-release briefing through scoped read and artifact tools.
+The Marketing Director prepares the briefing through scoped read and artifact tools. It delegates bounded tasks to the paid-search specialist and to draft-mode content and creative support through typed task contracts (D-043).
 
-The agent can submit an assessment, recommendation, draft, or action proposal. It cannot publish, send, spend, pause, resume, or change external state directly.
+The agents can submit an assessment, recommendation, draft, campaign package, or action proposal. They cannot publish, send, spend, pause, resume, activate, or change external state directly.
 
-Deterministic services calculate canonical metrics, validate policy, resolve destinations, execute approved actions, and reconcile results.
+Deterministic services calculate canonical metrics, validate policy, resolve destinations, reserve budget, execute approved actions, and reconcile results.
 
-Specialist profiles remain an expansion option when evaluation evidence proves that a separate role improves safety or quality.
+Further specialist profiles remain an expansion option when evaluation evidence proves that a separate role improves safety or quality.
 
 ## Security and policy
 
@@ -257,7 +270,7 @@ Release evidence must cover:
 - citation extraction and canonical URL handling;
 - factual accuracy against approved business truth;
 - partial, stale, missing, conflicting, and corrected data;
-- recommendation evidence and exactly-three selection;
+- recommendation evidence, ranking, the at-most-three limit, and the explicit quiet state;
 - no ranking or causality promise;
 - prompt-injection and untrusted-content resistance;
 - CRM outcome reconciliation and booked-revenue corrections;
@@ -270,11 +283,11 @@ Release evidence must cover:
 
 ### Read-only gate
 
-- The Pilot Scope Record names the organization, outcome, website, CRM, connected sources, and owners.
-- Required connector reads pass capability, tenant, freshness, and reconciliation tests.
-- AI Reach samples include method, version, window, limitations, and evidence.
+- The Pilot Scope Record names the organization, outcome, website, outcome source, connected sources, enabled capabilities, and owners.
+- Required connector reads (those the record names) pass capability, tenant, freshness, and reconciliation tests.
+- When AI-answer sampling is enabled, samples include method, version, window, limitations, and evidence. Sampling is not a prerequisite for this gate under D-043.
 - The dashboard and chat use the same canonical outcome snapshot.
-- Each briefing gives three useful, evidence-linked actions.
+- Each briefing gives ranked, evidence-linked decisions or an explicit quiet state.
 - No mutation credential or tool is enabled.
 
 ### Supervised-action gate

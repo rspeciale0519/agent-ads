@@ -203,8 +203,9 @@
 
 ### D-026 — OpenAI is the first model provider behind the Hermes gateway
 
-- Status: accepted.
+- Status: superseded by D-039 and D-041 for provider choice; the gateway, data-control, and usage-record constraints below remain in force.
 - Amendment: D-036 allows the pilot application-owned AI gateway to call OpenAI without a separate Hermes deployment.
+- Amendment: D-039 (2026-09-29) makes the gateway model-agnostic with Anthropic as the first adapter. D-041 (2026-09-30) lets each organization choose its provider and key. Documents that still name OpenAI as the first provider describe the 2026-08-07 state.
 - Context: Phase 1 needs a concrete provider for schemas, cost controls, evals, and gateway integration without granting the provider or Hermes operational authority.
 - Options: OpenAI first, another provider first, or postpone all provider integration until after the pilot response.
 - Decision: implement OpenAI as the first supported model provider through the application-owned Hermes gateway. Use typed/strict structured outputs and scoped application tools. Exact model selection and task routing are configuration selected by eval, latency, data-control, and cost evidence rather than hard-coded product assumptions.
@@ -282,6 +283,7 @@
 ### D-032 — Narrow sales-trainer pilot boundary
 
 - Status: accepted.
+- Amendment: D-043 (accepted 2026-10-04) narrows the first complete workflow to one paid channel, one website, and one outcome source. Expert-led services and Google Ads are the starting hypothesis, confirmed in milestone A. Meta connection discovery exists in code; Meta campaign reporting is not implemented, and a Meta connection is optional.
 - Context: the prior MVP required fourteen platform connectors before one customer could receive value.
 - Decision: use a sales trainer or similar expert-led business as the first pilot. Include website/CMS, GA4, Search Console, Google Ads, Meta Ads, and one selected CRM. Calendar and email remain conditional.
 - Constraint: Google Ads and Meta Ads both have pilot read adapters, but an organization can connect either one or both.
@@ -292,6 +294,7 @@
 ### D-033 — AI Reach is the chat-first pilot experience
 
 - Status: accepted.
+- Amendment: D-043 (accepted 2026-10-04) replaces "exactly three recommended actions" with a ranked decision list of at most three items, or an explicit statement that no decision needs attention today. The Marketing Director prepares the briefing inside the AI Reach workspace.
 - Context: nontechnical owners need a guided experience, not an agent console or large operator dashboard.
 - Decision: AI Reach is a feature inside the product and the default signed-in pilot workspace. It combines guided chat, one outcome dashboard, evidence, and exactly three recommended actions.
 - Constraint: AI Reach measures access, index evidence, controlled answer samples, referrals, and CRM outcomes separately. It has no composite GEO score.
@@ -321,6 +324,8 @@
 ### D-036 — One supervisor and managed pilot services first
 
 - Status: accepted.
+- Amendment: D-043 (accepted 2026-10-04) names the supervisor the Marketing Director and allows one bounded paid-search specialist plus draft-only content and creative support in the first complete workflow. D-046 (accepted 2026-10-04) selects the runtime through a bounded prototype. Hermes, Temporal, Postiz, Coolify, separate workers, SigNoz, and AWS keep their trigger rule.
+- Amendment: D-039 and D-041 replace "managed OpenAI" with the organization-selected model provider behind the same gateway.
 - Context: the narrow read-only loop does not need a specialist team or a separate automation host.
 - Decision: use one supervisor through the application-owned AI gateway. Keep the pilot on Vercel and managed Supabase with managed OpenAI and Resend.
 - Trigger rule: add Hermes, specialist profiles, Temporal, Postiz, Coolify, separate workers, SigNoz, or AWS only after recorded quality, workflow, reliability, scale, compliance, residency, or cost evidence.
@@ -330,7 +335,7 @@
 
 ### D-037 — Pilot external actions are supervised and bounded
 
-- Status: accepted.
+- Status: accepted; amended by D-044 (accepted by the owner on 2026-10-04). D-044 now defines the action-design boundary. The read-only adapter contract stays in force for each action until that action passes its own readiness gate.
 - Context: the pilot must prove a complete loop without broad mutation authority.
 - Decision: the first useful release is read-only. The pilot MVP can create a CMS draft, send one approved lead follow-up, and pause one approved advertising campaign with resume as rollback when supported.
 - Constraint: each write approval binds one organization, account, destination, action, proposal hash, cap, and expiry. It also requires current AAL2 and active-session binding.
@@ -413,6 +418,99 @@
 - Migration: none (environment and Supabase Auth settings only).
 - Owner/date: product owner, 2026-09-30.
 - Affects: ONB-001–ONB-016, UX-006, OPS-003–OPS-005, SEC-005 (the same as D-025).
+
+### D-043 — Marketing Director product direction and first complete workflow
+
+- Status: accepted. Agreed between Codex and Claude on 2026-10-04 after the two research reports. Approved by Rob (product owner) on 2026-10-04 with the words "I approve all 7 of those." in the Codex chat, naming D-043 to D-049; Rob confirmed the approval in the Claude session the same day. Acceptance covers the product design only. It authorizes no live spending, deployment, protected Git action, or production data change, and marks no implementation or release gate complete.
+- Amends: D-001 (scope statement), D-032 (pilot boundary), D-033 (briefing rule), D-036 (supervisor naming and specialists).
+- Context: the owner's goal is a product that lets a nontechnical business owner run digital marketing without expertise. The repository's control-plane foundation is strong and read-only. The product needs one complete marketing workflow that creates, executes, and measures work.
+- Options: keep the read-only pilot and add actions one at a time; replace the application with a configured Claude or ChatGPT workspace per customer; build the subscription product around one Marketing Director with bounded specialists.
+- Decision:
+  - Agent Ads is a subscription product with assisted setup. The current application remains the foundation for identity, tenancy, approvals, execution, records, and operations.
+  - One Marketing Director coordinates bounded specialists. The owner has one relationship with the Director and never manages specialists directly.
+  - The first complete workflow covers one customer type, one offer, one paid channel, one website, and one outcome source. Expert-led services and Google Ads are the starting hypothesis. Milestone A confirms or changes them against the first customer's need.
+  - An approved CSV outcome export is an acceptable outcome source when its limits and age are visible. A CRM migration is not a prerequisite. Snapshot imports never invent historical stage transitions.
+  - The first workflow uses the Director, one bounded paid-search specialist, and content or creative support in draft mode only. Draft content serves the same offer and acquisition workflow. Broad SEO delivery and sampling of several AI answer surfaces are not launch prerequisites.
+  - The daily briefing shows ranked decisions (at most three) with evidence, or states in one line that no decision needs attention.
+  - A configured Claude or ChatGPT workspace is a delivery method for assisted setup or an optional package. It is not the core architecture.
+  - The product does not claim to replace a full marketing team. Success is measured by owner time, operator support, correction burden, task quality, and qualified outcomes.
+- Consequences: the Hermes specialist catalog stays a reference design (D-003, D-036). Requirements that assumed "exactly three actions" change to "at most three ranked decisions or an explicit quiet state." New requirement families DIR, ACT, and LRN record the agreed design; they are planned behavior, not implemented behavior.
+- Evidence: `docs/temp/agentic-marketing-strategy-report-2026-10-04.md` (Claude), `.Codex/plans/report-marketing-director-research-and-launch.md` (Codex), and `.Codex/plans/plan-joint-marketing-director-delivery.md`.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: P-009, ONB-001–ONB-016, PAID-001–PAID-014, AIR-011, AGT-001–AGT-010, UX-002–UX-006, DIR-001–DIR-010, ACT-001–ACT-012, LRN-001–LRN-012.
+
+### D-044 — Supervised acquisition workflow and separate action definitions (accepted D-037 amendment)
+
+- Status: accepted. Approved by Rob on 2026-10-04 as one of the seven decisions in "I approve all 7 of those." (Codex chat; confirmed in the Claude session the same day). This acceptance is the approved mutation plan for action design. Nothing is implemented. Every action still needs implementation, its own readiness evidence, and customer authorization before live execution. No live spending, deployment, protected Git action, or production data change is authorized by this acceptance.
+- Amends: D-037 (pilot action boundary), D-010 (approval default remains).
+- Context: a complete customer workflow needs an approved campaign package that the system creates, verifies, activates, monitors, and reconciles. Creating paused objects alone leaves the owner to launch through the advertising interface.
+- Decision:
+  - The first complete workflow is: prepare package → approve exact objects and caps → create paused objects → verify them against the approved package → obtain or validate activation approval → activate → monitor → reconcile → learn.
+  - Core launch actions: `paid.campaign.create_paused`, `paid.campaign.activate`, `paid.campaign.pause`, `paid.campaign.resume`, verified results, and `cms.draft.create` where the chosen workflow uses that CMS.
+  - Conditional actions, each with its own readiness gate: `paid.campaign.edit`, `paid.budget.decrease`, `paid.budget.increase`, `email.follow_up.send` (eligible leads with suppression), and `paid.conversion.upload` (offline outcome feedback). They are enabled only when the chosen funnel needs them and their gates pass.
+  - Pause, resume, budget decrease, and budget increase are four separate action definitions with separate risk assessments and gates. Resume restarts spending. A budget decrease can harm delivery, learning, or contractual obligations. Gates may reuse infrastructure after their risks are assessed.
+  - Approval binds the exact campaign package, account, destination, content version hash, caps, policy version, and expiry. A material change to any bound element requires new approval.
+  - Account state and the approval are revalidated before every activation. Seven days is a provisional maximum approval age, not a proven safety threshold.
+  - One explicit approval may cover package creation and activation together when it binds both steps and verification passes. The owner does not approve every API call.
+  - Available budget is reserved across concurrent proposals and workers. Pending reservations count against limits. The local ledger records `dispatched` before the provider request is sent, and dispatched or uncertain exposure stays counted across failures. After independent provider reconciliation verifies activation, the local ledger updates atomically from `dispatched` to `committed` without reducing counted exposure. No transaction spans the application database and the provider API. Expiry alone never releases funds after dispatch or during an uncertain result.
+  - A kill switch stops new dispatch and cancels queued work. An in-flight provider request may still finish; its result is reconciled and recovered through an approved action, not assumed stopped.
+  - A timeout after a provider write is an uncertain result. The system reconciles provider state before any retry. Rollback has limits: a paused campaign can sometimes resume; incurred spend and public impressions cannot be recalled.
+  - Outcome uploads are consequential writes. They validate event identity, mapping, duplicates, permissions, diagnostics, and the current official route before use. The system uploads the reliable approved outcome, not automatically the deepest event.
+- Consequences: the root `AGENTS.md` instruction already keeps provider operations read-only until a separately approved mutation plan exists. D-044 satisfies that design condition; the instruction needs no change. Each action still needs implementation, customer authority, and its own readiness gate before it is enabled for an organization. No gate is complete.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: APR-001–APR-016, PAID-001–PAID-020, ACT-001–ACT-012, SEC-001–SEC-012.
+
+### D-045 — Official read APIs and the canonical data layer
+
+- Status: accepted by Rob, 2026-10-04 (same approval statement as D-043).
+- Reaffirms: DAT-001.
+- Context: one research source claimed that bulk reporting reads cause advertising-account bans and that platform APIs should be used for writes only. `docs/agentic-marketing/research-synthesis.md` records this claim as unsupported.
+- Decision: use official platform APIs for reads and writes. Reads are scheduled, incremental, paginated, and quota-aware. The application data layer (PostgreSQL on Supabase) is the analytical system of record; the platforms remain the delivery systems of record. Add ClickHouse or another analytical store only after measured query cost requires it.
+- Consequences: no "write-only API" rule exists. Freshness, completeness, and reconciliation status accompany every imported dataset. Required sources are capability-based: a source is required only when an enabled decision needs it.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: DAT-001–DAT-013, PAID-005, OPS-002.
+
+### D-046 — Runtime selection through a bounded prototype
+
+- Status: accepted by Rob, 2026-10-04 (same approval statement as D-043). The prototype has not run; the runtime is not selected.
+- Amends: D-018 and D-036 expectations about the pilot runtime.
+- Context: the Director and specialists need a runtime. The Claude Agent SDK is a leading candidate. Its documentation describes a library that runs Claude Code in an operated process; hosting, tool containment, recovery, and model portability are unverified for this product.
+- Decision: build a small application-owned tool loop as the reference implementation. Run a prototype of at most two weeks, with an earlier decision when evidence suffices. Select the Agent SDK only if it shows a measured advantage and passes containment, hosting, recovery, cost, and tool-allowlist tests. Record exactly which runtime and provider combinations were tested and work. Do not present the Agent SDK's Claude runtime as automatically compatible with every provider in D-041.
+- Consequences: durable task, proposal, and execution records stay application-owned so the runtime can change later. Hermes remains a reference design and expansion runtime (D-018, D-036). If the prototype fails, the application-owned loop is the runtime; no third option is searched for.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: AGT-001–AGT-012, OPS-001, OPS-011.
+
+### D-047 — Marketing learning contract
+
+- Status: accepted by Rob, 2026-10-04 (same approval statement as D-043). Not implemented.
+- Context: the Director must improve its marketing decisions through measured feedback without changing its own permissions or production controls.
+- Decision:
+  - Every proposal records a prediction before approval: metric, direction, range, observation window, and confidence, or an explicit insufficient-evidence state.
+  - An append-only learning record captures each completed task and experiment from the first task: business conditions, decision, inputs, versions, authority, execution, human feedback, mature outcomes, conclusion, and applicability.
+  - Learning layers are separate, each with its own promotion authority: customer facts (customer confirmation only), customer preferences (recorded in that tenant), marketing hypotheses (approved experiment), supported practices (measurement review), skills and prompts (offline evaluation plus operator approval), model routing (quality, cost, and regression evaluation plus operator approval), and execution autonomy (separate capability and customer authorization).
+  - Success at one layer never approves another layer. Silence never approves a change. Customer-confirmed facts remain authoritative until the customer corrects them.
+  - Shadow proposals, including unexecuted alternatives, may receive offline review of reasoning, evidence use, and permission compliance. Outcome calibration applies only to the action actually executed, against its observed result. No shadow proposal proves hypothetical revenue. A claim about an unexecuted alternative needs a controlled experiment or an explicitly limited estimate.
+  - New ideas enter through approved first-party material and a weekly research task. Repetition is a measured risk, not an assumed decay after a fixed number of days.
+  - A critical safety failure blocks promotion regardless of average scores. Previous skill and prompt versions remain restorable.
+  - Shared learning across customers is deferred until a separately approved data-use process exists.
+- Consequences: new requirement family LRN-001–LRN-012. The learning record and evaluation library are build tasks D-01 and D-02 in the joint plan.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: AGT-004–AGT-007, EXP-001–EXP-007, LRN-001–LRN-012, SEC-007.
+
+### D-048 — Autonomy levels
+
+- Status: accepted by Rob, 2026-10-04 (same approval statement as D-043). Every organization still launches at L1; no L2 or L3 promotion exists.
+- Amends: APR-006, APR-009 (bounded autonomy stays expansion scope; this decision defines the levels for later use).
+- Decision: four levels per action class and per organization. L0 observe: report only. L1 propose: the owner approves each action. L2 bounded: execute inside a per-action cap and a per-period cap; the owner receives a digest; a breach pauses the class. L3 delegated: execute inside a period budget with a weekly review. Every organization launches at L1 for every enabled action class. L2 is an optional later gate per action and per customer; it needs the customer's authorization and action-specific evidence. No numeric floor is a universal mandatory threshold; counts and acceptance rates are examples in the per-action evidence table. Customer acceptance is a UX metric and never substitutes for action correctness, business quality, or permission. A critical failure blocks promotion. Demotion is one switch. A paid launch has no L2 prerequisite.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: APR-006–APR-016, ACT-001–ACT-012.
+
+### D-049 — Pilot sequencing and planning allowance
+
+- Status: accepted by Rob, 2026-10-04 (same approval statement as D-043). The planning ranges remain capacity allowances, not commitments.
+- Decision: deliver through milestones A (scope and baseline), B (foundation and plumbing), C (supervised acquisition workflow), D (observe and learn), E (launch one package), and F (expand). Valid foundation evidence is reused; unfinished target and recovery gates still block live operation. A first paid supervised pilot may start after milestone C's execution gates and minimum billing, support, recovery, and cancellation controls pass; it does not require three to five existing customers. Milestone E validates repeatability across three to five similar customers for about thirty days, subject to their outcome window. The planning allowance is 12–17 engineering weeks to the first complete workflow and 20–29 weeks to broader launch readiness, assuming one engineer with Claude Code and part-time marketing support. These are capacity allowances, not commitments. Re-estimate after milestone A and the runtime prototype.
+- Owner/date: proposed by Codex and Claude, 2026-10-04; accepted by Rob, 2026-10-04.
+- Affects: implementation roadmap milestones; P-009.
 
 ## Decision process
 

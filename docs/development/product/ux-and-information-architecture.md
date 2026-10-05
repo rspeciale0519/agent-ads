@@ -2,17 +2,25 @@
 
 ## Experience model
 
-The product should feel like talking to a capable marketing manager. The owner uses plain language and sees evidence before decisions.
+The product should feel like talking to a capable Marketing Director. The owner uses plain language and sees evidence before decisions. The Director is the owner's one relationship with the product; specialists work behind it (D-043, accepted).
 
 AI Reach is a feature inside the product. It is the default pilot workspace, not the product name.
 
 Agent runtimes, prompts, provider details, and specialist roles stay outside the normal customer experience.
 
+### First screen
+
+The first screen shows the goal, the current outcome, active work, and the decisions that need attention. The owner understands the next action without reading an advertising report.
+
+### Daily briefing rule
+
+The daily briefing shows ranked decisions, at most three, each with evidence, expected effect, cost exposure, and uncertainty. When no decision needs attention, the briefing says so in one line. A quiet day is a valid, complete briefing. Original rule: exactly three actions (D-033); amended by D-043.
+
 ## Global navigation
 
-1. **AI Reach** — chat, current briefing, outcome dashboard, and three actions.
-2. **Work** — findings, drafts, proposals, completed actions, and activity.
-3. **Decisions** — pending, expired, approved, rejected, and executed approvals.
+1. **AI Reach** — chat, current briefing, outcome dashboard, and ranked decisions.
+2. **Work** — findings, drafts, campaign packages, proposals, completed actions, and activity.
+3. **Decisions** — the single decision inbox: pending, expired, approved, rejected, and executed approvals.
 4. **Connections** — accounts, permissions, capabilities, sync health, and errors.
 5. **Settings** — business profile, users, roles, notifications, policies, plan, and billing.
 
@@ -31,18 +39,24 @@ The UI never requires direct cloud, database, provider-console, or agent-runtime
 - Search and AI Reach discovery status.
 - Data freshness, missing sources, and connector health.
 - Material changes and pending decisions.
-- Exactly three recommended actions.
-- Current mutation status and kill switch.
+- Ranked decisions (at most three) or the explicit no-decision state.
+- Current mutation status, autonomy level per action class, and kill switch.
 
 The default view leads with business outcomes. Platform details and raw evidence stay behind clear drill-down links.
 
 The user can ask a question, choose a suggested question, or open an action card. The interface never requires a special prompt format.
 
-## Paid campaign artifact — expansion
+## Campaign package artifact — first complete workflow (D-044, accepted)
 
-The first useful release analyzes existing Google Ads and Meta Ads campaigns. It does not require campaign construction.
+The first useful release analyzes existing campaigns. It does not require campaign construction.
 
-Later, AI Reach can start a structured campaign artifact from chat. The artifact retains these steps.
+The first complete workflow adds the campaign package. The Director prepares it from the approved business memory; the owner reviews and approves it inside AI Reach or Work. The artifact retains these steps. Steps 2 and 3 use one paid channel in the first workflow.
+
+### Package states
+
+`drafting -> validated -> awaiting_package_approval -> approved -> creating_paused -> verifying -> awaiting_activation_approval | activation_bound -> activating -> live -> monitoring -> reconciled | failed | uncertain`
+
+A changed object after approval returns the package to `validated` and requires new approval. The owner sees the exact difference.
 
 ### Step 1: Goal
 
@@ -81,11 +95,14 @@ Later, AI Reach can start a structured campaign artifact from chat. The artifact
 - Dependencies and tracking readiness.
 - Warnings, unsupported features, and alternatives.
 
-### Step 6: Approval and launch
+### Step 6: Approval, creation, verification, and activation
 
-- Approve all or selected platform proposals.
-- Require step-up authentication for configured high-risk actions.
-- Display execution progress and external identifiers.
+- Approve the exact package, destination, and caps. One approval may bind creation and activation together.
+- Require step-up authentication (current AAL2, active session, action-bound grant).
+- Show paused objects as created, then the verification result against the approved package.
+- Show the activation decision separately when the approval did not bind it, or when account state changed.
+- Display execution progress, external identifiers, and the current reconciliation state.
+- Show predictions beside results after the observation window.
 
 ## Content workspace — expansion
 
@@ -137,21 +154,21 @@ The conversation supports onboarding, analysis, explanation, drafting, proposals
 - Offer links to inspect or edit generated artifacts.
 - Show loading, cancel, retry, partial-result, and support-handoff states.
 - Keep prior context visible without treating old context as current permission.
-- Give exactly three actions in each formal briefing.
+- Give ranked decisions (at most three) in each formal briefing, or state that none is needed.
+- Show the prediction that was recorded before approval and the observed result after the window.
 
-## Autonomy settings — expansion
+## Autonomy settings
 
-The pilot uses observe, recommend, and approval-required levels. Later, users configure broader action classes through a policy builder.
+The pilot launches at L1 for every enabled action class. Later, users configure broader action classes through a policy builder (D-048, accepted).
 
-The complete levels are:
+| Level | Behavior | Owner view |
+|---|---|---|
+| L0 Observe | Report only | Briefing and evidence |
+| L1 Propose | The owner approves each action | Decision inbox item per action |
+| L2 Bounded | Execute inside a per-action cap and a per-period cap; a breach pauses the class | Daily digest; one switch to demote |
+| L3 Delegated | Execute inside a period budget with a weekly review | Weekly review; one switch to demote |
 
-1. Observe only.
-2. Recommend.
-3. Approval required.
-4. Bounded autonomy.
-5. Prohibited.
-
-Policies display scope, thresholds, schedule, expiry, notification recipients, and recent evidence. The UI prevents contradictory policies and previews which actions a change would authorize.
+`Prohibited` remains a policy result for blocked tactics. Policies display scope, thresholds, schedule, expiry, notification recipients, and recent evidence. The UI prevents contradictory policies and previews which actions a change would authorize. Promotion to L2 or L3 needs the customer's authorization and action-specific evidence; no numeric floor is universal.
 
 ## Empty and exceptional states
 
@@ -163,7 +180,12 @@ Policies display scope, thresholds, schedule, expiry, notification recipients, a
 - Sync delayed: show last complete period and block affected optimization.
 - Partial campaign support: expose capability limits before drafting.
 - Approval expired: require regeneration/revalidation.
+- Package changed after approval: show the exact difference and require new approval.
+- Activation blocked by account drift: show what changed and the revalidation path.
+- Budget reserved by another proposal: show the reservation and the remaining limit.
 - Execution uncertain: never retry blindly; reconcile external state first.
+- Insufficient evidence for a prediction: show the explicit state, not a guessed range.
+- Work states: waiting, running, blocked, failed, uncertain, and complete, each with the next useful action.
 - Platform rejection: preserve platform message, map to the proposal, and suggest compliant edits.
 - Kill switch active: permit read, analysis, and drafts while clearly disabling execution.
 - Conversation interrupted: preserve completed artifacts and offer a safe retry.

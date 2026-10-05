@@ -4,7 +4,16 @@
 
 Create useful marketing content without losing factual grounding, originality, brand consistency, rights provenance, human control, or outcome traceability.
 
-The pilot focuses on website drafts that close an AI Reach or conversion gap. Broad social asset production is expansion work.
+The pilot focuses on website drafts that close an AI Reach or conversion gap. The first complete workflow adds content and creative support in draft mode for the same offer: landing-page drafts, ad copy variants, and creative briefs for the campaign package (D-043, accepted). Broad social asset production is expansion work.
+
+## Draft mode and batch size
+
+- Content and creative support never publishes. Outputs are drafts, variants, and briefs attached to a campaign package or a website draft.
+- The useful unit is the concept and its business hypothesis. Generate a batch that the available test budget and conversion maturity can evaluate. Do not generate hundreds of minor variations by default.
+- The pipeline must scale to volume when the budget allows it. Volume is a capability, not a default.
+- Every generated asset passes the validation gates below before it reaches a proposal. A vision or text review step checks brand rules, claim rules, and legibility; failures produce remediation, never silent removal.
+- Creative support reads the creative history before generating: exhausted angles, rejected formats, and winning hooks are known inputs.
+- New angles enter through approved first-party material (interviews, sales calls, reviews) and the weekly research task (competitor public messaging, transcripts, trends collected through permitted means). Repetition is measured, not assumed.
 
 ## Pipeline
 
@@ -162,6 +171,8 @@ Failures produce explicit remediation; they are never silently removed from a cr
 ## Creative performance model
 
 Store performance at concept, asset, variant, platform, audience, placement, and time-window levels. Avoid attributing performance to copy alone when delivery, targeting, offer, landing page, or measurement changed.
+
+Every asset keeps its full lineage: pain point, angle, hook, format, generation inputs, brand-filter result, platform, audience, and performance by window (creative history, D-047). Do not promote a winner from one click, one lead, or a short unstable window.
 
 Creative fatigue detection uses deterministic thresholds and uncertainty, including frequency/exposure, declining qualified outcome rate, spend, age, audience size, and comparative variants. The agent explains likely causes and proposes refresh experiments.
 

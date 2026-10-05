@@ -8,20 +8,22 @@ The Phase 0 desk assessment below records access gates visible in official sourc
 
 ## Approved pilot capability matrix
 
-The pilot includes the sources below. Calendar and email remain conditional. Every other connector is expansion work.
+The pilot includes the sources below under the earlier D-032 scope. Calendar and email remain conditional. Every other connector is expansion work.
+
+Under D-043 (accepted 2026-10-04), the "Pilot release effect" column follows the Pilot Scope Record instead: one selected paid channel, one website, and one outcome source are required; GA4, Search Console, CMS, calendar, email, and AI-answer sampling are required only when an enabled decision or capability needs them. Implemented today: Google Ads has a campaign report read; Meta Ads has connection discovery only. No source is verified in a target environment.
 
 | Source | Read-only release | Supervised stage | Pilot release effect |
 |---|---|---|---|
 | Website | crawl, page content, status, redirects, canonical, robots, sitemap, index signals | none | required |
 | Selected CMS | page and metadata reads where permitted | create draft only | provider named in Pilot Scope Record |
 | Google Analytics 4 | traffic, landing-page, event, and referral evidence | none | required when selected as analytics source |
-| Google Search Console | search performance, page and index evidence | none | required |
-| Google Ads | account, campaign, insight, creative metadata, conversion, and landing-page reads | pause/resume only after a separate gate | adapter required; organization connection optional |
-| Meta Ads | account, campaign, insight, creative metadata, conversion, and landing-page reads | pause/resume only after a separate gate | adapter required; organization connection optional |
+| Google Search Console | search performance, page and index evidence | none | required under D-032; under D-043 required only when an enabled decision needs it |
+| Google Ads | account, campaign, insight, creative metadata, conversion, and landing-page reads | pause/resume after a separate gate (D-037); under D-044 (accepted) create-paused and activate as core, with edit, budget decrease, budget increase, and outcome upload as conditional gates | adapter required; starting hypothesis for the first complete workflow |
+| Meta Ads | account, campaign, insight, creative metadata, conversion, and landing-page reads | pause/resume only after a separate gate; supervised campaign work is expansion | adapter required; organization connection optional |
 | Selected CRM | lead, stage, booking, closed-won, booked-revenue, and correction reads | approved follow-up only after a separate gate | provider named in Pilot Scope Record |
 | Calendar | booking evidence | no pilot calendar write | conditional |
 | Email | delivery and follow-up evidence | approved send only after a separate gate | conditional |
-| AI Reach observation source | labeled answers, citations, facts, method, version, locale, samples, and limits | none | approved method required |
+| AI Reach observation source | labeled answers, citations, facts, method, version, locale, samples, and limits | none | approved method required when the sampling capability is enabled; not a launch prerequisite under D-043 |
 
 The read-only release has no mutation principal. A missing optional connection reduces evidence and cannot silently create an all-platform gate.
 

@@ -187,7 +187,8 @@ These defaults enable design and test work. They do not authorize client data pr
 | Identity | Supabase Auth for pilot and initial pooled service; application-owned organization/membership authorization | Accepted; invitation, MFA/step-up, CAPTCHA/rate limits, custom SMTP, retention, and tenant tests remain implementation gates |
 | Email notifications | Resend for application email and Supabase Auth custom SMTP | Accepted; verified sending domain, DMARC, disabled link tracking for auth, idempotency, bounce handling, and delivery monitoring remain gates |
 | In-app notifications | Durable application inbox is authoritative; email is a delivery convenience | Accepted architecture; implementation pending |
-| Model provider | OpenAI is the first supported model provider behind the application-owned AI gateway | Accepted default; exact model routing requires supervisor eval, data-control, latency, and cost evidence |
+| Model provider | Organization-selected provider and key behind the application-owned AI gateway, Anthropic first (D-039, D-041; supersedes the 2026-08-07 OpenAI default) | Accepted; exact model routing requires Director eval, data-control, latency, and cost evidence; routing changes need operator approval and a regression evaluation (D-047) |
+| Agent runtime | Application-owned reference tool loop; Claude Agent SDK as the leading candidate | Accepted (D-046); bounded two-week prototype with recorded runtime and provider combinations |
 | Customer-facing hosting and data | Vercel plus managed Supabase for the initial pooled service | Accepted; commercial-plan compliance, free-tier limit alerts, backup/restore, non-pausing production availability, budgets, and upgrade gates remain implementation gates |
 | Automation hosting | No separate pilot automation host | Hermes, Temporal, Postiz, Coolify, workers, and a collector need a recorded post-pilot trigger and readiness gate |
 | Error monitoring | Sentry Free alongside OpenTelemetry; self-hosted SigNoz after a measured upgrade trigger | Accepted default; PII/secrets scrubbing, sampling, tenant-safe tags, alert ownership, limit alerts, and retention review remain gates |
@@ -208,6 +209,8 @@ These defaults enable design and test work. They do not authorize client data pr
 - [ ] Qualified outcome and metric contract approved.
 - [ ] Named legal, platform, data, brand, budget, incident, and kill-switch owners assigned.
 - [ ] Identity, notification, model, monitoring, AI Reach, CRM, CMS, and supervised-action decisions accepted or explicitly deferred.
+- [x] D-043 to D-049 accepted by the owner on 2026-10-04 ("I approve all 7 of those."), including the D-044 amendment; recorded in the decision register. This records a decision only; no implementation or gate is complete.
+- [ ] Per-action evidence table (create-paused, activate, pause, resume, budget decrease, budget increase, edit, follow-up, outcome upload) drafted for milestone A.
 - [ ] Critical/high Phase 0 risks reviewed and accepted or mitigated.
 - [ ] No assumption is represented as client-confirmed evidence.
 

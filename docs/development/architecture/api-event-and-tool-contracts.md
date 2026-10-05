@@ -76,6 +76,28 @@
 - `POST /platform-campaign-drafts/{id}/proposals`
 - `GET /campaigns` and `GET /campaigns/{id}`
 
+Accepted under D-044 (not implemented):
+
+- `POST /campaign-packages` and `GET /campaign-packages/{id}`
+- `POST /campaign-packages/{id}/validate`
+- `POST /campaign-packages/{id}/proposal` (package approval; may bind creation and activation)
+- `GET /campaign-packages/{id}/verification`
+- `POST /campaign-packages/{id}/activation-proposal` (when the first approval did not bind activation)
+
+### Business memory and tasks (accepted, D-043)
+
+- `GET /memory/facts` and `POST /memory/facts/{key}/correct`
+- `GET /memory/examples` and `POST /memory/examples`
+- `GET /tasks` and `GET /tasks/{id}`
+- `GET /decisions/inbox`
+
+### Learning (accepted, D-047)
+
+- `GET /learning/records` and `GET /learning/records/{id}`
+- `GET /learning/calibration`
+- `GET /skills/candidates/{id}` and `POST /skills/candidates/{id}/approve` (operator only)
+- `POST /skills/{id}/restore` (operator only)
+
 ### Content
 
 - `POST /source-briefs`
@@ -189,6 +211,20 @@ Events are immutable facts. Consumers must be idempotent and tolerate redelivery
 - `execution.uncertain.v1`
 - `execution.rollback_completed.v1`
 
+Accepted under D-044 and D-047 (not implemented):
+
+- `package.approved.v1`
+- `package.created_paused.v1`
+- `package.verified.v1`
+- `package.verification_mismatch.v1`
+- `package.activated.v1`
+- `budget.reserved.v1`
+- `budget.released.v1`
+- `learning.record_created.v1`
+- `learning.outcome_matured.v1`
+- `skill.candidate_promoted.v1`
+- `skill.version_restored.v1`
+
 ### Agents and experiments
 
 - `agent.run_requested.v1`
@@ -261,8 +297,12 @@ Tool responses include `evidence_id`, source/freshness, tenant-scoped resource I
 - `submit_opportunity_assessment`
 - `submit_experiment_design`
 - `request_action_proposal`
+- `submit_campaign_package` (accepted, D-044)
+- `delegate_task` (Director only; accepted, D-043)
+- `submit_learning_note` (accepted, D-047; writes to the learning record, never to skills)
+- `propose_skill_change` (accepted, D-047; creates a candidate diff for operator review)
 
-There is intentionally no `run_sql`, `call_platform_api`, `publish_post`, `publish_page`, `send_email`, `pause_campaign`, `increase_budget`, or general shell tool in a production agent profile.
+There is intentionally no `run_sql`, `call_platform_api`, `publish_post`, `publish_page`, `send_email`, `pause_campaign`, `activate_campaign`, `increase_budget`, `edit_skill`, `change_policy`, or general shell tool in a production agent profile.
 
 ## Proposal action schema
 
@@ -281,12 +321,24 @@ There is intentionally no `run_sql`, `call_platform_api`, `publish_post`, `publi
   "confidence": 0.86,
   "maximum_exposure": {"amount": 0, "currency": "USD"},
   "risk_class": "low_reversible",
-  "rollback": {"action_type": "paid.campaign.resume"},
+  "rollback": {"action_type": "paid.campaign.resume", "limits": "incurred spend is not recoverable"},
+  "prediction": {
+    "metric": "qualified_acquisition_cost",
+    "direction": "down",
+    "range": [8, 14],
+    "currency": "USD",
+    "window_days": 14,
+    "state": "predicted"
+  },
   "expires_at": "2026-08-06T20:00:00Z"
 }
 ```
 
-The proposal service normalizes and hashes the request, evaluates policy, and decides whether approval can be requested.
+`prediction.state` is `predicted` or `insufficient_evidence`. When it is `insufficient_evidence`, `range` is omitted and the proposal says why (LRN-001).
+
+Action types under D-044 (accepted): `paid.campaign.create_paused`, `paid.campaign.activate`, `paid.campaign.pause`, `paid.campaign.resume`, `paid.budget.decrease`, `paid.budget.increase`, `paid.campaign.edit`, `paid.conversion.upload`, `cms.draft.create`, `email.follow_up.send`. Each is a separate definition with its own policy rules.
+
+The proposal service normalizes and hashes the request, evaluates policy, reserves budget where the action spends, and decides whether approval can be requested.
 
 ## Error model
 
