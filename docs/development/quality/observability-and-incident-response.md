@@ -34,7 +34,9 @@ Never place secrets, access tokens, raw personal data, or unrestricted content i
 - onboarding completion;
 - connected/healthy accounts;
 - AI Reach conversation and briefing completion;
-- exactly-three recommendation usefulness and action acceptance;
+- ranked-decision usefulness, quiet-state frequency, and action acceptance (a UX metric, not proof of correctness);
+- prediction calibration error, owner review minutes, and operator support minutes;
+- campaign package verification mismatches, activation revalidation failures, and budget reservation conflicts (under D-044);
 - qualified lead, booked call, closed-won, and booked-revenue reconciliation;
 - website draft, lead follow-up, and campaign pause/resume completion;
 - approval latency and outcomes;
@@ -74,7 +76,7 @@ Never place secrets, access tokens, raw personal data, or unrestricted content i
 
 ### Hosting, usage, and commercial health
 
-- Vercel, Supabase, Resend, OpenAI, Stripe, GitHub, and Sentry availability, usage-tier pressure, database/storage health, backup age, restore-test status, and configuration drift;
+- Vercel, Supabase, Resend, the selected model providers, Stripe, GitHub, and Sentry availability, usage-tier pressure, database/storage health, backup age, restore-test status, and configuration drift;
 - Coolify, Hermes, Temporal, Postiz, worker, and self-hosted telemetry health only when a recorded trigger enables them;
 - AWS service availability and account/region health when an AWS deployment exists;
 - per-tenant concurrency, quota pressure, throttling, queue fairness, and noisy-neighbor indicators;

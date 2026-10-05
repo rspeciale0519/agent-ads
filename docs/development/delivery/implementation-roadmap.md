@@ -4,22 +4,50 @@
 
 The approved pilot boundary controls release. The full connector catalog is a later expansion target.
 
-The pilot includes the website/CMS, GA4, Google Search Console, Google Ads, Meta Ads, and one selected CRM.
+The pilot includes the website/CMS, GA4, Google Search Console, Google Ads, Meta Ads, and one selected CRM. The first complete workflow uses one paid channel (Google Ads as the starting hypothesis), one website, and one outcome source (D-043, accepted). GA4 and Search Console are required only for enabled decisions that need them.
 
 Calendar and email are conditional. No unselected connector can block pilot release or receive production credentials.
 
 Each gate needs an owner, environment, Git revision, date, evidence link, and accepted limitations.
 
+## Milestone overlay (2026-10-04, accepted under D-043 to D-049 on 2026-10-04)
+
+The milestones below sequence the agreed design onto the controlling gates. They do not replace, waive, or close any gate. Valid foundation evidence is reused; a proof is redone only when a dependency changed or the evidence has a gap. Unfinished target and recovery gates still block live operation.
+
+| Milestone | Main outcome | Existing gate relationship | Exit evidence | Planning range |
+|---|---|---|---|---|
+| A. Scope and baseline | Pilot Scope Record; capability inventory mapped to code; metric contract; per-action evidence table; owner roles; access-gap list; competitor research task opened | P0 preparation | Customer and product owner sign the offer, outcome, accounts, budget boundaries, and first workflow | 1–2 weeks |
+| B. Foundation and plumbing | Unresolved live-operation gates closed (staging revalidation, restore drill, developer token); business memory with corrections; selected-source ingestion with freshness; durable jobs with leases, retries, cancellation, kill switches; usage accounting; runtime prototype decision | F0, F1, P1 preparation | Foundation evidence passes on the real deployment path; a nontechnical user corrects a fact and it persists; one sync runs daily for a week; runtime chosen with recorded test results | 5–7 weeks |
+| C. Supervised acquisition workflow | Director briefing and decision inbox; proposals with predictions; paid-search specialist; draft-mode content and creative; action gateway; the full package-to-reconcile workflow; pause/resume; CMS draft only when the chosen workflow uses that CMS; learning record from task one | P2, P3, plus the D-044 amendment | A nontechnical owner approves a complete package; objects are created, verified, activated, and reconciled; every action has a reconstructable history; failure tests pass | 6–8 weeks |
+| D. Observe and learn | Weekly review; held-out evaluation set; one controlled improvement cycle; one harmful candidate rejected; one rollback exercised | P4 evaluation | Outcomes observed to the agreed maturity window; the learning cycle passes; customer learning stays in tenant | 4–6 weeks, overlapping C |
+| E. Launch one package | One billing package and setup fee; assisted setup; support procedures; alerts with named responders; export and offboarding; accurate capability page | Commercial gate, P4 | Three to five similar customers live for about 30 days; invoices match the usage ledger; cancellation stops work; no unresolved critical finding | 4–6 weeks |
+| F. Expand | Conditional actions by gate; Meta supervised work; email; content delivery; bounded automation per action and customer | E1 | Each addition proves access, data quality, execution, reconciliation, recovery, cost, and customer value | Ongoing |
+
+A first paid supervised pilot may start after milestone C's execution gates and minimum billing, support, recovery, and cancellation controls pass. It does not require three to five existing customers.
+
+The planning allowance is 12–17 engineering weeks to the first complete workflow and 20–29 weeks to broader launch readiness. Assumptions: one engineer with Claude Code and part-time marketing support; the Google developer token is granted within milestone B; the pilot customer provides an outcome source; the runtime prototype decides within two weeks. These are capacity allowances, not commitments. External access, staffing, customer data, and outcome maturity control the practical date. Re-estimate after milestone A and the runtime prototype.
+
+Task ownership between Codex and Claude is recorded in `.Codex/plans/plan-joint-marketing-director-delivery.md`. Observed progress is recorded in `shared-progress.md`.
+
+D-044 was accepted on 2026-10-04. Milestone C work that depends on it still starts with mocked providers and fixtures, and each action is enabled only after its own gate. Product implementation under this plan has not started.
+
+### Scope before and after 2026-10-04
+
+- **Before 2026-10-04 (D-032 and D-037 scope):** sources are the D-032 list; actions are the three D-037 actions; Gate P3 steps 1–4 apply as written; pilot stages 1–6 run in order.
+- **Since 2026-10-04 (D-043 and D-044 accepted):** required sources and actions follow the Pilot Scope Record. Core actions are create-paused, activate, pause, and resume. CMS draft applies when the chosen workflow uses that CMS; lead follow-up and outcome upload when the chosen funnel needs them; edit, budget decrease, and budget increase behind their own gates. AI-answer sampling and broad discovery work stay behind their enabled-capability gates. Milestone C's "CMS draft" and "pause/resume" entries carry these conditions.
+- **Unchanged in both cases:** provider authorization, Gate F0 and F1 evidence, restore drill, named owners, observation window, and every evidence checkbox above.
+
 ## Workstreams
 
 1. Foundation truth, database repair, recovery, and environment isolation.
-2. AI Reach chat, one outcome dashboard, onboarding, and three actions.
-3. Website, analytics, search, advertising, and CRM read sources.
-4. Canonical outcomes, booked revenue, evidence, and data quality.
-5. One supervisor profile, typed tools, and evaluations.
-6. Proposals, approvals, supervised actions, reconciliation, and audit.
-7. Pilot support, observability, security, backup, and restore.
-8. Later paid, organic, specialist, workflow, and hosting expansion.
+2. AI Reach chat, one outcome dashboard, onboarding, business memory, and the Director's ranked decisions.
+3. Website, analytics, search, advertising, and outcome read sources with scheduled, quota-aware synchronization.
+4. Canonical outcomes, booked revenue, evidence, predictions, and data quality.
+5. Marketing Director, paid-search specialist, draft-mode content and creative support, typed task contracts, runtime prototype, and evaluations.
+6. Proposals, approvals, the supervised acquisition workflow, action definitions, budget reservation, reconciliation, and audit.
+7. Learning records, weekly review, evaluation library, promotion controls, and restoration.
+8. Pilot support, observability, security, backup, restore, usage accounting, and one billing package.
+9. Later paid, organic, specialist, workflow, autonomy, and hosting expansion.
 
 Workstreams run in parallel after the shared contracts stabilize.
 
@@ -55,12 +83,14 @@ A checked item means only the state written in that item. Release evidence must 
 | F1 | Recovery and isolated environments | complete recovery set, restore drill, target fingerprint, staging revalidation |
 | P0 | Approved pilot contract | sales-trainer scope, owners, outcome definitions, connections, approvals, data uses |
 | P1 | Read-only outcome loop | scoped sources connect, synchronize, reconcile, and produce one canonical outcome snapshot |
-| P2 | AI Reach useful release | chat and dashboard explain evidence, limits, and exactly three actions without mutation access |
-| P3 | Supervised actions | CMS draft, approved lead follow-up, and one campaign pause/resume path pass separate gates |
-| P4 | Pilot observation and exit | agreed duration, volume, outcomes, incidents, support, recovery, and user evidence |
+| P2 | AI Reach useful release | chat and dashboard explain evidence, limits, and ranked decisions (at most three) or an explicit quiet state, without mutation access |
+| P3 | Supervised actions | CMS draft, approved lead follow-up, and one campaign pause/resume path pass separate gates; under D-044 (accepted) the campaign package workflow and each conditional action add their own gates |
+| P4 | Pilot observation and exit | agreed duration, volume, outcomes, incidents, support, recovery, user evidence, and one controlled learning cycle |
 | E1 | Expansion | each later connector, agent role, action, or service passes an independent readiness gate |
 
 Gates run in this order. A later gate cannot waive an earlier failure.
+
+Gate P2 now means the Director's briefing and decision inbox with ranked decisions or an explicit quiet state (D-043), in place of "exactly three actions." The read-only and no-mutation constraints are unchanged.
 
 ## Gate F0: Foundation truth and repair
 
@@ -106,11 +136,11 @@ Application rollback uses feature flags and a compatible build. Database recover
 - Name the selected CRM and CMS in the private Pilot Scope Record.
 - Approve the CRM stage map and booked-revenue definition.
 - Approve required and optional sources, owners, data uses, retention, and support paths.
-- Connect Google Ads, Meta Ads, or both, as selected in the Pilot Scope Record. Both read adapters ship.
+- Connect Google Ads, Meta Ads, or both, as selected in the Pilot Scope Record (earlier D-032 scope). Under D-043, one selected paid channel. Implemented today: Google campaign report read; Meta connection discovery only.
 
 ## Gate P1: Read-only outcome loop
 
-- Connect the website/CMS, GA4, Search Console, selected CRM, and approved advertising sources.
+- Connect the website/CMS, GA4, Search Console, selected CRM, and approved advertising sources (earlier D-032 scope). Under D-043, connect the sources named in the Pilot Scope Record; an approved CSV outcome export is acceptable with its limits visible.
 - Read and reconcile the available source evidence.
 - Show freshness, completeness, duplicate, correction, and attribution status.
 - Produce one canonical snapshot for qualified leads, booked calls, closed-won deals, and booked revenue.
@@ -123,7 +153,7 @@ Application rollback uses feature flags and a compatible build. Database recover
 - Provide guided onboarding, persistent chat, one outcome dashboard, and evidence links.
 - Run approved website and AI Reach observations.
 - Show the primary outcome and the most important limitation.
-- Select exactly three useful recommendations.
+- Select ranked useful decisions (at most three), or return the explicit quiet state.
 - Pass factual, evidence, abstention, prompt-injection, tenant, latency, retry, and cancellation evaluations.
 
 ## Gate P3: Supervised actions
@@ -136,6 +166,14 @@ Enable each action only after its separate gate passes:
 4. Resume that campaign as rollback when current state permits it.
 
 Each action requires current AAL2, active-session binding, an action-bound grant, exact destination, immutable proposal hash, expiry, idempotency, reconciliation, audit, and kill switch.
+
+### Gate P3 under D-044 (accepted 2026-10-04; not implemented)
+
+5. Create paused campaign objects from an approved package and verify them.
+6. Activate a verified package after revalidating account state and approval.
+7. Conditional, each with its own gate: existing-campaign edit, budget decrease, budget increase, eligible lead follow-up, and outcome upload.
+
+Under D-044, steps 3–6 are the core P3 actions. Steps 1 and 2 apply only when the Pilot Scope Record selects a CMS draft or lead follow-up; they are not mandatory before step 5. Pause, resume, budget decrease, and budget increase are four separate definitions. See the paid advertising specification for the campaign package readiness gate.
 
 ## Gate P4: Pilot observation and exit
 
@@ -170,7 +208,7 @@ These work packages support the controlling gates. Their number does not set rel
 - [ ] Named operator and client legal/platform/data decision owners.
 - [x] Cloud hosting, deployment-profile, secrets, storage, and AI-gateway boundaries documented.
 - [x] Identity, email-notification, initial model-provider, error-monitoring, and native-first publishing-route defaults.
-- [x] Cost-conscious managed pilot policy: Vercel/Supabase with managed OpenAI, Resend, GitHub, and Sentry where their limits remain safe.
+- [x] Cost-conscious managed pilot policy: Vercel/Supabase with a managed model provider (OpenAI at the time; organization-selected under D-039 and D-041 since 2026-09-30), Resend, GitHub, and Sentry where their limits remain safe.
 - [ ] Recorded trigger and owner before adding Coolify, Hermes, Temporal, Postiz, separate workers, SigNoz, or AWS.
 
 ### Exit criteria
@@ -249,7 +287,7 @@ These work packages support the controlling gates. Their number does not set rel
 
 ### Exit criteria
 
-- Google Ads and Meta Ads read adapters pass the pilot paid contract.
+- The selected paid channel's read adapter passes the pilot paid contract (both under the earlier D-032 and D-037 scope; neither has passed it yet — Google has a local campaign report read, Meta has connection discovery only).
 - Website, GA4, Search Console, selected CRM, and AI Reach observation sources pass their read contracts.
 - Unknown-result, duplicate, revocation, quota, and capability-change tests pass.
 
@@ -322,11 +360,30 @@ Implement and verify:
 - An experiment can run from hypothesis through approved conclusion.
 - Illegal/prohibited mechanisms are blocked without erasing the underlying objective.
 
+## Work package 8a: Marketing Director, specialists, and learning (milestones B–D; D-043, D-046, D-047)
+
+### Deliverables
+
+- Business memory service with confirmed and inferred facts, corrections, and approved and rejected examples (joint plan B-02).
+- Runtime comparison against an application-owned reference loop, within two weeks, with recorded runtime and provider combinations (B-05).
+- Director orchestration, briefing with ranked decisions or an explicit quiet state, evidence view, and decision inbox (C-01).
+- Paid-search specialist and draft-mode content and creative support with typed task contracts, predictions, and insufficient-evidence states (C-02).
+- Campaign package preview, approval UI, status, and failure explanations (C-04).
+- Learning record, prediction review, held-out evaluation library, improvement proposals, and creative history (D-01).
+- Version promotion with operator approval, regression barriers, isolation, and restoration (D-02).
+
+### Exit criteria
+
+- The Director handles incomplete inputs and disagreement, and returns the explicit quiet state when nothing needs a decision.
+- Every Director and specialist output links factual claims to business memory or evidence.
+- One controlled improvement cycle passes; a harmful candidate is rejected; a promoted version is restored.
+- No agent has a direct production mutation tool, raw secret, or authority over its own permissions.
+
 ## Expansion work package 8: Hermes specialist team
 
 ### Deliverables
 
-- Isolated Hermes runtime behind the application-owned gateway.
+- Isolated Hermes runtime behind the application-owned gateway, only after a recorded trigger and only if the D-046 prototype outcome does not already cover the need.
 - Chief orchestrator and specialist profiles.
 - Versioned skills, task/output schemas, memory policy, model routing, cost limits, and schedules.
 - Read, analysis, artifact, and proposal tools.
@@ -343,12 +400,14 @@ Implement and verify:
 
 ### Deliverables
 
-- Immutable proposals and evidence snapshots.
+- Immutable proposals with predictions and evidence snapshots.
 - Policy engine, risk classes, legal/platform/data gates.
-- Approval inbox, step-up authentication, expiry, drift invalidation, and notifications.
-- CMS-draft, approved lead-follow-up, and campaign pause/resume executors with idempotency and reconciliation.
-- Global, connector, organization, and action kill switches.
-- Rollback/compensation proposals.
+- Decision inbox, step-up authentication, expiry, drift invalidation, exact package binding, and notifications.
+- CMS-draft, approved lead-follow-up, and campaign pause/resume executors with idempotency and reconciliation (D-037).
+- Under D-044 (accepted): create-paused, verify, and activate executors; separate budget decrease, budget increase, and edit executors; outcome upload executor; budget reservation across concurrent workers (joint plan C-03, C-05).
+- Durable jobs, attempts, leases, cancellation, and recovery (B-04).
+- Global, connector, organization, and action kill switches that stop new dispatch and cancel queued work; in-flight provider requests are reconciled and recovered through approved actions.
+- Rollback/compensation proposals with stated limits.
 
 ### Exit criteria
 
@@ -361,7 +420,7 @@ Implement and verify:
 ### Deliverables
 
 - AI Reach chat, one outcome dashboard, Work, Decisions, Connections, and Settings.
-- Requested, daily, and weekly briefings with exactly three actions.
+- Requested, daily, and weekly briefings with ranked decisions (at most three) or an explicit quiet state.
 - SLO dashboards, alerting, runbooks, backups, restore, and disaster recovery tests.
 - Accessibility, performance, security, and load testing.
 - Internal usage records, cost limits, alerts, and cost reporting. Automated plans and billing require the commercial gate.
@@ -380,10 +439,15 @@ Implement and verify:
 
 1. Foundation and recovery validation.
 2. Read-only source and outcome validation.
-3. AI Reach shadow briefings and recommendations.
-4. CMS draft and approved lead follow-up.
+3. Director shadow briefings and decisions, compared with qualified operator judgment.
+4. CMS draft and approved lead follow-up (earlier scope; under D-044 only when the Pilot Scope Record selects them).
 5. One supervised advertising pause with tested resume.
-6. Pilot observation and exit review.
+6. Under D-044 (accepted): the separately approved campaign package workflow, from creation through activation and reconciliation. When stage 4 actions are not selected, stage 6 follows stage 5 directly.
+7. Outcome observation to maturity, weekly reviews, and one controlled learning cycle.
+8. Recovery and offboarding test.
+9. Pilot observation and exit review: expand, revise, or stop.
+
+The first paid supervised pilot starts at stage 6 only after milestone C's execution gates and minimum billing, support, recovery, and cancellation controls pass (D-049).
 
 ### Pilot release gate
 

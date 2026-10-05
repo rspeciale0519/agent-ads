@@ -48,8 +48,10 @@ Trusted authorities are versioned application records approved by authorized hum
 
 ## Agent and tool security
 
-- One pilot supervisor behind an application-owned, replaceable AI gateway.
-- Hermes and specialist runtimes use the same boundary when enabled later.
+- One Marketing Director behind an application-owned, replaceable AI gateway, with bounded specialists delegated through typed task contracts (D-043).
+- The runtime chosen through the D-046 prototype uses the same boundary. Hermes and further specialist runtimes use it when enabled later.
+- No agent edits its own prompts, skills, permissions, approval rules, spend caps, audit rules, or billing permissions. Playbook changes are proposals merged by a human after evaluation (D-047).
+- Learning records, task records, and business memory stay inside the tenant. Shared learning across customers is deferred.
 
 ## Cloud and edge isolation
 
@@ -100,24 +102,32 @@ Raw personal data should not be sent to a model when aggregation, pseudonymizati
 | Class | Examples | Authorization when enabled |
 |---|---|---|
 | Read-only | reporting, research, website crawl, AI Reach observations | role permission; logged |
-| Draft-only | campaign plan, copy, source brief, local website draft | role permission; no external effect |
-| Low reversible | pause/resume within an approved campaign | human approval; later bounded autonomy after eval |
-| Medium | budget/bid edit, scheduled public post, targeting change | Stage 4 expansion; human approval and limits |
-| High | new campaign, new public claim, customer-list audience, large budget change | designated approver and step-up authentication |
+| Draft-only | campaign package draft, copy, creative brief, source brief, local website draft | role permission; no external effect |
+| Low reversible | `paid.campaign.pause`; CMS draft | human approval (L1); later L2 after evidence |
+| Low reversible, restarts spend | `paid.campaign.resume` | human approval (L1); separate definition from pause |
+| Medium | `paid.budget.decrease`, `paid.campaign.edit`, scheduled public post, targeting change | human approval and limits; separate gate per action (D-044) |
+| High | `paid.campaign.create_paused` plus `paid.campaign.activate`, `paid.budget.increase`, new public claim, customer-list audience, `paid.conversion.upload` | designated approver, step-up authentication, exact package binding, budget reservation |
 | Restricted | sensitive data, regulated claims, crisis reply | specialized approval; may be prohibited |
 | Prohibited | illegal, unauthorized, deceptive, evasive | cannot execute |
+
+Action classes under D-044 are accepted design (owner approval 2026-10-04). None is implemented. Each class is enabled for an organization only after its own readiness gate passes.
 
 ## Approval and autonomy rules
 
 - Approval binds to proposal hash, policy version, destination, maximum exposure, and expiry.
 - Pilot write approval also binds to organization, account, action type, current AAL2, and active session.
+- A campaign package approval also binds the exact objects, content version hash, caps, and, when chosen, both creation and activation (D-044).
+- Account state and approval are revalidated before every activation. Seven days is a provisional maximum approval age.
+- Budget is reserved across concurrent proposals and workers; pending, dispatched, committed, and uncertain reservations count against limits. The local ledger records dispatch before the provider request and moves to committed in a local atomic update only after provider reconciliation verifies activation, never reducing counted exposure. Expiry alone never releases funds after dispatch or during an uncertain result.
+- A kill switch stops new dispatch and cancels queued work. An in-flight provider request may finish and is reconciled; the product never promises that all active external work stops immediately.
 - Agent confidence never substitutes for authorization.
 - Policy evaluates both the action and all dependencies.
-- Changed platform state, stale evidence, expired credentials, or increased exposure invalidates approval.
-- Bounded autonomy is outside the pilot. Any later policy is opt-in per organization, platform, account, and action.
-- Bounded actions require notification and periodic review.
+- Changed platform state, stale evidence, expired credentials, changed package content, or increased exposure invalidates approval.
+- Every organization launches at L1 for every enabled action class. L2 and L3 (D-048) are opt-in per organization, platform, account, and action, need customer authorization and action-specific evidence, and are blocked by any critical failure. No numeric floor is universal.
+- Bounded actions require notification and periodic review. Demotion is one switch.
 - Users can disable all mutations globally or per connector.
 - The agent cannot edit, approve, or activate its own autonomy policy.
+- Silence never approves a change.
 
 ## Audit
 
@@ -142,6 +152,10 @@ Do not store private chain-of-thought. Store concise rationale, evidence, inputs
 | Audit unavailable | fail closed for mutations |
 | AI Reach overstates sampled evidence | separate evidence classes, sample metadata, no composite score, claims tests |
 | Broad approval changes another target | action-bound grant, exact destination, expiry, drift check, AAL2 |
+| Two agents spend the same remaining budget | shared budget reservation, pending-commitment accounting, pacing checks |
+| Stale package activated after account drift | revalidation before every activation, provisional maximum approval age, verification against the package |
+| Skill improves a narrow score but harms real work | held-out set, critical-failure block, limited rollout, operator approval, rollback |
+| Learning record ingests fabricated or cross-tenant data | tenant-scoped records, verified outcomes only, deferred shared learning |
 
 ## Security release gate
 

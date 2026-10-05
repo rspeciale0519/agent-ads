@@ -61,10 +61,10 @@ Client-owned always-on hardware is not a normal deployment target. Full local ho
 - Managed Supabase PostgreSQL/Auth/Storage.
 - Application-owned durable job state, outbox, and bounded scheduler.
 - Pilot read connectors and AI Reach observation jobs.
-- Application-owned AI gateway with one supervisor profile.
-- Introduce each supervised executor during Gate P3 after that action's entry controls pass.
+- Application-owned AI gateway with the Marketing Director profile and bounded specialists, on the runtime selected by the D-046 prototype.
+- Introduce each supervised executor during Gate P3 after that action's entry controls pass. Executors under D-044 wait for the owner's approval of that decision.
 - Application telemetry and managed error monitoring.
-- Managed OpenAI and Resend integrations.
+- Managed model provider integrations (organization-selected, D-041) and Resend.
 - Managed secrets and the application `SecretBroker` boundary.
 
 Coolify, Hermes, Temporal, Postiz, separate workers, an OpenTelemetry collector, SigNoz, and AWS are trigger-based services.
@@ -75,7 +75,7 @@ Mutation workers use stricter network and identity policies than read workers.
 
 - Vercel Pro hosts the commercial Next.js web/API with environment isolation, immutable releases, rollback, budgets, and usage alerts.
 - Managed Supabase provides initial PostgreSQL, Auth, and Storage. Free is limited to controlled testing; production upgrade follows the documented backup, availability, storage, and support gates.
-- Resend stays managed for transactional and authentication email. OpenAI stays managed for model and image-provider APIs.
+- Resend stays managed for transactional and authentication email. Model and image-provider APIs stay managed behind the gateway; the provider is organization-selected (D-041).
 - When commercial billing starts, Stripe processes payments while the application keeps authoritative entitlements and usage records.
 - The application-owned AI gateway uses one supervisor profile. Bounded jobs run in approved application or scheduler services.
 - GitHub and Sentry begin on safe managed tiers. Later self-hosting needs an explicit operational gate.
@@ -226,7 +226,9 @@ The current targets remain unaccepted until a restore drill proves them.
 - AI Reach observation and assessment refresh.
 - Capability and credential verification.
 - Data-quality assessment.
-- Requested, daily, and weekly AI Reach briefings.
+- Requested, daily, and weekly Director briefings; the daily run never forces a campaign change.
+- Learning-record maturation, weekly review, and the weekly research task.
+- Budget reservation expiry for undispatched pending reservations only; release of dispatched, committed, or uncertain reservations after reconciliation.
 - Agent skill/context/policy review reminders.
 - Retention, suppression, and deletion workflows.
 - Backup verification and audit integrity checks.

@@ -34,10 +34,21 @@ The authenticated pilot response has been received and reconciled into a private
 - What response-time, cancel, retry, and support-handoff targets apply?
 - Which three starter questions should AI Reach show the sales trainer?
 
+## Owner decisions from the 2026-10-04 joint plan
+
+These decisions do not block the documentation task. They block the work that depends on them.
+
+- Resolved 2026-10-04: Rob accepted D-043 to D-049, including the D-044 amendment to D-037, with "I approve all 7 of those." Acceptance authorizes no live spending, deployment, protected Git action, or production data change, and completes no gate.
+- Confirm the first customer, offer, channel, outcome source, CMS need, and operating owner (milestone A). This is the next product choice.
+- Approve the one commercial package, setup fee, and any required production dependency (Stripe) before milestone E.
+- Authorize each protected Git, environment, data, spending, and release action when its concrete result is ready.
+
 ## Architecture and vendors — before implementation
 
-- Client-specific creative generation and video/rendering vendors after brand, rights, format, privacy, volume, and quality requirements arrive.
-- Exact OpenAI model routing, budgets, retention controls, and pilot supervisor evaluation thresholds.
+- Client-specific creative generation and video/rendering vendors after brand, rights, format, privacy, volume, and quality requirements arrive. Select image generation through the tool gateway so the provider can be swapped (D-029 remains proposed).
+- Exact model routing, budgets, retention controls, and Director evaluation thresholds. The provider is organization-selected under D-039 and D-041; "OpenAI model routing" below reflects the 2026-08-07 state.
+- Runtime selection: the D-046 prototype's pass criteria, hosting target, and the tested provider combinations.
+- Whether the Agent SDK's hosting and recovery model fits Vercel Functions or needs a separate worker host.
 - Exact preview, staging, and pilot Supabase targets and their migration heads.
 - Backup destination and named restore owners for the complete recovery set.
 - Which measured trigger would justify Hermes, Temporal, Postiz, Coolify, separate workers, SigNoz, or AWS?
@@ -66,6 +77,16 @@ Amended on 2026-08-27:
 - AI Reach is the default signed-in pilot workspace and a feature inside the product.
 - The pilot release boundary is website/CMS, GA4, Search Console, Google Ads, Meta Ads, and one selected CRM.
 
+Amended on 2026-09-29 and 2026-09-30 (D-039, D-041):
+
+- The model provider is organization-selected behind the gateway, Anthropic first. OpenAI is one of the selectable providers, not the required first provider.
+
+Accepted on 2026-10-04 (D-043 to D-049; proposed by Codex and Claude, approved by Rob):
+
+- The supervisor is the Marketing Director. One bounded paid-search specialist and draft-mode content and creative support join it in the first complete workflow.
+- The first complete workflow uses one paid channel, one website, and one outcome source.
+- The runtime is selected through a bounded prototype against an application-owned reference loop.
+
 ## Data and measurement — before Gate P1 exit
 
 - Canonical qualified outcome and economics.
@@ -87,7 +108,8 @@ Amended on 2026-08-27:
 - Legal/platform-policy review owners.
 - Exact consent, suppression, destination, and expiry rules for lead follow-up.
 - Exact campaign pause threshold and tested resume rule.
-- Bounded autonomy remains outside the pilot.
+- Under D-044: the per-action evidence table for create-paused, activate, pause, resume, budget decrease, budget increase, edit, and outcome upload; the provisional maximum approval age; the budget reservation and buffer rules; the current official outcome-upload route.
+- Bounded autonomy (L2, L3) remains outside the pilot launch; its per-action evidence is defined in milestone A.
 
 ## Commercialization — before multi-client release
 

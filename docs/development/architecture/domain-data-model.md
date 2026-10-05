@@ -78,9 +78,19 @@ Fields: type, title, content reference, source, trust classification, effective 
 
 ### PilotScopeRecord
 
-Fields: organization_id, persona, primary outcome, website, required connections, optional connections, CRM stage map reference, enabled action classes, owners, approved_by, version, effective_at, status.
+Fields: organization_id, persona, primary outcome, website, required connections, optional connections, outcome source (CRM or approved CSV), CRM stage map reference, first paid channel, enabled action classes, autonomy level per action class, owners, approved_by, version, effective_at, status.
 
 Approved versions are immutable. A later version supersedes the old record.
+
+### BusinessFactVersion (accepted, D-043)
+
+Fields: organization_id, fact key, value, status (`confirmed` or `inferred`), source, confidence, approved_by, effective_at, supersedes, review date.
+
+Confirmed and inferred facts are distinct rows. A correction creates a new confirmed version that supersedes the old one without rewriting it. Conflicts create a review task.
+
+### BusinessExample (accepted, D-043)
+
+Fields: organization_id, type (creative, copy, claim, page), reference, verdict (`approved` or `rejected`), reason, recorded_by, recorded_at.
 
 ## Conversations and briefings
 
@@ -100,7 +110,7 @@ Fields: organization_id, reporting window, goal version, metric-definition versi
 
 Fields: briefing, recommendation, display rank, selection reason.
 
-Each briefing has exactly three unique ranks: one, two, and three.
+Original rule: each briefing has exactly three unique ranks. Amended by D-043 (accepted 2026-10-04): a briefing has zero to three unique ranks. A briefing with zero recommendations carries an explicit `quiet_state` reason that no decision needs attention.
 
 ## Connections and capabilities
 
@@ -210,6 +220,22 @@ Canonical mirrors with provider, external ID, hierarchy, status, normalized sett
 
 Platform-specific configuration remains in a versioned validated JSON field governed by the connector's Zod schema.
 
+### CampaignPackageVersion (accepted, D-044)
+
+Fields: organization_id, provider, account, offer reference, business memory version, structure, targeting, creative assignments, destination, tracking requirements, budget cap, schedule, stop rules, validation result, content hash, version, state.
+
+States follow the campaign package state machine in the system architecture. A changed object after approval creates a new version.
+
+### PackageVerification (accepted, D-044)
+
+Fields: package version, created external IDs, expected versus observed differences, verified_at, verifier, result.
+
+### BudgetReservation (accepted, D-044)
+
+Fields: organization_id, account, proposal reference, reserved amount, currency, period, state (`pending`, `dispatched`, `committed`, `uncertain`, `released`), created_at, expires_at, dispatched_at, committed_at, released_at, release reason.
+
+Reservations count against limits while `pending`, `dispatched`, `committed`, or `uncertain`. A second proposal cannot reserve funds already held. The ledger moves to `dispatched` in a local transaction before the provider request is sent. After independent provider reconciliation verifies activation, the ledger moves from `dispatched` to `committed` in a local transaction that never reduces counted exposure. A failed or unknown provider result moves the row to `uncertain`, still counted. No transaction spans the application database and the provider API. Expiry releases only a `pending` reservation that was never dispatched; `dispatched`, `committed`, and `uncertain` reservations release only after reconciliation proves safe release, with the reason recorded.
+
 ## Organic and creative
 
 ### SourceBrief
@@ -272,11 +298,13 @@ Fields: type, summary, evidence snapshot, expected effect, confidence, alternati
 
 ### ProposalVersion
 
-Fields: action type, destination, canonical desired state, dependencies, evidence snapshot, cost exposure, risk class, rollback plan, hash, expiry, policy version.
+Fields: action type, destination, canonical desired state, dependencies, evidence snapshot, cost exposure, risk class, rollback plan and its limits, prediction (metric, direction, range or insufficient-evidence state, window, confidence), hash, expiry, policy version.
+
+The prediction is recorded before approval (LRN-001).
 
 ### ApprovalDecision
 
-Fields: proposal hash, user, decision, reason, scope, decided_at, authentication context. Approval rows are immutable.
+Fields: proposal hash, user, decision, reason, scope, bound steps (for example creation and activation), decided_at, authentication context. Approval rows are immutable.
 
 ### Execution
 
@@ -322,6 +350,24 @@ Fields: name, purpose, inputs, outputs, instructions reference, allowed tools, t
 
 Fields: role/profile version, model/provider, task envelope, parent run, inputs, evidence, artifacts, token/cost, started/ended, status, failure class.
 
+### TaskContract (accepted, D-043)
+
+Fields: organization_id, task id, goal, acceptance criteria, role and version, allowed tools, business memory and policy versions, evidence references and freshness, cost and iteration limits, dependencies, state, expected output schema, escalation and cancellation rules.
+
+### LearningRecord (accepted, D-047)
+
+Fields: organization_id, task or experiment reference, business conditions, decision, inputs, versions (model, prompt, skill, tools, business memory, creative, policy), authority, execution, human feedback and reason, mature outcomes, conclusion (`supported`, `rejected`, `inconclusive`, `blocked_by_data`), applicability conditions, created_at, matured_at, retired_at.
+
+Append-only. Never trained on fabricated outcomes or unverified screenshots.
+
+### SkillCandidate (accepted, D-047)
+
+Fields: skill or prompt reference, candidate version, evaluation set version, evaluation results, critical failures, operator approval, rollout state, previous version, restored_at.
+
+### CreativeLineage (accepted, D-047)
+
+Fields: creative asset, pain point, angle, hook, format, generation inputs, brand-filter result, platform, audience, performance windows.
+
 ### MemoryRecord
 
 Fields: role scope, type, content, source, confidence, retention, review state, supersedes. Never stores secrets or undisclosed private reasoning.
@@ -345,7 +391,12 @@ Fields: severity, category, affected organizations/connectors, detected_at, stat
 - Active autonomy policies may not overlap ambiguously for the same action scope.
 - Every execution references one proposal and one policy decision.
 - Every approved proposal references at least one approval unless policy explicitly authorized bounded autonomy.
-- Briefing recommendation rank is unique within a briefing and limited to one through three.
+- Briefing recommendation rank is unique within a briefing and limited to one through three; a briefing may have zero recommendations with an explicit quiet-state reason (D-043).
+- A budget reservation cannot exceed the remaining limit for its account and period; pending, dispatched, committed, and uncertain reservations all count (D-044).
+- A reservation cannot move to `released` from `dispatched`, `committed`, or `uncertain` without a reconciliation reference.
+- A proposal records its prediction before any approval row exists (LRN-001).
+
+These accepted-design records extend the model; they are not claims about current Prisma models. Schema ownership is Codex's under joint plan task B-01.
 - Question stable key is unique within one question-set version.
 - AI Reach sample number is unique within one run and question.
 - Website origin is unique within an organization.

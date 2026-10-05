@@ -11,8 +11,8 @@ Accepted architecture and commercial-delivery decision. This document defines ho
 - AWS is the scale, compliance, and dedicated-deployment target rather than a Phase 0 prerequisite.
 - Most clients use a pooled multi-tenant deployment. Higher-isolation clients can purchase a dedicated deployment. A hybrid client-site connector is available only when private/local systems require it.
 - A client-owned always-on device is not the default hosting model and never becomes the authoritative control plane.
-- The pilot uses one supervisor through an application-owned AI gateway. Hermes remains a trigger-based expansion runtime.
-- OpenAI model APIs and Resend transactional email remain managed services. They are not candidates for local-model or self-hosted email replacement.
+- The pilot uses one Marketing Director through an application-owned AI gateway, with bounded specialists (D-043, accepted). The runtime is selected through a bounded prototype (D-046). Hermes remains a trigger-based expansion runtime.
+- Managed model APIs (organization-selected under D-039 and D-041; the text below that names OpenAI reflects the 2026-08-07 state) and Resend transactional email remain managed services. They are not candidates for local-model or self-hosted email replacement.
 - Vercel, managed Supabase, GitHub, and Sentry use suitable managed tiers. Stripe starts only after the commercial gate.
 - Coolify, Hermes, Temporal, Postiz, separate workers, and the OpenTelemetry collector require a recorded trigger and readiness gate.
 - Deterministic application services retain identity, tenancy, policy, approvals, billing, credentials, execution, audit, and rollback authority.
@@ -74,7 +74,7 @@ flowchart LR
     V --> SB["Managed Supabase PostgreSQL, Auth, and Storage"]
     V --> RS["Managed Resend email"]
     V -. commercial gate .-> ST["Optional Stripe payments and billing"]
-    V --> OA["Managed OpenAI API through application gateway"]
+    V --> OA["Managed model API (organization-selected) through application gateway"]
     V --> SE["Managed error monitoring"]
     V --> EXT["Approved website, ads, analytics, search, and CRM APIs"]
 ```
@@ -85,7 +85,7 @@ flowchart LR
 |---|---|
 | Client-facing Next.js web/API | Vercel Pro for commercial use, with usage budgets and rollback |
 | Transactional/canonical data, identity, and files | Managed Supabase Free during controlled testing; Pro before production data requires automatic backups and non-pausing availability |
-| Models | Managed OpenAI API behind the application-owned AI gateway |
+| Models | Managed model APIs behind the application-owned AI gateway; organization-selected provider and key, Anthropic first (D-039, D-041) |
 | Transactional and authentication email | Managed Resend; Free while volume remains within the published daily/monthly limits |
 | Payments and billing | Manual pilot terms; optional Stripe after the commercial gate |
 | Code hosting and CI | GitHub Free while included collaboration, storage, and CI limits remain sufficient |
@@ -137,9 +137,11 @@ AWS migration triggers include measured capacity or latency limits, an SLO that 
 
 ## Agent runtime decision
 
-The application exposes a stable AI gateway contract and uses one supervisor profile for the pilot.
+The application exposes a stable AI gateway contract and uses one Marketing Director profile with bounded specialists for the pilot (D-043, accepted).
 
 The gateway routes approved tenant-scoped tasks to the selected model provider. It exposes read and typed artifact or proposal tools only.
+
+The runtime that hosts the Director loop is selected through a bounded prototype of at most two weeks against an application-owned reference loop (D-046, accepted). The Claude Agent SDK is the leading candidate; it is selected only if it shows a measured advantage and passes containment, hosting, recovery, and cost checks, with the tested runtime and provider combinations recorded. Whether that runtime fits Vercel Functions or needs a separate worker host is an open question resolved by the prototype.
 
 Hermes can implement the same contract after a recorded trigger. Runtime sessions and provider payloads remain adapter metadata.
 

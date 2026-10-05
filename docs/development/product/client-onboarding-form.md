@@ -50,9 +50,9 @@ Staff can see request status, last saved time, completion percentage, unanswered
 
 1. **Business** — website, offer, audience, location, and approved facts.
 2. **Outcome** — qualified lead, booked call, closed-won stage, and booked revenue.
-3. **Sources** — website, GA4, Search Console, Google Ads, Meta Ads, and selected CRM.
+3. **Sources** — the sources named in the Pilot Scope Record: website, selected paid channel, selected outcome source, and GA4 or Search Console when an enabled decision needs them (earlier D-032 scope lists website, GA4, Search Console, Google Ads, Meta Ads, and selected CRM).
 4. **Rules** — brand, claims, budget, consent, approvers, and prohibited actions.
-5. **Diagnosis** — connection status, data gaps, assumptions, and first three actions.
+5. **Diagnosis** — connection status, data gaps, assumptions, and the first ranked decisions (at most three) or an explicit quiet state.
 6. **Confirm** — Pilot Scope Record, metric definitions, and read-only activation.
 
 AI Reach uses short questions and structured cards. It saves progress and explains why each required answer matters.

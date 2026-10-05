@@ -62,10 +62,14 @@ Examples:
 - `paid.account.read`
 - `paid.campaign.read`
 - `paid.insights.read`
-- `paid.campaign.create`
+- `paid.campaign.create_paused`
+- `paid.campaign.activate`
 - `paid.campaign.pause`
 - `paid.campaign.resume`
-- `paid.budget.update`
+- `paid.budget.decrease`
+- `paid.budget.increase`
+- `paid.campaign.edit`
+- `paid.conversion.upload`
 - `paid.audience.customer_list`
 - `paid.creative.image_upload`
 - `paid.creative.video_upload`
@@ -111,9 +115,13 @@ Google Ads and Meta Ads must support:
 6. Freshness and source reconciliation.
 7. Normalized user-facing errors and repair steps.
 
-The supervised stage adds `paid.campaign.pause` and `paid.campaign.resume` for one approved provider, account, and campaign class.
+The supervised stage adds `paid.campaign.pause` and `paid.campaign.resume` for one approved provider, account, and campaign class (D-037).
 
-Campaign creation, budget changes, audience changes, creative upload, and Microsoft, LinkedIn, TikTok, Reddit, and X are expansion work.
+Under D-044 (accepted 2026-10-04), the first complete workflow adds `paid.campaign.create_paused` and `paid.campaign.activate` on Google Ads, with `paid.campaign.edit`, `paid.budget.decrease`, `paid.budget.increase`, and `paid.conversion.upload` as conditional capabilities behind their own gates. Pause, resume, budget decrease, and budget increase are separate capability keys and separate definitions.
+
+Reads use official reporting APIs with scheduled, incremental, quota-aware synchronization (D-045). No write-only rule applies.
+
+Audience changes, creative upload at volume, Meta supervised work, and Microsoft, LinkedIn, TikTok, Reddit, and X are expansion work.
 
 If the provider or account blocks an action, the product shows the limit. Browser automation never simulates API availability.
 
@@ -172,7 +180,7 @@ Direct native integration is preferred for critical/high-volume channels and fea
 
 The first useful release has no write principal.
 
-The pilot MVP enables CMS draft creation, approved lead follow-up, and one advertising pause/resume pair through separate principals.
+The pilot MVP enables CMS draft creation, approved lead follow-up, and one advertising pause/resume pair through separate principals (D-037).
 
 Public CMS publishing remains disabled until a later gate.
 
@@ -180,12 +188,21 @@ Public CMS publishing remains disabled until a later gate.
 2. Resolve current capability snapshot.
 3. Translate through connector schema.
 4. Validate locally and, where available, through provider validation.
-5. Freeze proposal and obtain policy/approval decision.
+5. Freeze proposal and obtain policy/approval decision; reserve budget where the action spends.
 6. Re-read critical current state.
 7. Execute with an idempotency key or application deduplication guard.
 8. Persist request/response references.
 9. Poll or consume webhook until terminal state.
 10. Reconcile the external resource into canonical state.
+
+### Campaign package writes (D-044, accepted)
+
+11. Create objects paused, then read them back and verify against the approved package. Show every difference.
+12. Revalidate account state and the approval before activation. Activate only through the separately gated action, or through the approval that explicitly bound both steps.
+13. Record `dispatched` in the local budget ledger before sending the activation request. Keep dispatched and uncertain exposure counted across failures. Monitor delivery, pacing, rejection, and tracking; reconcile on a schedule. After independent provider reconciliation verifies activation, update the local ledger atomically from `dispatched` to `committed` without reducing counted exposure. No transaction spans the application database and the provider API. Expiry alone never releases funds after dispatch or during an uncertain result.
+14. A kill switch stops new dispatch and cancels queued work. An in-flight provider request may finish; reconcile its result and offer an approved recovery action.
+
+A timeout after any write is uncertain. Reconcile before retrying. Never create duplicates.
 
 ## Partial multi-platform execution
 
